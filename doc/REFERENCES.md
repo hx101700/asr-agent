@@ -99,6 +99,18 @@
 
 ### ASR 命令契约（源码确认，尚未执行）
 
+2026-09-28再次核对：`handleAsyncMode`在未指定`--async`时内置提交、`poll(...)`、结果下载及`--out`写文件；本地文件上传亦在同一命令内完成。**因此首选复用完整命令，不能把这些已有功能归为Python待开发项。**
+
+首选待测模板：
+
+```text
+bl speech recognize --model qwen-audio-3.0-asr-flash-filetrans --url <绝对路径> --out <JSON绝对路径> --quiet
+```
+
+Python读取`--out`文件而非把stdout当JSON。stdout可能含识别正文，应在本地受控捕获，不直接回传Codex。还需验证完整模式下任务ID的可见性、异常输出、超时以及产物判定；存在接口限制不代表CLI没有相应云端能力。
+
+以下`--async`只是待研究的另一模式，不是默认实现路线：
+
 ```text
 bl speech recognize --model qwen-audio-3.0-asr-flash-filetrans --url <绝对路径> --async --quiet --output json
 ```
@@ -117,7 +129,11 @@ bl speech recognize --model qwen-audio-3.0-asr-flash-filetrans --url <绝对路�
 
 依据：[recognize.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/speech/recognize.ts)。
 
-独立 ASR 查询命令缺口：注册表未提供 `speech task get`；`bl video task get` 实际使用通用任务查询路径，但名称与正式能力文档不匹配，且 `--quiet` 会丢弃 `results`。列为探针候选，不直接作为产品契约。[task-get.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/video/task-get.ts)、[commands.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/cli/src/commands.ts)
+独立恢复入口限制：注册表未提供`speech task get`；`bl video task get`实际使用通用任务查询路径，但名称与正式能力文档不匹配，且`--quiet`会丢弃`results`。这不表示BL缺少正常转写中的轮询或下载。仅在需要恢复任务时核实入口，不据此另建Python云端客户端。[task-get.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/video/task-get.ts)、[commands.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/cli/src/commands.ts)
+
+### 鉴权复用的边界
+
+普通Key登录已包含在线有效性校验，官方明确无需再重复模型调用测试。`auth status`只反映本地配置这一事实，不能用于推导“项目必须另写在线校验”。当前要解决的是既有登录能力的安全输入方式；如果BL公开接口与项目要求冲突，应明确讨论该冲突，不复制验证逻辑。[安装与鉴权](https://help.aliyun.com/zh/model-studio/cli/installation)、[login-api-key.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/login-api-key.ts)
 
 ### 上传和失败次数
 

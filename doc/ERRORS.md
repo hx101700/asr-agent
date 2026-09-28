@@ -4,7 +4,7 @@
 
 ## 适用范围
 
-本项目采用异步“提交—轮询—获取结果”，不建设公网回调服务。用户所说的回调状态在本项目中分为任务状态、HTTP/API 错误、CLI 退出码和本地错误，不能共用一张没有来源的状态码表。
+本项目采用异步“提交—轮询—获取结果”，默认由BL内置流程执行，不建设公网回调服务或Python轮询器。用户所说的回调状态在本项目中分为任务状态、HTTP/API错误、CLI退出码和本地错误，不能共用一张没有来源的状态码表。官方含义用于解释BL实际提供的信息，不为获取未暴露字段另发请求。
 
 官方资料可能建议重试；本项目遵从用户要求：**失败后不自动重试**。正常排队/运行中的查询不是重试失败请求。用户手动恢复也必须说明恢复哪一步，不能把重新提交识别藏在“继续”按钮后面。
 
@@ -101,6 +101,6 @@
 
 ## 错误记录字段
 
-计划保存：`stage`、`source`（cli/http/task/local）、`cli_exit_code`、`http_status`、`code`、脱敏`message`、`task_id`、`request_id`、时间、`source_url`、`applicability`、已保存文件和明确下一步。运行记录在 `.state/`，完整云端结果在 `outputs/`，均排除Git。
+计划保存：`stage`、`source`（cli/http/task/local）、`cli_exit_code`、`http_status`、`code`、脱敏`message`、`task_id`、`request_id`、时间、`source_url`、`applicability`、已保存文件和明确下一步。云端字段只记录BL实际暴露的值，未暴露则为空/未知，不补造，也不增加网络请求。`http/task`表示错误来源，不表示Python承担HTTP调用。运行记录在`.state/`，BL保存的转写JSON在`outputs/`，均排除Git。
 
 将字典与用户说明做成同一份数据的生成结果，避免代码和文档维护两套含义。每个官方条目必须有URL和核验版本/日期；测试至少包含未知code、stderr JSON、退出0但子任务失败和状态未知四类情况。
