@@ -89,6 +89,7 @@
 | --- | --- | --- |
 | `LOCAL_ENVIRONMENT_INVALID` | 依赖/版本/入口不符合要求 | 修复环境，不发云端请求 |
 | `LOCAL_AUDIO_INVALID` | 本地媒体探测或限制不通过 | 换文件/修改选择后再确认 |
+| `LOCAL_AUDIO_PREPARE_FAILED` | 已确认的单声道准备失败或副本检查不通过 | 保留源文件，说明转换/副本校验原因，不上传、不自动重试或关闭说话人 |
 | `LOCAL_HOTWORDS_INVALID` | Excel结构或热词规则错误 | 按行修改，不自动删词 |
 | `LOCAL_CONTEXT_INVALID` | 上下文为空或超过所选模式限制 | 用户修改，不自动截断 |
 | `LOCAL_OUTPUT_UNWRITABLE` | 输出目录不可写 | 修改目录后重新确认 |

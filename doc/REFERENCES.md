@@ -20,6 +20,7 @@
 | A12 | [CLI 配置与工具](https://help.aliyun.com/zh/model-studio/cli/config) | 文件上传和配置命令 |
 | O01 | [Codex AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md) | 项目指令发现与优先级 |
 | O02 | [Codex Skills](https://learn.chatgpt.com/docs/build-skills) | SKILL.md、发现路径和渐进加载 |
+| M01 | [FFmpeg 音频选项](https://ffmpeg.org/ffmpeg.html#Audio-Options) | 本地单声道转换的候选工具依据 |
 
 ## 模型与文件
 
@@ -38,19 +39,27 @@
 
 单文件上传上限 **1 GB**；资源有效 **48 小时**，与模型和阿里云主账号绑定。上传后不能查询、修改或下载；官方说明会在到期后清理，未找到本流程可主动删除临时音频的公开接口。获取上传凭证按主账号和模型限 **100 QPS**。`oss://` 识别请求需要 `X-DashScope-OssResourceResolve: enable`。官方不建议用于生产、高并发或压测。[A06](https://help.aliyun.com/zh/model-studio/get-temporary-file-url/)
 
-**项目方案**：采用保守阈值 1,000,000,000 字节，UI 明示为项目上传上限；这是 GB 单位未进一步澄清时的设计选择，不声称官方精确字节数。超过阈值直接阻止，不压缩/切片。先本地检查，再在确认后交由 CLI 上传。
+**项目方案**：采用保守阈值 1,000,000,000 字节，UI 明示为项目上传上限；这是 GB 单位未进一步澄清时的设计选择，不声称官方精确字节数。限制作用于实际上传文件：无需合并时检查原文件，需要合并时检查生成的单声道副本。实际上传文件超过阈值则停止，不自动压缩/切片重试。转换本身的资源限制在S1单独验证。
 
 ## 请求和结果注意事项
 
 - 固定模型必须有 `parameters` 对象，空配置也需 `{}`。
 - 上下文位置为 `input.context`；即时热词位置为 `parameters.vocabulary`。
 - `channel_id` 默认 `[0]`，多音轨独立计费；首版不提供多音轨选择。
-- `diarization_enabled` 默认关闭，仅单声道；开启建议 ≤2 小时。可选 `speaker_count` 为 2–100，仅是算法参考。
+- 官方`diarization_enabled`默认关闭，仅单声道；开启建议≤2小时。项目按用户决定默认开启，显式传BL的`--diarization`，不混淆产品默认值与官方默认值。可选`speaker_count`为2–100，仅是算法参考。
 - `keep_dialect` 为 3.1 专属，不给固定 3.0 开放。
 - 成功需检查任务和 `results[*].subtask_status`；转写链接有效 24 小时；句/词时间单位为毫秒。
 - 官方示例与字段表对全文/时长字段命名存在差异（`text`/`transcript`、`content_duration_in_milliseconds`/`content_duration`），S3 必须核实真实响应。
 
 依据：[A03](https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-http-api)。此页支持上下文与热词同用；首版三选一是产品选择，不是服务端禁令。
+
+### 单声道准备：取证范围与设计决定
+
+用户已要求说话人默认开启，多声道合并为单声道且网页提醒。2026-09-28针对固定CLI提交检查`recognize.ts`、`upload.ts`及命令注册表，识别参数有`--diarization`和`--channel-id`，已检查路径未见声道合并入口。此结论限定于上述源码，不声称所有BL版本均无此能力；S1仍需核对安装版本公开帮助。
+
+若确实缺失，候选复用FFmpeg输出音频选项`-ac 1`，Python仅调用工具，不写混音算法。FFmpeg手册规定`-ac`设置输出声道数；完整的音轨映射、输出编码/格式和时间轴校验参数在S1验证，不能把单个选项当作已验收的完整命令。[M01](https://ffmpeg.org/ffmpeg.html#Audio-Options)
+
+网页合并提示属于本项目交互；转换后的单声道要求来自模型接口。`channel_id`是音轨选择，不能代替媒体声道合并。
 
 ## 热词与上下文
 
@@ -104,15 +113,15 @@
 首选待测模板：
 
 ```text
-bl speech recognize --model qwen-audio-3.0-asr-flash-filetrans --url <绝对路径> --out <JSON绝对路径> --quiet
+bl speech recognize --model qwen-audio-3.0-asr-flash-filetrans --url <上传文件绝对路径> --diarization --out <JSON绝对路径> --quiet
 ```
 
-Python读取`--out`文件而非把stdout当JSON。stdout可能含识别正文，应在本地受控捕获，不直接回传Codex。还需验证完整模式下任务ID的可见性、异常输出、超时以及产物判定；存在接口限制不代表CLI没有相应云端能力。
+模板对应项目默认开启说话人；若需要合并，上传路径为已通过校验的单声道副本，用户关闭说话人时省略`--diarization`。Python读取`--out`文件而非把stdout当JSON。stdout可能含识别正文，应在本地受控捕获，不直接回传Codex。还需验证完整模式下任务ID的可见性、异常输出、超时以及产物判定；存在接口限制不代表CLI没有相应云端能力。
 
 以下`--async`只是待研究的另一模式，不是默认实现路线：
 
 ```text
-bl speech recognize --model qwen-audio-3.0-asr-flash-filetrans --url <绝对路径> --async --quiet --output json
+bl speech recognize --model qwen-audio-3.0-asr-flash-filetrans --url <上传文件绝对路径> --diarization --async --quiet --output json
 ```
 
 `--async --quiet` 分支仍返回 `task_id` JSON；`--out` 在该分支不保存结果。该模板只用于说明契约，完整启动方式应使用锁定的本地 CLI 入口，避免 PATH 上的另一版本。
