@@ -29,7 +29,7 @@ MAX_UPLOAD_BYTES = 1_000_000_000
 MAX_DURATION_SECONDS = 12 * 60 * 60
 MAX_HOTWORDS = 2000
 # 以下是本地解析资源上限，不是阿里云接口限制。
-MAX_XLSX_BYTES = 5 * 1024 * 1024
+MAX_XLSX_BYTES = 5_000_000
 MAX_XLSX_UNCOMPRESSED_BYTES = 20 * 1024 * 1024
 MAX_XLSX_ENTRIES = 200
 MAX_WORKSHEET_ROWS = 10_001
@@ -169,7 +169,7 @@ def validate_context(text: str) -> str:
 
 def _check_xlsx_archive(path: Path) -> None:
     if path.stat().st_size > MAX_XLSX_BYTES:
-        raise ValidationError("热词Excel超过本地5 MiB文件上限。", "hotwords_path")
+        raise ValidationError("热词文件超过 5 MB 文件上限。", "hotwords_path")
     with zipfile.ZipFile(path) as archive:
         entries = archive.infolist()
         if (len(entries) > MAX_XLSX_ENTRIES

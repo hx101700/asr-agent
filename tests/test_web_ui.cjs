@@ -21,6 +21,14 @@ function response(data, status = 200) {
   return { ok: status >= 200 && status < 300, status, json: async () => data };
 }
 
+function sessionResponse() {
+  return response({
+    model: "fixed-model", region: "beijing",
+    output_defaults: { json: "D:\\Example\\outputs", document: "D:\\Example\\outputs" },
+    languages: [["zh", "中文"], ["en", "英语"]],
+  });
+}
+
 function validation(id = "validation-1") {
   return response({
     validation_id: id,
@@ -44,6 +52,7 @@ function harness(overrides = {}) {
       tagName: tag, id: attributes.id, value: attributes.value || "", files: [],
       checked: "checked" in attributes, disabled: "disabled" in attributes,
       hidden: "hidden" in attributes, accept: attributes.accept || "",
+      type: attributes.type, readOnly: "readonly" in attributes, placeholder: attributes.placeholder,
       name: attributes.name, children: [], textContent: "",
       classList: {
         add: (...names) => names.forEach((name) => classes.add(name)),
@@ -75,12 +84,11 @@ function harness(overrides = {}) {
   }
   const byId = (id) => elements.find((node) => node.id === id) || null;
   function select(selector) {
-    if (selector.startsWith("input[name=")) return elements.find((node) => node.name === "auth_mode" && node.checked);
     if (selector.startsWith(".")) return elements.find((node) => node.classList.contains(selector.slice(1)));
     return elements.find((node) => node.tagName === selector);
   }
   const handlers = {
-    "/api/session": () => response({ model: "fixed-model", region: "beijing", auth: { console: { message: "本地会话已就绪" } } }),
+    "/api/session": sessionResponse,
     "/api/upload-audio": () => response({ upload_id: "audio-1", name: "sample.wav", size_bytes: 64000 }),
     "/api/validate": () => validation(),
     ...overrides,
@@ -104,14 +112,24 @@ function harness(overrides = {}) {
     drop: () => byId("audio-dropzone").dispatch("drop", { dataTransfer: { files: [{ name: "sample.wav" }] } }),
     submit: () => byId("config-form").dispatch("submit"),
     confirm: () => byId("confirm-button").dispatch("click"),
+    change: (id, property, value) => {
+      const target = byId(id);
+      target[property] = value;
+      byId("config-form").dispatch("input", { target });
+      byId("config-form").dispatch("change", { target });
+    },
   };
 }
 
-async function preparePreview(page) {
+async function addAudio(page) {
   await settle();
   assert.equal(page.node("config-fields").disabled, false);
   page.drop();
   await settle();
+}
+
+async function preparePreview(page) {
+  await addAudio(page);
   await page.submit();
   assert.equal(page.node("confirm-button").disabled, false);
   assert.equal(page.node("review-content").hidden, false);
@@ -125,7 +143,7 @@ test("会话未就绪时，拖拽和提交不产生上传或校验请求", async
   await settle();
   assert.deepEqual(page.calls.map((call) => call.url), ["/api/session"]);
   assert.equal(page.node("audio-file").files.length, 0);
-  session.resolve(response({ model: "fixed-model", region: "beijing", auth: { console: { message: "就绪" } } }));
+  session.resolve(sessionResponse());
   await settle();
   assert.equal(page.node("config-fields").disabled, false);
 });
@@ -147,17 +165,19 @@ test("保存网络结果未知后保持冻结，拖拽和提交均不能发送�
 });
 
 test("保存收到明确 4xx 拒绝后，可修改输入并重新校验", async () => {
-  const page = harness({ "/api/confirm": () => response({ error: "配置已过期" }, 409) });
+  const page = harness({
+    "/api/confirm": () => response({ error: "配置已过期" }, 409),
+    "/api/select-directory": () => response({ path: "D:\\Example\\revised" }),
+  });
   await preparePreview(page);
   await page.confirm();
   assert.equal(page.node("config-fields").disabled, false);
   assert.equal(page.node("confirm-button").disabled, true);
-  page.node("document-directory").value = "outputs/revised";
-  page.node("config-form").dispatch("input", { target: page.node("document-directory") });
+  await page.node("document-browse").dispatch("click");
   await page.submit();
   const validations = page.calls.filter((call) => call.url === "/api/validate");
   assert.equal(validations.length, 2);
-  assert.equal(JSON.parse(validations[1].options.body).document_directory, "outputs/revised");
+  assert.equal(JSON.parse(validations[1].options.body).document_directory, "D:\\Example\\revised");
   assert.equal(page.node("confirm-button").disabled, false);
   assert.equal(page.calls.filter((call) => call.url === "/api/confirm").length, 1);
 });
@@ -181,4 +201,94 @@ test("校验期间输入已修改时，不接受旧预览或允许确认", async
   await page.submit();
   assert.equal(page.node("confirm-button").disabled, false);
   assert.equal(page.focused().id, "review-card");
+});
+
+test("漏选音频时就地提示并聚焦，不发送校验请求", async () => {
+  const page = harness();
+  await settle();
+  await page.submit();
+  assert.equal(page.calls.filter((call) => call.url === "/api/validate").length, 0);
+  assert.equal(page.focused().id, "audio-file");
+  assert.equal(page.node("audio-error").hidden, false);
+  assert.equal(page.node("audio-dropzone").classList.contains("needs-attention"), true);
+  assert.equal(page.node("audio-file").getAttribute("aria-invalid"), "true");
+  assert.equal(page.node("error-panel").hidden, true);
+});
+
+for (const [kind, field] of [["hotwords", "hotwords-file"], ["context", "context"]]) {
+  test(`启用 ${kind} 却漏填时定位对应字段，不发送校验请求`, async () => {
+    const page = harness();
+    await addAudio(page);
+    page.change(`${kind}-enabled`, "checked", true);
+    if (kind === "context") page.change("context", "value", " \n ");
+    await page.submit();
+    assert.equal(page.calls.filter((call) => call.url === "/api/validate").length, 0);
+    assert.equal(page.node(`${kind}-fields`).hidden, false);
+    assert.equal(page.node(`${kind}-error`).hidden, false);
+    assert.equal(page.focused().id, field);
+    assert.ok(page.node(field).getAttribute("aria-describedby").includes(`${kind}-error`));
+  });
+}
+
+test("取消目录选择保留预览，选定后需要重检且提交所选路径", async () => {
+  const page = harness({ "/api/select-directory": () => response({ cancelled: true }) });
+  await preparePreview(page);
+  const before = page.node("json-directory").value;
+  assert.equal(page.node("json-directory").readOnly, true);
+  await page.node("json-browse").dispatch("click");
+  assert.equal(page.node("json-directory").value, before);
+  assert.equal(page.node("review-content").hidden, false);
+  assert.equal(page.node("confirm-button").disabled, false);
+  page.handlers["/api/select-directory"] = () => response({ path: "D:\\Example\\chosen" });
+  await page.node("json-browse").dispatch("click");
+  assert.equal(page.node("json-directory").value, "D:\\Example\\chosen");
+  assert.equal(page.node("review-content").hidden, true);
+  assert.equal(page.node("confirm-button").disabled, true);
+  await page.submit();
+  const calls = page.calls.filter((call) => call.url === "/api/validate");
+  assert.equal(JSON.parse(calls.at(-1).options.body).json_directory, "D:\\Example\\chosen");
+  assert.equal(JSON.parse(calls.at(-1).options.body).document_directory, "outputs");
+  assert.equal(page.calls.filter((call) => call.url === "/api/select-directory").every((call) => JSON.parse(call.options.body).kind === "json"), true);
+  page.node("json-reset").dispatch("click");
+  await page.submit();
+  assert.equal(JSON.parse(page.calls.at(-1).options.body).json_directory, "outputs");
+});
+
+test("API Key 仅在只读控件显示，不进入校验参数，关闭模式立即清空", async () => {
+  const fakeKey = "fixture-key-not-a-credential";
+  const page = harness({ "/api/api-key": () => response({ value: fakeKey }) });
+  await addAudio(page);
+  page.change("use-api-key", "checked", true);
+  await settle();
+  assert.equal(page.node("api-key-value").readOnly, true);
+  assert.equal(page.node("api-key-value").type, "password");
+  assert.equal(page.node("api-key-value").value, fakeKey);
+  page.node("api-key-toggle").dispatch("click");
+  assert.equal(page.node("api-key-value").type, "text");
+  await page.submit();
+  const request = page.calls.find((call) => call.url === "/api/validate");
+  assert.equal(JSON.parse(request.options.body).auth_mode, "api_key");
+  assert.equal(JSON.stringify(request.options).includes(fakeKey), false);
+  page.change("use-api-key", "checked", false);
+  assert.equal(page.node("api-key-value").value, "");
+  assert.equal(page.node("api-key-value").type, "password");
+  assert.equal(page.node("api-key-fields").hidden, true);
+  await page.submit();
+  assert.equal(JSON.parse(page.calls.at(-1).options.body).auth_mode, "console");
+  assert.equal(page.calls.filter((call) => call.url === "/api/api-key").length, 1);
+});
+
+test("关闭发言人区分后，不提交先前填写的人数", async () => {
+  const page = harness();
+  await addAudio(page);
+  page.change("speaker-count", "value", "3");
+  await page.submit();
+  assert.equal(JSON.parse(page.calls.at(-1).options.body).speaker_count, 3);
+  page.change("diarization-enabled", "checked", false);
+  assert.equal(page.node("speaker-fields").hidden, true);
+  assert.equal(page.node("speaker-count").disabled, true);
+  await page.submit();
+  const payload = JSON.parse(page.calls.at(-1).options.body);
+  assert.equal(payload.diarization_enabled, false);
+  assert.equal(payload.speaker_count, null);
 });

@@ -185,3 +185,21 @@ S1已安装真实CLI发布包并执行公开帮助、虚构URL dry-run及本机�
 - [Filetrans HTTP API](https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-http-api)：核对固定模型支持的context、vocabulary与diarization_enabled。“区分发言人”是说话人分离的产品用语，不表示识别真实身份；单声道要求与超过2小时的建议继续明确提示。
 - [百炼CLI安装与鉴权](https://help.aliyun.com/zh/model-studio/cli/installation)：账号登录通过官方浏览器页面完成。产品页保留登录与API Key两个选择；预览版尚不执行登录，本地Key检测不能写成“验证成功”。
 - [通义听悟官网](https://tingwu.aliyun.com/)：参考以录音场景、发言人和操作动作描述用途的表达方式。仅参考公开首页，不借用其速度、实时翻译、总结等能力承诺，也未访问用户的听悟内容。
+
+## 模型参数与当前界面覆盖（2026-09-29）
+
+范围固定为qwen-audio-3.0-asr-flash-filetrans和已安装BL2.1.0。API依据：[Filetrans参数](https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-http-api)。
+
+| 参数 | 官方模型能力 | BL2.1.0公开入口与项目处理 |
+| --- | --- | --- |
+| language_hints | 最多4种语言，省略时自动识别 | --language只接受一个字符串并包装为单元素数组；UI仅自动/一种语言，不拼接伪多选 |
+| speaker_count | 2–100参考值，需开启说话人分离，不保证精确人数 | --speaker-count，UI自动或指定整数，关闭分离时不传 |
+| diarization_enabled | 单声道，建议不超过2小时 | --diarization；项目多声道合并方案保留 |
+| context / vocabulary | 上下文与即时热词可并用 | --context / --vocabulary；继续独立展开输入 |
+| channel_id | 音轨索引数组，各轨单独计费 | --channel-id只接受一个ID；BL帮助称“声道”，PyAV流到云端轨道对应尚未实测，暂不开放UI选择 |
+| special_word_filter | API支持敏感词过滤 | BL公开help及已安装commands/core包没有该选项或请求透传入口；不自造参数/HTTP后备 |
+| keep_dialect | 仅3.1模型支持 | 固定3.0不开放 |
+
+已实际运行锁定BL帮助及保留域名URL的dry-run：--language zh --diarization --speaker-count 3 --channel-id 1，输出parameters包含language_hints:["zh"]、speaker_count:3、diarization_enabled:true、channel_id:[1]。无真实Key或音频。证据位于安装包bailian-cli-commands/dist/index.mjs识别命令及bailian-cli-core/dist/index.mjs语言构造函数；通用参数表不能替代发布包验证。
+
+目录窗口使用Python3.12标准库[tkinter.filedialog.askdirectory](https://docs.python.org/3.12/library/dialog.html#tkinter.filedialog.askdirectory)，支持initialdir/parent和mustexist。用户已授权选择项目外保存位置；当前只选现有目录，不用浏览器文件上传控件冒充保存位置选择。

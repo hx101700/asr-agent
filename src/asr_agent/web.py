@@ -19,7 +19,9 @@ from urllib.parse import unquote, urlsplit
 from openpyxl import Workbook
 
 from . import MODEL
-from .auth import api_key_status
+from .auth import api_key_status, read_api_key
+from .directory_picker import choose_directory
+from .recognition_options import LANGUAGES, validate_options
 from .environment import Project, SetupError
 from .validation import (
     AUDIO_SUFFIXES, MAX_XLSX_BYTES, ValidationError, file_fingerprint, load_hotwords,
@@ -31,18 +33,21 @@ MAX_REQUEST_BYTES = 32 * 1024
 MAX_LOCAL_AUDIO_BYTES = 2_000_000_000
 
 
-def output_directory(project: Project, value: str, field: str) -> Path:
-    """S2只允许项目outputs下的目录；不创建成品或覆盖用户文件。"""
+def output_directory(project: Project, value: str, field: str, approved: Path | None = None) -> Path:
+    """默认目录留在项目内；外部目录必须来自本会话的系统选择窗口。"""
     if not isinstance(value, str) or not value.strip():
         raise ValidationError("请输入输出目录。", field)
     base = project.root.resolve() / "outputs"
     try:
         if base.resolve() != base:
             raise ValidationError("outputs根目录不能重定向到其他目录。", field)
-        path = project.path(value)
-        if not path.is_relative_to(base) or any(part.startswith(".") for part in path.relative_to(base).parts):
-            raise ValidationError("当前输出目录只支持项目outputs及其非隐藏子目录。", field)
-        if any(Path(part).is_reserved() for part in path.relative_to(base).parts):
+        path = (project.root / value).resolve()
+        chosen = approved is not None and path == approved and approved.resolve() == approved
+        if not chosen and (not path.is_relative_to(base) or any(part.startswith(".") for part in path.relative_to(base).parts)):
+            raise ValidationError("请点击“选择文件夹”设置保存位置。", field)
+        if chosen and not path.is_dir():
+            raise ValidationError("所选文件夹已不存在，请重新选择。", field)
+        if any(Path(part).is_reserved() for part in path.parts):
             raise ValidationError("输出目录包含系统保留名称。", field)
         parent = path
         while not parent.exists():
@@ -53,7 +58,7 @@ def output_directory(project: Project, value: str, field: str) -> Path:
             pass
         return path
     except (OSError, SetupError) as exc:
-        raise ValidationError("输出目录不可写或超出项目范围，请检查路径。", field) from exc
+        raise ValidationError("此文件夹无法保存文件，请选择其他位置。", field) from exc
 
 
 class Session:
@@ -65,6 +70,45 @@ class Session:
         self.receipt = None
         self.upload_directory = project.root.resolve() / ".state/web-uploads" / uuid.uuid4().hex
         self.uploads = {}
+        self.output_directories = {}
+        self.picker_lock = threading.Lock()
+
+    def select_directory(self, kind: str) -> dict:
+        if kind not in ("json", "document"):
+            raise ValidationError("未知的保存位置。", "directory")
+        if not self.picker_lock.acquire(blocking=False):
+            raise ValidationError("请先关闭已打开的文件夹窗口。", f"{kind}_directory")
+        try:
+            with self.lock:
+                if self.receipt:
+                    raise ValidationError("设置已保存，请新建任务。", "session")
+                initial = self.output_directories.get(kind, self.project.root / "outputs")
+                while not initial.exists():
+                    initial = initial.parent
+            # 对话框只返回用户选择的目录，浏览器不能提交路径来扩展访问范围。
+            try:
+                selected = choose_directory(initial)
+            except SetupError as exc:
+                raise ValidationError(str(exc), f"{kind}_directory") from exc
+            if selected is None:
+                return {"ok": True, "cancelled": True}
+            with self.lock:
+                if self.receipt:
+                    raise ValidationError("设置已保存，请新建任务。", "session")
+                path = output_directory(self.project, str(selected), f"{kind}_directory", approved=selected)
+                self.output_directories[kind] = path
+                self.draft = None
+                return {"ok": True, "cancelled": False, "path": str(path)}
+        finally:
+            self.picker_lock.release()
+
+    def api_key_display(self) -> dict:
+        """用户选择指定Key后，仅向受保护的本机页面提供；不写配置和日志。"""
+        try:
+            return {"ok": True, "value": read_api_key(self.project)}
+        except (SetupError, OSError, UnicodeError) as exc:
+            message = str(exc) if isinstance(exc, SetupError) else "无法读取 .env 文件。"
+            raise ValidationError(message, "auth_mode") from exc
 
     def auth_status(self, mode: str) -> dict:
         if mode == "api_key":
@@ -78,6 +122,9 @@ class Session:
         with self.lock:
             return {"model": MODEL, "region": "华北2（北京）", "stage": "S2",
                     "project_name": self.project.root.name,
+                    "output_defaults": {"json": str(self.project.root.resolve() / "outputs"),
+                                        "document": str(self.project.root.resolve() / "outputs")},
+                    "languages": LANGUAGES,
                     "auth": {"console": self.auth_status("console"),
                              "api_key": {"configured": None, "message": "选择后检查 API Key 设置。"}},
                     "confirmed": self.receipt}
@@ -127,7 +174,7 @@ class Session:
 
     def uploaded(self, identifier, kind: str) -> dict:
         if not isinstance(identifier, str) or identifier not in self.uploads:
-            raise ValidationError("请先添加文件，等待添加完成后再继续。", f"{kind}_upload_id")
+            raise ValidationError("请选择音频文件。" if kind == "audio" else "请选择热词文件。", f"{kind}_upload_id")
         record = self.uploads[identifier]
         if record["kind"] != kind:
             raise ValidationError("文件类型与所选用途不符。", f"{kind}_upload_id")
@@ -166,7 +213,8 @@ class Session:
                 raise ValidationError("本会话已保存配置，请启动新会话准备另一项任务。", "session")
             self.draft = None  # 即使新校验失败，旧预览也不再可确认。
             allowed = {"auth_mode", "audio_upload_id", "diarization_enabled", "enhancement_mode",
-                       "hotwords_upload_id", "context", "json_directory", "document_directory"}
+                       "hotwords_upload_id", "context", "json_directory", "document_directory",
+                       "language_hint", "speaker_count"}
             if set(payload) - allowed:
                 raise ValidationError("请求含不支持的配置字段。", "form")
             mode = payload.get("auth_mode")
@@ -174,6 +222,7 @@ class Session:
                 raise ValidationError("请选择有效的鉴权方式。", "auth_mode")
             credential_stamp = self._credential_stamp(mode)
             diarization = payload.get("diarization_enabled")
+            recognition_options = validate_options(payload, diarization)
             source = self.uploaded(payload.get("audio_upload_id"), "audio")
             upload_project = Project(self.upload_directory)
             audio = validate_audio(upload_project, source["path"], diarization)
@@ -193,11 +242,12 @@ class Session:
                 context = validate_context(payload.get("context"))
 
             job_id = uuid.uuid4().hex
-            json_base = output_directory(self.project, payload.get("json_directory"), "json_directory")
-            document_base = output_directory(self.project, payload.get("document_directory"), "document_directory")
+            json_base = output_directory(self.project, payload.get("json_directory"), "json_directory", self.output_directories.get("json"))
+            document_base = output_directory(self.project, payload.get("document_directory"), "document_directory", self.output_directories.get("document"))
             config = {
                 "schema_version": 1, "job_id": job_id, "model": MODEL, "region": "cn-beijing",
                 "auth_mode": mode, "audio": audio, "diarization_enabled": diarization,
+                "recognition_options": recognition_options,
                 "enhancement": {"mode": enhancement, "hotwords": hotwords, "context": context},
                 "json_directory": str(json_base / job_id / "json"),
                 "document_directory": str(document_base / job_id / "documents"),
@@ -205,6 +255,7 @@ class Session:
             }
             summary = {
                 "model": MODEL, "region": "华北2（北京）", "auth_mode": mode,
+                "recognition_options": recognition_options,
                 "audio": {"name": audio["name"], **audio["metadata"],
                           "format": audio["metadata"]["format_name"], "requires_mono": audio["requires_mono"]},
                 "enhancement": {"mode": enhancement, "count": hotwords["count"] if hotwords else 0,
@@ -234,8 +285,8 @@ class Session:
                     path = resolve_input(Project(self.upload_directory), record["path"], suffixes, field)
                     if file_fingerprint(path) != record["fingerprint"]:
                         raise ValidationError("文件已变更，请重新检查后保存。", field)
-                output_directory(self.project, draft["json_base"], "json_directory")
-                output_directory(self.project, draft["document_base"], "document_directory")
+                output_directory(self.project, draft["json_base"], "json_directory", self.output_directories.get("json"))
+                output_directory(self.project, draft["document_base"], "document_directory", self.output_directories.get("document"))
                 relative = f".state/jobs/{config['job_id']}"
                 directory = self.project.path(relative)
                 if directory != self.project.root.resolve() / relative:
@@ -377,6 +428,10 @@ def create_server(project: Project, port: int = 0) -> ThreadingHTTPServer:
                     self.json(200, session.confirm(payload.get("validation_id")))
                 elif path == "/api/auth-status":
                     self.json(200, session.auth_status(payload.get("auth_mode")))
+                elif path == "/api/api-key":
+                    self.json(200, session.api_key_display())
+                elif path == "/api/select-directory":
+                    self.json(200, session.select_directory(payload.get("kind")))
                 else:
                     self.json(404, {"ok": False, "error": "未找到此接口。"})
             except (ValidationError, SetupError, OSError) as exc:

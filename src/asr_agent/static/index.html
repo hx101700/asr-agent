@@ -50,51 +50,57 @@
                   <progress id="audio-progress" class="upload-progress" aria-label="正在添加音频" hidden></progress>
                   <p id="audio-file-status" class="file-status" role="status">尚未选择文件</p>
                 </div>
+                <div id="audio-error" class="field-error" role="alert" hidden></div>
                 <details class="format-help"><summary>支持格式与文件限制</summary><p id="audio-limits" class="helper">可添加不超过 2 GB、12 小时的文件。发送至阿里云的音频须不超过 1 GB；如需合并声道，将以转换后的文件大小为准。支持 AAC、AMR、AVI、FLAC、FLV、M4A、MKV、MOV、MP3、MP4、MPEG、OGG、OPUS、WAV、WEBM、WMA、WMV。</p></details>
               </section>
 
+              <section class="card" aria-labelledby="settings-heading">
+                <div class="section-heading"><span class="step-number">02</span><h2 id="settings-heading">转写设置</h2></div>
+                <div class="setting-grid">
+                  <div class="field-target"><label for="language-hint">音频语言</label><select id="language-hint"><option value="">自动识别</option></select><div id="language-error" class="field-error" role="alert" hidden></div></div>
+                  <div id="speaker-fields" class="field-target"><label for="speaker-count">发言人数 <span class="optional-label">选填</span></label><input id="speaker-count" type="number" min="2" max="100" step="1" placeholder="自动判断" aria-describedby="speaker-help"><p id="speaker-help" class="helper">可指定 2–100 人，供识别参考。</p><div id="speaker-error" class="field-error" role="alert" hidden></div></div>
+                </div>
+                <label class="check-row"><input id="diarization-enabled" type="checkbox" checked aria-describedby="diarization-help"><span><strong>区分发言人</strong></span></label>
+                <p id="diarization-help" class="helper">多声道音频将合并为单声道副本，保留原文件。</p>
+              </section>
+
               <section class="card" aria-labelledby="enhancement-heading">
-                <div class="section-heading"><span class="step-number">02</span><h2 id="enhancement-heading">转写设置</h2><span class="section-aside">按需开启</span></div>
-                <label class="check-row"><input id="diarization-enabled" type="checkbox" checked aria-describedby="diarization-help"><span><strong>区分发言人</strong><span>按声音区分发言人，便于阅读多人对话</span></span><span class="recommended-tag">默认开启</span></label>
-                <p id="diarization-help" class="helper">开启后，多声道音频将在转写前合并为单声道副本，原文件不变。</p>
-                <div class="field-heading"><h3>识别精度增强</h3><span>可选 · 支持同时使用</span></div>
-                <p class="enhancement-description helper">补充录音中的人名、产品名或行业术语，帮助识别专有词汇。</p>
-                <div class="choice-grid" role="group" aria-label="识别增强方式，可同时选择">
-                  <label class="choice-card"><input id="hotwords-enabled" type="checkbox" aria-controls="hotwords-fields"><span><strong>热词增强</strong><span>通过词表指定重点识别的词语</span></span></label>
-                  <label class="choice-card"><input id="context-enabled" type="checkbox" aria-controls="context-fields"><span><strong>上下文增强</strong><span>提供包含相关词语的参考文本</span></span></label>
-                </div>
-                <div id="hotwords-fields" class="enhancement-fields" hidden>
-                  <div class="label-action"><label for="hotwords-file">热词文件</label><button id="download-template" type="button" class="text-button">下载模板</button></div>
-                  <div id="hotwords-dropzone" class="file-dropzone compact-upload">
-                    <input id="hotwords-file" class="file-input" type="file" accept=".xlsx" aria-labelledby="hotwords-action" aria-describedby="hotwords-file-status hotwords-help">
-                    <label for="hotwords-file" class="upload-target"><strong id="hotwords-action">选择或拖入 Excel 文件</strong><span>.xlsx 格式 · 最大 5 MiB</span></label>
-                    <progress id="hotwords-progress" class="upload-progress" aria-label="正在添加热词文件" hidden></progress>
-                    <p id="hotwords-file-status" class="file-status" role="status">尚未选择文件</p>
+                <div class="section-heading"><span class="step-number">03</span><h2 id="enhancement-heading">精度增强</h2><span class="section-aside">可同时使用</span></div>
+                <div class="enhancement-option">
+                  <label class="option-toggle"><input id="hotwords-enabled" type="checkbox" aria-controls="hotwords-fields"><span><strong>添加热词</strong><span>人名、产品名称、专业术语</span></span></label>
+                  <div id="hotwords-fields" class="enhancement-fields" hidden>
+                    <div class="label-action"><label for="hotwords-file">热词表</label><button id="download-template" type="button" class="text-button">下载模板</button></div>
+                    <div id="hotwords-dropzone" class="file-dropzone compact-upload">
+                      <input id="hotwords-file" class="file-input" type="file" accept=".xlsx" aria-labelledby="hotwords-action" aria-describedby="hotwords-file-status hotwords-help">
+                      <label for="hotwords-file" class="upload-target"><strong id="hotwords-action">选择 Excel 文件</strong><span>或拖拽至此处 · .xlsx · 最大 5 MB</span></label>
+                      <progress id="hotwords-progress" class="upload-progress" aria-label="正在添加热词文件" hidden></progress>
+                      <p id="hotwords-file-status" class="file-status" role="status">尚未选择文件</p>
+                    </div>
+                    <div id="hotwords-error" class="field-error" role="alert" hidden></div>
+                    <p id="hotwords-help" class="helper">按模板填写词语和权重，最多 2,000 个热词。</p>
                   </div>
-                  <p id="hotwords-help" class="helper">按模板填写热词及权重，最多 2,000 个热词。导入的词表仅用于本次转写。</p>
                 </div>
-                <div id="context-fields" class="enhancement-fields" hidden>
-                  <label for="context">参考文本</label>
-                  <textarea id="context" rows="4" placeholder="例如：本次技术评审涉及 Kubernetes、容器编排和灰度发布，参会人有陈雨、林舟。" aria-describedby="context-help context-count"></textarea>
-                  <div class="textarea-footer"><p id="context-help" class="helper">请包含录音中可能出现的具体词语，最多 400 个字符。仅填写宽泛背景，增强效果有限。</p><span id="context-count" class="character-count" role="status">0 / 400</span></div>
+                <div class="enhancement-option">
+                  <label class="option-toggle"><input id="context-enabled" type="checkbox" aria-controls="context-fields"><span><strong>添加上下文</strong><span>与录音相关的术语、对话或参考资料</span></span></label>
+                  <div id="context-fields" class="enhancement-fields field-target" hidden>
+                    <label for="context">参考文本</label>
+                    <textarea id="context" rows="4" placeholder="例如：本次技术评审涉及 Kubernetes、容器编排和灰度发布，参会人有陈雨、林舟。" aria-describedby="context-help context-count"></textarea>
+                    <div class="textarea-footer"><p id="context-help" class="helper">包含录音中可能出现的具体词语，最多 400 字符。</p><span id="context-count" class="character-count" role="status">0 / 400</span></div>
+                    <div id="context-error" class="field-error" role="alert" hidden></div>
+                  </div>
                 </div>
               </section>
 
-              <section class="card" aria-labelledby="auth-heading">
-                <div class="section-heading"><span class="step-number">03</span><h2 id="auth-heading">账号与保存</h2></div>
-                <fieldset class="auth-group"><legend>账号连接方式</legend>
-                  <div class="choice-grid">
-                    <label class="choice-card"><input type="radio" name="auth_mode" value="console" checked aria-describedby="auth-status"><span><strong>百炼账号登录 <small>推荐</small></strong><span>在浏览器中登录阿里云账号</span></span></label>
-                    <label class="choice-card"><input type="radio" name="auth_mode" value="api_key" aria-describedby="auth-status api-key-help"><span><strong>使用 API Key</strong><span>使用已配置的百炼 API Key</span></span></label>
-                  </div>
-                </fieldset>
-                <p id="auth-status" class="helper" role="status">正在加载账号设置…</p>
-                <p id="api-key-help" class="helper" hidden>请提前在项目 .env 文件中填写 DASHSCOPE_API_KEY，页面无需输入密钥。</p>
-                <details id="output-settings" class="output-settings">
-                  <summary><span>保存位置<span class="summary-hint">默认：项目内 outputs 文件夹</span></span><span class="summary-action">修改</span></summary>
-                  <div class="output-fields"><label for="json-directory">原始结果（JSON）</label><input id="json-directory" type="text" value="outputs" autocomplete="off" spellcheck="false" aria-describedby="output-help"><label for="document-directory">转写文档</label><input id="document-directory" type="text" value="outputs" autocomplete="off" spellcheck="false" aria-describedby="output-help"><p id="output-help" class="helper">文件将保存到项目内的 outputs 文件夹，也可指定其子文件夹，例如 outputs/meeting。</p></div>
-                </details>
+              <section class="card" aria-labelledby="output-heading">
+                <div class="section-heading"><span class="step-number">04</span><h2 id="output-heading">保存位置</h2></div>
+                <div class="field-target"><div class="label-action"><label for="json-directory">原始结果（JSON）</label><button id="json-reset" type="button" class="text-button" hidden>恢复默认</button></div><div class="directory-row"><input id="json-directory" type="text" readonly placeholder="outputs" aria-label="JSON保存文件夹"><button id="json-browse" type="button" class="button button-secondary">选择文件夹</button></div><div id="json-error" class="field-error" role="alert" hidden></div></div>
+                <div class="field-target output-fields"><div class="label-action"><label for="document-directory">转写文档</label><button id="document-reset" type="button" class="text-button" hidden>恢复默认</button></div><div class="directory-row"><input id="document-directory" type="text" readonly placeholder="outputs" aria-label="文档保存文件夹"><button id="document-browse" type="button" class="button button-secondary">选择文件夹</button></div><div id="document-error" class="field-error" role="alert" hidden></div></div>
                 <div class="export-note"><span>文档格式</span><span class="format-tag">Excel</span><span class="format-tag">Word</span><span class="format-tag">Markdown</span><span>保留时间戳</span></div>
+              </section>
+              <section id="auth-fields" class="card field-target" aria-label="API Key设置">
+                <label class="check-row"><input id="use-api-key" type="checkbox" aria-controls="api-key-fields" title="不启用时使用百炼控制台登录"><span><strong>使用指定 API Key</strong></span></label>
+                <div id="api-key-fields" class="enhancement-fields" hidden><label for="api-key-value">DASHSCOPE_API_KEY</label><div class="directory-row"><input id="api-key-value" type="password" readonly autocomplete="off" spellcheck="false" placeholder="正在读取…"><button id="api-key-toggle" type="button" class="button button-secondary" disabled>显示</button></div></div>
+                <div id="auth-error" class="field-error" role="alert" hidden></div>
               </section>
             </fieldset>
 
@@ -113,7 +119,7 @@
           </div>
         </form>
       </main>
-      <footer><span>asr-agent · 基于阿里云百炼语音识别</span><span>让录音更便于阅读与整理</span></footer>
+      <footer><span>asr-agent</span></footer>
     </div>
   </body>
 </html>

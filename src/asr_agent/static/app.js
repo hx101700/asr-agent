@@ -13,13 +13,20 @@ let validating = false;
 let confirming = false;
 let confirmed = false;
 let errorField = null;
+let errorBox = null;
+let errorTarget = null;
+let choosingDirectory = false;
+let apiKeyLoading = false;
+let authRevision = 0;
+const directories = { json: "outputs", document: "outputs" };
+const languageNames = new Map();
 const uploads = {
   audio: { id: null, name: "", busy: false },
   hotwords: { id: null, name: "", busy: false },
 };
 
-function selected(name) {
-  return form.querySelector(`input[name="${name}"]:checked`).value;
+function authMode() {
+  return element("use-api-key").checked ? "api_key" : "console";
 }
 
 async function request(path, payload, file) {
@@ -61,17 +68,33 @@ function clearError() {
   element("error-panel").hidden = true;
   element("error-details").replaceChildren();
   if (errorField) {
-    const descriptions = (errorField.getAttribute("aria-describedby") || "").split(" ").filter((id) => id !== "error-message");
+    const descriptions = (errorField.getAttribute("aria-describedby") || "").split(" ").filter((id) => id !== (errorBox ? errorBox.id : "error-message"));
     errorField.setAttribute("aria-describedby", descriptions.join(" "));
     errorField = null;
   }
+  if (errorBox) { errorBox.hidden = true; errorBox.replaceChildren(); errorBox = null; }
+  if (errorTarget) { errorTarget.classList.remove("needs-attention"); errorTarget = null; }
   element("error-field-link").hidden = true;
   form.querySelectorAll('[aria-invalid="true"]').forEach((input) => input.removeAttribute("aria-invalid"));
 }
 
 function showError(error) {
-  element("error-message").textContent = error.message;
-  const details = element("error-details");
+  clearError();
+  const fields = {
+    audio_upload_id: ["audio-file", "audio-error", "audio-dropzone"],
+    audio_path: ["audio-file", "audio-error", "audio-dropzone"],
+    hotwords_upload_id: ["hotwords-file", "hotwords-error", "hotwords-dropzone"],
+    hotwords_path: ["hotwords-file", "hotwords-error", "hotwords-dropzone"],
+    context: ["context", "context-error", "context"],
+    speaker_count: ["speaker-count", "speaker-error", "speaker-count"],
+    language_hint: ["language-hint", "language-error", "language-hint"],
+    json_directory: ["json-browse", "json-error", "json-directory"],
+    document_directory: ["document-browse", "document-error", "document-directory"],
+    auth_mode: ["use-api-key", "auth-error", "auth-fields"],
+  };
+  const target = fields[error.field];
+  // 输入错误就地提示；网络或保存结果未知仍保留页级反馈，避免误认为只是漏填。
+  const details = target ? document.createElement("ul") : element("error-details");
   details.replaceChildren();
   const fieldLabels = { text: "热词", weight: "权重", header: "表头", row: "内容" };
   for (const detail of error.details || []) {
@@ -81,18 +104,21 @@ function showError(error) {
     details.append(item);
   }
   details.hidden = details.childElementCount === 0;
-  const fieldIds = {
-    audio_upload_id: "audio-file", hotwords_upload_id: "hotwords-file",
-    audio_path: "audio-file", hotwords_path: "hotwords-file", context: "context",
-    json_directory: "json-directory", document_directory: "document-directory",
-  };
-  const input = error.field === "auth_mode" ? form.querySelector('input[name="auth_mode"]:checked') : element(fieldIds[error.field]);
-  if (input) {
-    input.setAttribute("aria-invalid", "true");
-    input.setAttribute("aria-describedby", `${input.getAttribute("aria-describedby") || ""} error-message`.trim());
-    errorField = input;
-    element("error-field-link").hidden = false;
+  if (target) {
+    errorField = element(target[0]);
+    errorBox = element(target[1]);
+    errorTarget = element(target[2]);
+    errorBox.textContent = error.message;
+    if (details.childElementCount) errorBox.append(details);
+    errorBox.hidden = false;
+    errorField.setAttribute("aria-invalid", "true");
+    errorField.setAttribute("aria-describedby", `${errorField.getAttribute("aria-describedby") || ""} ${errorBox.id}`.trim());
+    errorField.focus({ preventScroll: true });
+    errorTarget.scrollIntoView({ block: "center" });
+    errorTarget.classList.add("needs-attention");
+    return;
   }
+  element("error-message").textContent = error.message;
   element("error-panel").hidden = false;
   element("error-panel").focus();
 }
@@ -104,7 +130,7 @@ function showStatus(message) {
 
 function updateButtons() {
   const uploading = uploads.audio.busy || uploads.hotwords.busy;
-  const locked = element("config-fields").disabled;
+  const locked = element("config-fields").disabled || apiKeyLoading || choosingDirectory;
   element("validate-button").disabled = locked || uploading || validating || confirming || confirmed;
   element("validate-button").hidden = Boolean(validationId) || confirmed;
   element("confirm-button").disabled = locked || !validationId || uploading || validating || confirming || confirmed;
@@ -153,22 +179,82 @@ function updateEnhancement() {
   updateContextCount();
 }
 
-function updateOutputHint() {
-  const defaults = element("json-directory").value.trim() === "outputs" && element("document-directory").value.trim() === "outputs";
-  document.querySelector(".summary-hint").textContent = defaults ? "默认：项目内 outputs 文件夹" : "已自定义保存位置";
+function updateSpeakerCount() {
+  const enabled = element("diarization-enabled").checked;
+  element("speaker-count").disabled = !enabled;
+  element("speaker-fields").hidden = !enabled;
+  element("diarization-help").hidden = !enabled;
 }
 
 async function updateAuthStatus() {
-  const mode = selected("auth_mode");
-  element("api-key-help").hidden = mode !== "api_key";
-  element("auth-status").textContent = mode === "api_key" ? "正在检查 API Key 设置…" : "正在加载账号设置…";
-  try {
-    const status = await request("/api/auth-status", { auth_mode: mode });
-    if (selected("auth_mode") !== mode) return;
-    element("auth-status").textContent = status.message;
-  } catch (error) {
-    if (selected("auth_mode") === mode) element("auth-status").textContent = error.message;
+  const currentAuthRevision = ++authRevision;
+  const input = element("api-key-value");
+  input.value = "";
+  input.type = "password";
+  element("api-key-toggle").textContent = "显示";
+  element("api-key-toggle").disabled = true;
+  element("api-key-fields").hidden = authMode() !== "api_key";
+  if (authMode() !== "api_key") {
+    apiKeyLoading = false;
+    updateButtons();
+    return;
   }
+  apiKeyLoading = true;
+  input.placeholder = "正在读取…";
+  updateButtons();
+  try {
+    const result = await request("/api/api-key", {});
+    if (authMode() !== "api_key" || currentAuthRevision !== authRevision) return;
+    // Key仅留在只读控件；不进入任务payload、storage或日志，切换方式时立即清除。
+    input.value = result.value;
+    input.placeholder = "";
+    element("api-key-toggle").disabled = false;
+  } catch (error) {
+    if (authMode() === "api_key" && currentAuthRevision === authRevision) {
+      input.placeholder = "未配置 API Key";
+      error.field = "auth_mode";
+      showError(error);
+    }
+  } finally {
+    if (currentAuthRevision === authRevision) {
+      apiKeyLoading = false;
+      updateButtons();
+    }
+  }
+}
+
+function fileSize(bytes) {
+  return bytes < 1_000_000 ? `${(bytes / 1000).toFixed(1)} KB` : `${(bytes / 1_000_000).toFixed(2)} MB`;
+}
+
+async function selectDirectory(kind) {
+  if (element("config-fields").disabled || choosingDirectory) return;
+  choosingDirectory = true;
+  element("config-fields").disabled = true;
+  const button = element(`${kind}-browse`);
+  button.textContent = "请在弹窗中选择…";
+  updateButtons();
+  let failure = null;
+  try {
+    const result = await request("/api/select-directory", { kind });
+    if (!result.cancelled) {
+      directories[kind] = result.path;
+      element(`${kind}-directory`).value = result.path;
+      element(`${kind}-directory`).title = result.path;
+      element(`${kind}-reset`).hidden = false;
+      clearError();
+      invalidatePreview();
+    }
+  } catch (error) {
+    error.field = `${kind}_directory`;
+    failure = error;
+  } finally {
+    choosingDirectory = false;
+    element("config-fields").disabled = false;
+    button.textContent = "选择文件夹";
+    updateButtons();
+  }
+  if (failure) showError(failure);
 }
 
 async function uploadFile(kind, files) {
@@ -181,11 +267,11 @@ async function uploadFile(kind, files) {
   upload.id = null;
   upload.name = "";
   element(`${kind}-dropzone`).classList.remove("is-ready");
-  element(`${kind}-action`).textContent = kind === "audio" ? "选择音频文件" : "选择或拖入 Excel 文件";
+  element(`${kind}-action`).textContent = kind === "audio" ? "选择音频文件" : "选择 Excel 文件";
   if (files.length !== 1) {
     input.value = "";
     status.textContent = "未添加文件，请每次选择 1 个文件。";
-    showError(new Error("一次只能添加 1 个文件，请重新选择。"));
+    showError(Object.assign(new Error("一次只能添加 1 个文件。"), { field: `${kind}_upload_id` }));
     return;
   }
   const file = files[0];
@@ -193,7 +279,7 @@ async function uploadFile(kind, files) {
   if (!allowedExtensions.some((extension) => file.name.toLowerCase().endsWith(extension))) {
     input.value = "";
     status.textContent = "文件格式不符合要求，请重新选择。";
-    showError(new Error(kind === "hotwords" ? "请选择 .xlsx 格式的热词文件。" : "暂不支持此文件格式，请选择支持的音频文件。"));
+    showError(Object.assign(new Error(kind === "hotwords" ? "请选择 .xlsx 格式的热词文件。" : "暂不支持此文件格式。"), { field: `${kind}_upload_id` }));
     return;
   }
   upload.busy = true;
@@ -206,7 +292,7 @@ async function uploadFile(kind, files) {
     const result = await request(`/api/upload-${kind}`, undefined, file);
     upload.id = result.upload_id;
     upload.name = result.name;
-    status.textContent = `已添加 · ${result.name} · ${(result.size_bytes / 1024 / 1024).toFixed(2)} MiB`;
+    status.textContent = `已添加 · ${result.name} · ${fileSize(result.size_bytes)}`;
     element(`${kind}-action`).textContent = kind === "audio" ? "更换音频" : "更换热词文件";
     element(`${kind}-dropzone`).classList.add("is-ready");
   } catch (error) {
@@ -227,14 +313,16 @@ function configuration() {
   const context = element("context-enabled").checked;
   const mode = hotwords && context ? "both" : hotwords ? "hotwords" : context ? "context" : "none";
   return {
-    auth_mode: selected("auth_mode"),
+    auth_mode: authMode(),
     audio_upload_id: uploads.audio.id,
     diarization_enabled: element("diarization-enabled").checked,
     enhancement_mode: mode,
     hotwords_upload_id: hotwords ? uploads.hotwords.id : null,
     context: context ? element("context").value : "",
-    json_directory: element("json-directory").value.trim(),
-    document_directory: element("document-directory").value.trim(),
+    language_hint: element("language-hint").value || null,
+    speaker_count: element("diarization-enabled").checked && element("speaker-count").value !== "" ? Number(element("speaker-count").value) : null,
+    json_directory: directories.json,
+    document_directory: directories.document,
   };
 }
 
@@ -268,11 +356,13 @@ function showPreview(summary, config) {
   };
   detailRow(details, "音频文件", uploads.audio.name || audio.name);
   detailRow(details, "音频时长", durationText(audio.duration_seconds));
-  detailRow(details, "文件大小", `${(audio.size_bytes / 1024 / 1024).toFixed(2)} MiB`);
+  detailRow(details, "文件大小", fileSize(audio.size_bytes));
   detailRow(details, "格式 / 声道", `${audio.format || audio.name.split(".").pop().toUpperCase()} / ${audio.channels} 声道`);
   detailRow(details, "采样率", `${audio.sample_rate.toLocaleString("zh-CN")} Hz`);
   detailRow(details, "账号连接", summary.auth_mode === "api_key" ? "API Key" : "百炼账号登录");
   detailRow(details, "区分发言人", config.diarization_enabled ? "开启" : "关闭");
+  detailRow(details, "音频语言", config.language_hint ? languageNames.get(config.language_hint) : "自动识别");
+  if (config.diarization_enabled) detailRow(details, "发言人数", config.speaker_count === null ? "自动判断" : `${config.speaker_count} 人（参考）`);
   detailRow(details, "精度增强", enhancementLabels[summary.enhancement.mode]);
   if (config.enhancement_mode === "hotwords" || config.enhancement_mode === "both") detailRow(details, "热词文件", uploads.hotwords.name);
   detailRow(details, "JSON 保存位置", summary.json_directory);
@@ -306,6 +396,7 @@ function showReceipt(receipt) {
   document.querySelector(".workspace").classList.add("is-confirmed");
   element("review-card").hidden = true;
   element("action-bar").hidden = true;
+  element("api-key-value").value = "";
   document.querySelector(".skip-link").hidden = true;
   document.querySelector(".review-column").setAttribute("aria-labelledby", "receipt-heading");
   element("review-state").textContent = "已保存";
@@ -346,15 +437,33 @@ form.addEventListener("input", () => {
   clearError();
   invalidatePreview();
   updateContextCount();
-  updateOutputHint();
 });
 form.addEventListener("change", (event) => {
   if (element("config-fields").disabled) return;
   invalidatePreview();
-  if (event.target.name === "auth_mode") updateAuthStatus();
+  if (event.target.id === "use-api-key") updateAuthStatus();
+  if (event.target.id === "diarization-enabled") updateSpeakerCount();
   if (event.target.id === "hotwords-enabled" || event.target.id === "context-enabled") updateEnhancement();
   if (event.target.id === "audio-file") uploadFile("audio", event.target.files);
   if (event.target.id === "hotwords-file") uploadFile("hotwords", event.target.files);
+});
+
+for (const kind of ["json", "document"]) {
+  element(`${kind}-browse`).addEventListener("click", () => selectDirectory(kind));
+  element(`${kind}-reset`).addEventListener("click", () => {
+    if (element("config-fields").disabled) return;
+    directories[kind] = "outputs";
+    element(`${kind}-directory`).value = "";
+    element(`${kind}-directory`).title = element(`${kind}-directory`).placeholder;
+    element(`${kind}-reset`).hidden = true;
+    clearError();
+    invalidatePreview();
+  });
+}
+element("api-key-toggle").addEventListener("click", () => {
+  const input = element("api-key-value");
+  input.type = input.type === "password" ? "text" : "password";
+  element("api-key-toggle").textContent = input.type === "password" ? "显示" : "隐藏";
 });
 
 for (const kind of ["audio", "hotwords"]) {
@@ -379,10 +488,27 @@ for (const kind of ["audio", "hotwords"]) {
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (element("config-fields").disabled || uploads.audio.busy || uploads.hotwords.busy || validating || confirming || confirmed) return;
+  if (element("config-fields").disabled || apiKeyLoading || choosingDirectory || uploads.audio.busy || uploads.hotwords.busy || validating || confirming || confirmed) return;
   clearError();
   invalidatePreview();
   const config = configuration();
+  // 常见漏填无需往返服务端，直接定位输入区域；服务器仍独立校验完整请求。
+  if (!config.audio_upload_id) {
+    showError(Object.assign(new Error("请选择音频文件"), { field: "audio_upload_id" }));
+    return;
+  }
+  if (element("hotwords-enabled").checked && !config.hotwords_upload_id) {
+    showError(Object.assign(new Error("请选择热词文件"), { field: "hotwords_upload_id" }));
+    return;
+  }
+  if (element("context-enabled").checked && !config.context.trim()) {
+    showError(Object.assign(new Error("请填写参考文本"), { field: "context" }));
+    return;
+  }
+  if (config.speaker_count !== null && (!Number.isInteger(config.speaker_count) || config.speaker_count < 2 || config.speaker_count > 100)) {
+    showError(Object.assign(new Error("请输入 2–100 的整数，或留空自动判断"), { field: "speaker_count" }));
+    return;
+  }
   if ((config.enhancement_mode === "context" || config.enhancement_mode === "both") && Array.from(config.context).length > 400) {
     const error = new Error("参考文本超过 400 个字符，请精简后重新检查。已保留您输入的全部内容。");
     error.field = "context";
@@ -465,13 +591,24 @@ async function start() {
     const session = await request("/api/session");
     element("model-name").textContent = session.model;
     element("region-name").textContent = session.region === "cn-beijing" || session.region === "beijing" ? "中国内地 · 北京" : session.region;
-    element("auth-status").textContent = session.auth.console.message;
+    for (const kind of ["json", "document"]) {
+      element(`${kind}-directory`).placeholder = session.output_defaults[kind];
+      element(`${kind}-directory`).title = session.output_defaults[kind];
+    }
+    for (const [code, name] of session.languages) {
+      languageNames.set(code, name);
+      const option = document.createElement("option");
+      option.value = code;
+      option.textContent = name;
+      element("language-hint").append(option);
+    }
     if (session.confirmed) {
       showReceipt(session.confirmed);
       return;
     }
     element("config-fields").disabled = false;
     updateEnhancement();
+    updateSpeakerCount();
     updateButtons();
   } catch (error) {
     showError(error);

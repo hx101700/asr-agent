@@ -187,10 +187,11 @@ class WebServerTests(WebFixture):
         connection.close()
         return result
 
-    def test_static_page_has_no_key_field_and_does_not_expose_files(self):
+    def test_static_page_has_readonly_key_display_and_does_not_expose_files(self):
         status, headers, body = self.request("GET", "/", token=False)
         self.assertEqual(status, 200)
-        self.assertNotIn(b'type="password"', body)
+        self.assertIn(b'id="api-key-value" type="password" readonly', body)
+        self.assertNotIn(b'name="api_key"', body)
         self.assertIn("frame-ancestors 'none'", headers["Content-Security-Policy"])
         self.assertEqual(self.request("GET", "/.env")[0], 404)
 
