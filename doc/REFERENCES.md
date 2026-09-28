@@ -1,0 +1,136 @@
+# 官方资料与能力基线
+
+> 核验日期：2026-09-28。仅采用已读取的官方文档、官方仓库和 npm 发布元数据。以下“源码确认”不等于“本机安装包实测通过”。
+
+## 来源索引
+
+| 编号 | 官方来源 | 用途 |
+| --- | --- | --- |
+| A01 | [模型详情](https://help.aliyun.com/en/model-studio/qwen-audio-3-0-asr-flash-filetrans) | 固定模型确实存在 |
+| A02 | [语音识别与音频规格](https://help.aliyun.com/zh/model-studio/asr-model) | 格式、大小、时长和采样率 |
+| A03 | [Filetrans HTTP API](https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-http-api) | 请求参数、任务与转写 JSON |
+| A04 | [提升识别准确率](https://help.aliyun.com/zh/model-studio/improve-asr-accuracy) | 即时热词、预编译热词、上下文限制 |
+| A05 | [热词 HTTP API](https://help.aliyun.com/zh/model-studio/vocabulary-http-api) | 创建、查询、删除预编译词表 |
+| A06 | [临时文件 URL](https://help.aliyun.com/zh/model-studio/get-temporary-file-url/) | 上传限额、有效期及资源约束 |
+| A07 | [管理异步任务](https://help.aliyun.com/zh/model-studio/manage-asynchronous-tasks) | 通用任务状态与轮询 |
+| A08 | [百炼错误码](https://www.alibabacloud.com/help/zh/model-studio/error-code) | 通用错误；页面更新于 2026-09-25 |
+| A09 | [本模型系列 Python SDK 参考](https://help.aliyun.com/zh/model-studio/funauidio-asr-recorded-speech-recognition-python-sdk) | 状态/错误示例，仅作为资料，不采用 SDK 实现 |
+| A10 | [CLI 安装与鉴权](https://help.aliyun.com/zh/model-studio/cli/installation) | 安装要求和官方鉴权流程 |
+| A11 | [CLI 快速开始](https://help.aliyun.com/zh/model-studio/cli/quickstart) | Agent 调用范式 |
+| A12 | [CLI 配置与工具](https://help.aliyun.com/zh/model-studio/cli/config) | 文件上传和配置命令 |
+| O01 | [Codex AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md) | 项目指令发现与优先级 |
+| O02 | [Codex Skills](https://learn.chatgpt.com/docs/build-skills) | SKILL.md、发现路径和渐进加载 |
+
+## 模型与文件
+
+固定 ID：`qwen-audio-3.0-asr-flash-filetrans`。不能用 `qwen3-asr-flash-filetrans`、实时版或 3.1 替代。官方列出的地域为北京、新加坡。[A01](https://help.aliyun.com/en/model-studio/qwen-audio-3-0-asr-flash-filetrans)
+
+| 约束 | 官方值/语义 | 首版处理 |
+| --- | --- | --- |
+| 每次输入 | 一个文件 URL | 只接受单文件 |
+| 模型大小/时长 | ≤2 GB，≤12 小时 | 还须满足临时存储限制 |
+| 采样率 | 任意 | 检测但不强制改为 16 kHz |
+| 格式 | aac、amr、avi、flac、flv、m4a、mkv、mov、mp3、mp4、mpeg、ogg、opus、wav、webm、wma、wmv | 首版UI面向音频；视频容器是否展示待定，不承诺视频编辑 |
+
+依据：[音频规格 A02](https://help.aliyun.com/zh/model-studio/asr-model)。本地须验证真实媒体内容，扩展名合法不能证明可识别。
+
+## 临时 OSS
+
+单文件上传上限 **1 GB**；资源有效 **48 小时**，与模型和阿里云主账号绑定。上传后不能查询、修改或下载；官方说明会在到期后清理，未找到本流程可主动删除临时音频的公开接口。获取上传凭证按主账号和模型限 **100 QPS**。`oss://` 识别请求需要 `X-DashScope-OssResourceResolve: enable`。官方不建议用于生产、高并发或压测。[A06](https://help.aliyun.com/zh/model-studio/get-temporary-file-url/)
+
+**项目方案**：采用保守阈值 1,000,000,000 字节，UI 明示为项目上传上限；这是 GB 单位未进一步澄清时的设计选择，不声称官方精确字节数。超过阈值直接阻止，不压缩/切片。先本地检查，再在确认后交由 CLI 上传。
+
+## 请求和结果注意事项
+
+- 固定模型必须有 `parameters` 对象，空配置也需 `{}`。
+- 上下文位置为 `input.context`；即时热词位置为 `parameters.vocabulary`。
+- `channel_id` 默认 `[0]`，多音轨独立计费；首版不提供多音轨选择。
+- `diarization_enabled` 默认关闭，仅单声道；开启建议 ≤2 小时。可选 `speaker_count` 为 2–100，仅是算法参考。
+- `keep_dialect` 为 3.1 专属，不给固定 3.0 开放。
+- 成功需检查任务和 `results[*].subtask_status`；转写链接有效 24 小时；句/词时间单位为毫秒。
+- 官方示例与字段表对全文/时长字段命名存在差异（`text`/`transcript`、`content_duration_in_milliseconds`/`content_duration`），S3 必须核实真实响应。
+
+依据：[A03](https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-http-api)。此页支持上下文与热词同用；首版三选一是产品选择，不是服务端禁令。
+
+## 热词与上下文
+
+| 项目 | 官方规则 | 项目策略 |
+| --- | --- | --- |
+| 即时热词 | 请求携带词→权重映射，无须建云表 | 优先建议；等待用户选择及CLI实测 |
+| 总词数 | 最多 2,000 | 本地阻止超限，避免服务端选择部分词 |
+| 权重 | 普通 1–5；50 为超级热词，超级词最多 50 个 | 不默认启用超级热词 |
+| 词长 | 含非 ASCII 字符时总长≤15字符；纯 ASCII 按空格分段≤7段 | 逐行校验并解释 |
+| 词义 | 真实词语、语种受模型支持 | 只能校验结构；不能承诺自动判断所有词义 |
+| 预编译配额 | 每账号最多10表，共享配额；更新建议间隔≥5分钟 | 不复用用户既有表，不做更新循环 |
+| 上下文 | 每轮合计≤400字符；最多保留最近5轮；服务端可能截断 | 首版单段文本≤400字符，超限阻止 |
+| 上下文效果 | 应包含待识别的相关原词 | 不把它当作摘要/行为指令 |
+| 海外限制 | 新加坡子业务空间暂不支持热词 | 海外不列首版保证 |
+
+依据：[A04](https://help.aliyun.com/zh/model-studio/improve-asr-accuracy)。字符计数须在实现时明确 Unicode 语义，不能用 UTF-8 字节数或估计 token 数替代。
+
+预编译方案使用 `speech-biasing` 的 create/query/delete 操作；`target_model` 必须等于固定模型。前缀只能含数字、小写字母且≤10字符，查询状态 `OK` 可用、`UNDEPLOYED` 不可用。管理与识别需同账号。[A05](https://help.aliyun.com/zh/model-studio/vocabulary-http-api)
+
+**差异**：A05 的权重说明仍为 1–5，A04/A03 已支持 50。预编译方案若被采用，先仅开放 1–5，等实际契约明确后再讨论超级词；不可用不确定的“兼容”代码掩盖差异。
+
+## CLI 取证版本
+
+- 官方仓库：[modelstudioai/cli](https://github.com/modelstudioai/cli)。
+- 已检查源码提交：`8bbbbc722d70fb200641ef22b6f6d033aeae9f74`，提交时间 `2026-09-28T05:23:20Z`。
+- [固定提交 package.json](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/cli/package.json) 与 [npm latest 元数据](https://registry.npmjs.org/bailian-cli/latest) 均显示 `2.1.0`，Node 要求 `>=18.17.0`。
+- [2.1.0 发布包](https://registry.npmjs.org/bailian-cli/-/bailian-cli-2.1.0.tgz) integrity：`sha512-G90UvW74qgMzZWSonLsbfCAca9+md6jnP99xFI8KkDR2xUPH7TlUmNKQENDTB2GeVAGcvCWSbUysjIAZtrn8Kw==`。
+- npm 元数据缺少 `gitHead`；源码与发布包是否一致仍需 S1 核验。不把搜索缓存中的旧版 1.25.0 当作当前版本。
+
+### 安装与鉴权源码事实
+
+| 发现 | 实现影响 | 官方源码 |
+| --- | --- | --- |
+| `BAILIAN_CONFIG_DIR` 可重定位配置/凭据 | 设计项目内独立目录，安装后验证实际写入 | [paths.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/config/paths.ts) |
+| postinstall下载Wiki，也使用该配置目录 | 安装钩子也需考虑缓存和网络，不执行未经审查的默认全局安装脚本 | [postinstall.js](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/cli/postinstall.js) |
+| 模型请求支持 `DASHSCOPE_API_KEY` | Key可由内存注入子进程环境；不必放argv | [resolver.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/auth/resolver.ts) |
+| `auth login --api-key` 在线校验但Key在argv；未见stdin入口 | 不能直接用于本项目安全输入流程；校验方式待定 | [login-api-key.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/login-api-key.ts) |
+| `auth status`只检查本地配置 | 不能把authenticated等同于模型可用 | [status.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/status.ts) |
+| 源码读取 `DASHSCOPE_BASE_URL`，帮助资料写过 `BAILIAN_BASE_URL` | 固定版本实测，不能凭名称猜环境变量 | [loader.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/config/loader.ts) |
+
+### 自动更新与遥测
+
+命令中间件存在更新检查与条件自动更新，可能运行全局 npm 更新和 `bl skill update`。`--quiet` 可阻止这一步实际更新，但不完全禁止检查网络和写更新状态。`DO_NOT_TRACK=1` 关闭遥测，不能代替关闭更新。未查到可直接使用的禁更新环境变量，不创造变量名。
+
+依据：[middleware.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/runtime/src/middleware.ts)、[update-checker.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/runtime/src/utils/update-checker.ts)。
+
+### ASR 命令契约（源码确认，尚未执行）
+
+```text
+bl speech recognize --model qwen-audio-3.0-asr-flash-filetrans --url <绝对路径> --async --quiet --output json
+```
+
+`--async --quiet` 分支仍返回 `task_id` JSON；`--out` 在该分支不保存结果。该模板只用于说明契约，完整启动方式应使用锁定的本地 CLI 入口，避免 PATH 上的另一版本。
+
+参数：`--context <text>` 转为上下文；`--vocabulary <json>` 为即时词映射；`--vocabulary-id` 为预编译表；`--diarization`、`--speaker-count`、`--channel-id` 分别控制相关参数。没有查到 `--context-file`，不得编造。[recognize.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/speech/recognize.ts)
+
+**Windows 待验证**：2,000 个热词直接作为 `--vocabulary` 参数可能达到进程命令行长度限制。须测定实际入口可承载范围；超限应准确拒绝或回到用户讨论，不能悄悄截词，也不能擅自改用云端表。
+
+### 需要规避的行为
+
+1. `recognize` 在检查 dry-run 之前可能上传本地音频；本地预检不得调用此路径。
+2. 默认等待模式的 stdout 不能保证为完整 JSON；子任务失败可能仅打印信息而退出0。
+3. 等待代码对 `CANCELED/UNKNOWN` 的处理不能满足本项目终态语义，需要自行有界管理。
+
+依据：[recognize.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/speech/recognize.ts)。
+
+独立 ASR 查询命令缺口：注册表未提供 `speech task get`；`bl video task get` 实际使用通用任务查询路径，但名称与正式能力文档不匹配，且 `--quiet` 会丢弃 `results`。列为探针候选，不直接作为产品契约。[task-get.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/video/task-get.ts)、[commands.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/cli/src/commands.ts)
+
+### 上传和失败次数
+
+当前上传实现使用国内端点，整体读入文件再构造 Blob；上传凭证超时15秒、上传超时120秒。大文件内存和网络耗时可能早于官方大小上限成为限制，S1/S3 必须验证，不能承诺任意接近1GB的文件都可成功。[upload.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/files/upload.ts)
+
+已审查的 ASR 主路径中，HTTP/上传失败直接抛出，正常未终结状态才轮询，未发现自动重提识别。此结论不覆盖整个 CLI；控制台域存在令牌刷新后再次调用的分支。安装包必须用请求计数测试复核。[http.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/client/http.ts)、[polling.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/runtime/src/utils/polling.ts)
+
+## Codex 文件约定
+
+`AGENTS.md` 是项目常驻规则，按目录发现；`SKILL.md` 是可按需加载的工作流，元数据需说明触发边界。项目技能由 `.agents/skills` 发现，单独 ZIP 未安装/未置于发现目录不等于可在所有聊天自动使用。首版在本项目范围内接入，后续若需跨项目调用另行讨论安装范围。[O01](https://learn.chatgpt.com/docs/agent-configuration/agents-md)、[O02](https://learn.chatgpt.com/docs/build-skills)
+
+## 取证局限
+
+尝试查看用户已打开的浏览器标签页时，浏览器工具先返回连接失败，后续超时；未取得标签页正文、登录状态或账户配置。公开官方资料已经另行读取。没有访问密钥内容、创建资源、上传音频或产生模型调用。
+
+未安装 CLI、未执行任何真实 ASR 命令；源码事实和在线文档不能替代 S1/S3 实测。未确认的项目集中记录在 [ISSUES.md](ISSUES.md)。

@@ -216,3 +216,17 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# asr-agent: user data, credentials, local runtimes and transcription outputs.
+/data/
+/outputs/
+/.runtime/
+/.state/
+/.secrets/
+/.tools/
+/.npm-cache/
+/node_modules/
+.env.*
+!.env.example
+*.pem
+*.key
