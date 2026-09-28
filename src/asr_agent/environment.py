@@ -183,10 +183,11 @@ def doctor(project: Project) -> dict:
     else:
         # 检查真正使用的虚拟环境，不依赖启动脚本的全局Python是否装过这些库。
         result = run_process(project, [str(venv_python), "-c",
-            "import av, dotenv, importlib.metadata as m, json; "
-            "print(json.dumps({'av': av.__version__, 'python-dotenv': m.version('python-dotenv')}))"])
+            "import av, dotenv, openpyxl, defusedxml, importlib.metadata as m, json; "
+            "print(json.dumps({name:m.version(name) for name in "
+            "['av','python-dotenv','openpyxl','et-xmlfile','defusedxml']}))"])
         if result.returncode:
-            report["issues"].append("PyAV或python-dotenv缺失/无法加载，请运行bootstrap。")
+            report["issues"].append("Python运行依赖缺失或无法加载，请运行bootstrap。")
         else:
             report["python_packages"] = json.loads(result.stdout)
     report["note"] = "仅检查本地环境；不读取凭据，不验证账号权限，不执行转写。"

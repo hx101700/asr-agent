@@ -7,7 +7,16 @@ name = "asr-agent"
 version = "0.1.0"
 description = "Local Codex workflow for Bailian file transcription"
 requires-python = ">=3.12"
-dependencies = ["av==18.1.0", "python-dotenv==1.2.3"]
+dependencies = [
+    "av==18.1.0",
+    "python-dotenv==1.2.3",
+    "openpyxl==3.1.5",
+    "et-xmlfile==2.0.0",
+    "defusedxml==0.7.1",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+asr_agent = ["static/*.html", "static/*.css", "static/*.js"]

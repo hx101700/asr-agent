@@ -53,7 +53,7 @@
 - 成功需检查任务和 `results[*].subtask_status`；转写链接有效 24 小时；句/词时间单位为毫秒。
 - 官方示例与字段表对全文/时长字段命名存在差异（`text`/`transcript`、`content_duration_in_milliseconds`/`content_duration`），S3 必须核实真实响应。
 
-依据：[A03](https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-http-api)。此页支持上下文与热词同用；首版三选一是产品选择，不是服务端禁令。
+依据：[A03](https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-http-api)。此页同一示例同时包含input.context与parameters.vocabulary；BL2.1.0同一请求也同时构造二者。已修正旧三选一界面，使用两个独立开关；联合请求构造探针再次通过。
 
 ### 单声道准备：取证范围与设计决定
 
@@ -67,7 +67,7 @@
 
 | 项目 | 官方规则 | 项目策略 |
 | --- | --- | --- |
-| 即时热词 | 请求携带词→权重映射，无须建云表 | 优先建议；等待用户选择及CLI实测 |
+| 即时热词 | 请求携带词→权重映射，无须建云表 | 用户已确定采用；可与上下文同时使用 |
 | 总词数 | 最多 2,000 | 本地阻止超限，避免服务端选择部分词 |
 | 权重 | 普通 1–5；50 为超级热词，超级词最多 50 个 | 不默认启用超级热词 |
 | 词长 | 含非 ASCII 字符时总长≤15字符；纯 ASCII 按空格分段≤7段 | 逐行校验并解释 |

@@ -1,4 +1,4 @@
-"""S1公开入口：检查、局部安装与无音频合约探针。"""
+"""项目工具入口；serve只打开S2本地配置页面。"""
 
 import argparse
 import json
@@ -16,11 +16,17 @@ def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")
-    parser = argparse.ArgumentParser(description="asr-agent S1工具；尚不执行转写。")
-    parser.add_argument("command", choices=("doctor", "bootstrap", "probe-bl", "api-key-status"))
+    parser = argparse.ArgumentParser(description="asr-agent本地工具；当前尚不执行云端转写。")
+    parser.add_argument("command", choices=("doctor", "bootstrap", "probe-bl", "api-key-status", "serve"))
+    parser.add_argument("--port", type=int, default=0, help="本地网页端口，默认自动选择")
+    parser.add_argument("--no-browser", action="store_true", help="不自动打开系统浏览器")
     args = parser.parse_args(argv)
     project = Project(Path(__file__).resolve().parents[2])
     try:
+        if args.command == "serve":
+            from .web import serve
+            serve(project, port=args.port, open_browser=not args.no_browser)
+            return 0
         actions = {
             "doctor": doctor,
             "bootstrap": bootstrap,

@@ -7,7 +7,8 @@
 | 文档 | 内容 | 何时阅读 |
 | --- | --- | --- |
 | [STATUS.md](STATUS.md) | 当前阶段、已确认决策、下一步和验证情况 | 每次开始工作 |
-| [S1_VERIFICATION.md](S1_VERIFICATION.md) | 首批代码、实际命令、合约测试与安装阻碍 | 接续S1 |
+| [S1_VERIFICATION.md](S1_VERIFICATION.md) | S1历史验证与环境能力依据 | 需要追溯基础实现时 |
+| [S2_VERIFICATION.md](S2_VERIFICATION.md) | 网页、直接选文件、组合增强、确认及浏览器验证 | 接续S2/S3 |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | 需求、原子能力、架构、界面、数据与阶段计划 | 开发前 |
 | [REFERENCES.md](REFERENCES.md) | 官方来源、版本基线、能力限制与证据边界 | 实现接口前 |
 | [ERRORS.md](ERRORS.md) | 官方状态/错误与本地错误的区别及解释规则 | 实现和排障 |
