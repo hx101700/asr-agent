@@ -7,7 +7,8 @@ import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from asr_agent import MODEL
-from asr_agent.environment import Project, bl_command, child_environment
+from asr_agent.auth import bailian_environment
+from asr_agent.environment import Project, bl_command
 from asr_agent.probe import SYNTHETIC_AUDIO_URL
 from tests.support import ROOT, ProjectTestCase
 
@@ -33,6 +34,7 @@ class BailianContractTests(ProjectTestCase):
                 self.wfile.write(body)
 
             def do_POST(self):
+                owner.authorization = self.headers.get("Authorization")
                 body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
                 owner.calls.append(("POST", self.path, body))
                 if owner.mode in ("submit_401", "submit_500"):
@@ -74,8 +76,9 @@ class BailianContractTests(ProjectTestCase):
     def invoke(self, mode="success"):
         self.mode = mode
         self.project.prepare()
-        env = child_environment(self.project, probe_mode=True)
-        env["DASHSCOPE_API_KEY"] = "asr-agent-synthetic-test-key"
+        self.project.path(".env").write_text(
+            "DASHSCOPE_API_KEY=asr-agent-synthetic-test-key\n", encoding="utf-8")
+        env = bailian_environment(self.project, "api_key")
         output = self.project.path("result.json")
         arguments = [
             "speech", "recognize", "--model", MODEL, "--url", SYNTHETIC_AUDIO_URL,
@@ -100,6 +103,7 @@ class BailianContractTests(ProjectTestCase):
         submitted = self.calls[0][2]
         self.assertEqual(submitted["model"], MODEL)
         self.assertTrue(submitted["parameters"]["diarization_enabled"])
+        self.assertEqual(self.authorization, "Bearer " + "asr-agent-synthetic-test-key")
 
     def test_submit_401_is_not_retried(self):
         result, output = self.invoke("submit_401")

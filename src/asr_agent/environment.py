@@ -70,6 +70,9 @@ def child_environment(project: Project, *, probe_mode: bool = False) -> dict[str
         "NPM_CONFIG_FUND": "false",
         # 已审阅BL的postinstall只预下载推荐器Wiki，ASR不需要该技能资产。
         "NPM_CONFIG_IGNORE_SCRIPTS": "true",
+        "PIP_CONFIG_FILE": os.devnull,
+        "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+        "PYTHONNOUSERSITE": "1",
     })
     return env
 
@@ -146,12 +149,6 @@ def verify_bl_installation(project: Project) -> None:
         raise SetupError("BL入口无法按锁定版本启动，安装可能不完整；未自动重装。")
 
 
-def media_paths(project: Project) -> dict[str, Path]:
-    lock = json.loads(project.path("tools/media-lock.json").read_text(encoding="utf-8"))
-    return {name: project.path(f".tools/ffmpeg/{lock['directory']}/bin/{name}.exe")
-            for name in ("ffmpeg", "ffprobe")}
-
-
 def doctor(project: Project) -> dict:
     report = {
         "stage": "S1",
@@ -179,14 +176,18 @@ def doctor(project: Project) -> dict:
             verify_bl_installation(project)
         except SetupError as exc:
             report["issues"].append(str(exc))
-    report["media_tools"] = {name: {"local": str(path) if path.is_file() else None,
-                                   "on_path": shutil.which(name)}
-                             for name, path in media_paths(project).items()}
-    if any(tool["local"] is None for tool in report["media_tools"].values()):
-        report["issues"].append("项目内FFmpeg/ffprobe尚未安装；单声道转换不能验收。")
     venv_python = project.path(".venv/Scripts/python.exe")
     report["venv_python"] = str(venv_python) if venv_python.is_file() else None
     if not venv_python.is_file():
         report["issues"].append("项目虚拟环境尚未创建或不完整。")
+    else:
+        # 检查真正使用的虚拟环境，不依赖启动脚本的全局Python是否装过这些库。
+        result = run_process(project, [str(venv_python), "-c",
+            "import av, dotenv, importlib.metadata as m, json; "
+            "print(json.dumps({'av': av.__version__, 'python-dotenv': m.version('python-dotenv')}))"])
+        if result.returncode:
+            report["issues"].append("PyAV或python-dotenv缺失/无法加载，请运行bootstrap。")
+        else:
+            report["python_packages"] = json.loads(result.stdout)
     report["note"] = "仅检查本地环境；不读取凭据，不验证账号权限，不执行转写。"
     return report

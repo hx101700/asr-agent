@@ -1,6 +1,6 @@
 # 使用说明
 
-> 当前状态：S1已有环境与探针工具，尚不能执行用户转写。下方先列已实现命令，后续用户页面流程仍为计划。
+> 当前已有环境工具、PyAV音频处理及.env配置检查，尚不能执行用户转写。下方先列已实现命令，网页与完整流程仍为计划。
 
 ## 已实现的开发命令
 
@@ -13,11 +13,21 @@ python scripts/asr.py bootstrap
 .venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -t . -v
 ```
 
-bootstrap只向项目内创建虚拟环境、安装锁定BL；不改全局PATH或Codex配置。S1 Python只用标准库，虚拟环境暂不安装pip。doctor返回非零表示有缺失项，不能只看JSON是否打印成功。probe-bl仅用虚构URL构造请求，不读取密钥或上传音频。
+bootstrap只向项目内创建虚拟环境，安装锁定BL、PyAV和python-dotenv；不改全局PATH或Codex配置。PyAV wheel自带FFmpeg库，无需下载ffmpeg.exe或ffprobe.exe。doctor返回非零表示有缺失项，不能只看JSON是否打印成功。probe-bl仅用虚构URL构造请求，不读取密钥或上传音频。
 
-媒体工具安装命令为`.venv\Scripts\python.exe scripts/asr.py bootstrap-media`。本轮首次下载未通过大小/SHA256校验，未解压；再次执行前需先检查已保留的`.runtime/*.part`失败文件。程序不会自动覆盖失败副本、换源或重复下载。当前3项真实媒体工具测试会跳过，见[S1验证记录](S1_VERIFICATION.md)。
+旧bootstrap-media命令已移除。媒体与配置验证见[S1验证记录](S1_VERIFICATION.md)。
 
-安装后的工具、缓存和配置保存在`.tools/`、`.runtime/`、`.state/`，均不进入Git。未提供登录或转写命令，不能从环境检查成功推断账号已可用。
+安装后的工具、缓存和状态保存在`.tools/`、`.runtime/`、`.state/`，均不进入Git。未提供真实登录或转写命令，不能从环境检查成功推断账号已可用。
+
+## API Key配置
+
+用户在本地编辑项目根目录`.env`，填写`DASHSCOPE_API_KEY=`右侧的值；不要发到聊天中。发行包首次配置可参考`.env.example`，已有.env不要覆盖。
+
+```powershell
+.venv\Scripts\python.exe scripts/asr.py api-key-status
+```
+
+此命令只返回是否已配置，不输出密钥、不访问百炼验证权限。后续网页只提供“使用API Key”选择项，后端从.env读取；页面不会显示输入框、密钥或编辑.env。真实密钥有效性由正式BL调用判断。选择控制台登录时不读取.env中的Key。
 
 ## 适用场景
 
@@ -31,7 +41,7 @@ bootstrap只向项目内创建虚拟环境、安装锁定BL；不改全局PATH�
 
 1. 将发行 ZIP 交给 Codex，指定解压/安装目录。Codex 检查环境并在项目内安装所需组件；超出目录的操作不会被默认接受。
 2. 在该项目中说“帮我转写这个录音”。Codex 启动本地网页。
-3. 选择控制台登录（推荐）或普通 API Key。控制台登录在阿里云官方页面由用户完成；网页只显示脱敏状态。
+3. 选择控制台登录（推荐）或“使用API Key”。后者要求用户提前填写项目.env，页面仅显示配置状态；控制台登录在阿里云官方页面由用户完成。
 4. 选择一个文件，查看格式、大小、时长、声道是否符合要求。
 5. 选择不增强、Excel 热词或 Prompt 上下文；错误项按页面提示修改。说话人区分默认开启，可关闭；多声道且保持开启时，网页会提示将合并为单声道副本。
 6. 确认 JSON 与文档目录，默认均位于 agent 的 `outputs/<job_id>/` 下。

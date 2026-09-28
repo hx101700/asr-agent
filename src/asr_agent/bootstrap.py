@@ -1,4 +1,4 @@
-"""通过npm安装锁定的官方BL包；不实现BL安装器或修改包内源码。"""
+"""用pip/npm安装锁定依赖；不自建工具下载器或修改BL源码。"""
 
 import json
 import os
@@ -41,7 +41,7 @@ def bootstrap(project: Project) -> dict:
     if environment.exists() and not (environment / "pyvenv.cfg").is_file():
         raise SetupError(".venv已存在且不是可识别的虚拟环境，未覆盖。")
     if not environment.exists():
-        # S1只有标准库代码，无需pip下载或全局安装Python依赖。
+        # ensurepip也通过受控子进程执行，临时文件留在项目内。
         venv.EnvBuilder(with_pip=False).create(environment)
     python = project.path(".venv/Scripts/python.exe")
     if not python.is_file():
@@ -49,6 +49,18 @@ def bootstrap(project: Project) -> dict:
     checked = run_process(project, [str(python), "-c", "import sys; raise SystemExit(sys.version_info < (3, 12))"])
     if checked.returncode:
         raise SetupError("项目虚拟环境无法启动或Python版本低于3.12，未覆盖。")
+    if not (environment / "Lib/site-packages/pip").is_dir():
+        result = run_process(project, [str(python), "-m", "ensurepip", "--default-pip"])
+        if result.returncode:
+            raise SetupError("无法在项目虚拟环境中准备pip，未自动重试。")
+    result = run_process(project, [
+        str(python), "-m", "pip", "install", "--require-hashes", "--only-binary=:all:",
+        "--no-cache-dir", "--retries", "0", "--index-url", "https://pypi.org/simple",
+        "-r", str(project.path("requirements.txt")),
+    ], timeout=300)
+    if result.returncode:
+        project.path(".runtime/python-install.log").write_text(result.stdout + result.stderr, encoding="utf-8")
+        raise SetupError("Python依赖安装失败，未重试；详见.runtime/python-install.log。")
 
     installed = installed_bl_version(project)
     if installed is not None:

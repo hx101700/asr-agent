@@ -20,7 +20,9 @@
 | A12 | [CLI 配置与工具](https://help.aliyun.com/zh/model-studio/cli/config) | 文件上传和配置命令 |
 | O01 | [Codex AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md) | 项目指令发现与优先级 |
 | O02 | [Codex Skills](https://learn.chatgpt.com/docs/build-skills) | SKILL.md、发现路径和渐进加载 |
-| M01 | [FFmpeg 音频选项](https://ffmpeg.org/ffmpeg.html#Audio-Options) | 本地单声道转换的候选工具依据 |
+| M01 | [PyAV18.1.0安装文档](https://github.com/PyAV-Org/PyAV/blob/v18.1.0/docs/overview/installation.rst) | Windows wheel包含FFmpeg库 |
+| M02 | [PyAV18.1.0 AudioResampler](https://github.com/PyAV-Org/PyAV/blob/v18.1.0/av/audio/resampler.py) | 声道转换和逐帧flush契约 |
+| C01 | [python-dotenv文档](https://bbc2.github.io/python-dotenv/) | 解析指定.env而不修改全局环境 |
 
 ## 模型与文件
 
@@ -57,7 +59,7 @@
 
 用户已要求说话人默认开启，多声道合并为单声道且网页提醒。2026-09-28针对固定CLI提交检查`recognize.ts`、`upload.ts`及命令注册表，识别参数有`--diarization`和`--channel-id`，已检查路径未见声道合并入口。此结论限定于上述源码，不声称所有BL版本均无此能力；S1仍需核对安装版本公开帮助。
 
-若确实缺失，候选复用FFmpeg输出音频选项`-ac 1`，Python仅调用工具，不写混音算法。FFmpeg手册规定`-ac`设置输出声道数；完整的音轨映射、输出编码/格式和时间轴校验参数在S1验证，不能把单个选项当作已验收的完整命令。[M01](https://ffmpeg.org/ffmpeg.html#Audio-Options)
+现采用PyAV18.1.0官方wheel，自带FFmpeg库；AudioResampler支持改变格式、声道布局、采样率，传None用于flush。项目仅调用其声道转换并保留采样率，随后编码FLAC，不调用独立FFmpeg程序、不实现混音计算。[M01](https://github.com/PyAV-Org/PyAV/blob/v18.1.0/docs/overview/installation.rst)、[M02](https://github.com/PyAV-Org/PyAV/blob/v18.1.0/av/audio/resampler.py)
 
 网页合并提示属于本项目交互；转换后的单声道要求来自模型接口。`channel_id`是音轨选择，不能代替媒体声道合并。
 
@@ -142,9 +144,9 @@ bl speech recognize --model qwen-audio-3.0-asr-flash-filetrans --url <上传文�
 
 ### 鉴权复用的边界
 
-普通Key登录已包含在线有效性校验，官方明确无需再重复模型调用测试。`auth status`只反映本地配置这一事实，不能用于推导“项目必须另写在线校验”。当前要解决的是既有登录能力的安全输入方式；如果BL公开接口与项目要求冲突，应明确讨论该冲突，不复制验证逻辑。[安装与鉴权](https://help.aliyun.com/zh/model-studio/cli/installation)、[login-api-key.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/login-api-key.ts)
+普通Key登录已包含在线有效性校验，`auth status`只反映本地配置。本项目按用户最新决定使用.env本地检查，并通过BL支持的DASHSCOPE_API_KEY子进程环境变量正式调用；不执行带明文Key参数的登录命令、不另做在线预验证。[安装与鉴权](https://help.aliyun.com/zh/model-studio/cli/installation)、[resolver.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/auth/resolver.ts)
 
-S1补充：实际安装版登录帮助无stdin/env模式，源码只从`flags.apiKey`进入普通Key校验。`model list`为`auth:none`公开模型目录；`config ui`的Profile保存不执行在线Key校验。两者不能替代安全的登录预校验。[login.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/login.ts)、[model/list.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/model/list.ts)、[config/ui.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/config/ui.ts)
+本地解析使用`dotenv_values`，显式指定项目文件并关闭变量展开；结果状态不会暴露原值。配置存在只表示已填写，不代表在线有效。[C01](https://bbc2.github.io/python-dotenv/)
 
 ### 上传和失败次数
 
@@ -165,5 +167,5 @@ S1已安装真实CLI发布包并执行公开帮助、虚构URL dry-run及本机�
 ## S1安装资料
 
 - BL使用npm生成的锁文件与`npm ci --ignore-scripts`；隔离userconfig/globalconfig/cache，禁止安装阶段重试。参数依据：[npm ci](https://docs.npmjs.com/cli/v11/commands/npm-ci/)、[npm配置](https://docs.npmjs.com/cli/v11/using-npm/config/)。
-- FFmpeg官网列出Gyan Windows构建：[官方下载入口](https://ffmpeg.org/download.html)、[Gyan构建说明](https://www.gyan.dev/ffmpeg/builds/)。固定9.0.2构建及SHA256来源见`tools/media-lock.json`，构建许可证为GPLv3，不将其记录为LGPL。
-- 本轮FFmpeg下载不完整，未通过本地摘要验证；官方元数据与实际下载结果分别记录，未更改锁值绕过检查。
+- Python库版本/wheel摘要来源：[av18.1.0 PyPI元数据](https://pypi.org/pypi/av/18.1.0/json)、[python-dotenv1.2.3元数据](https://pypi.org/pypi/python-dotenv/1.2.3/json)，已写入requirements.txt；仅使用二进制wheel。
+- pip通过原生require-hashes验证安装包；项目未保留自建下载器。[pip安全安装](https://pip.pypa.io/en/stable/topics/secure-installs/)

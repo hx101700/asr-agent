@@ -1,84 +1,62 @@
-# S1 环境与能力验证记录
+# S1 本地基础验证记录
 
-更新时间：2026-09-28。当前状态：**S1进行中，已完成本地基础工具与BL本机合约验证；媒体安装和真实鉴权未完成。**
+更新时间：2026-09-28。当前媒体实现为PyAV，旧独立FFmpeg ZIP安装方案已退役。
 
-## 本轮范围
+## 已实现命令
 
-只编写环境检查、项目内安装与探针。没有用户转写入口、Web页面、Excel热词导入或三种文档导出；没有用Python重写百炼上传、轮询、下载或鉴权协议。
+在项目根目录执行：
 
-## 已实现入口
-
-在项目根目录执行，命令返回UTF-8 JSON；成功返回0，环境问题/失败返回1。
-
-| 命令 | 行为 | 当前证据 |
+| 命令 | 行为 | 本机结果 |
 | --- | --- | --- |
-| `python scripts/asr.py bootstrap` | 检查现有Python/Node；创建无pip的本地venv；npm ci安装锁定BL | 已安装；再次执行返回already_installed并实际检查BL入口 |
-| `.venv\Scripts\python.exe scripts/asr.py doctor` | 检查版本、BL实际启动及媒体工具路径；不读取凭据 | 本机正确报告FFmpeg/ffprobe缺失并返回1 |
-| `.venv\Scripts\python.exe scripts/asr.py probe-bl` | 读取公开帮助，用固定example.invalid URL执行请求构造dry-run | 已通过；确认固定模型、说话人、热词、上下文映射 |
-| `.venv\Scripts\python.exe scripts/asr.py bootstrap-media` | 下载固定FFmpeg构建，校验大小/SHA256/ZIP路径，再解压到项目 | 首次下载不完整，被拦截，未解压/执行 |
+| `python scripts/asr.py bootstrap` | 创建项目venv，pip安装锁定Python依赖，npm ci安装BL | 已安装；再次执行成功，不覆盖不匹配的BL |
+| `.venv\Scripts\python.exe scripts/asr.py doctor` | 检查BL实际启动、venv与Python库 | 通过，issues为空 |
+| `.venv\Scripts\python.exe scripts/asr.py probe-bl` | 公开帮助与固定虚构URL dry-run | 前一轮已通过；本轮仍受合约测试保护 |
+| `.venv\Scripts\python.exe scripts/asr.py api-key-status` | 读取指定.env，仅返回配置状态 | 空Key正确返回未配置；不回显Key、不宣称在线验证 |
 
-不接受真实音频路径的探针设计是有意限制：BL本地文件dry-run可能先上传。`probe-bl`与将来的登录配置使用不同目录，发现探针目录中有配置/凭据文件即停止而不读取。
+网页、真实登录、音频上传、云端识别和三种文档导出尚未实现/验收。`bailian_environment()`只构造后续调用所需环境，尚未连接真实识别入口。
 
-## 实际环境与安装边界
+## 环境与依赖
 
-| 项目 | 本轮观察 |
-| --- | --- |
-| OS | Windows x64 |
-| Python | 3.12.1，复用现有运行时；`.venv`位于项目内 |
-| Node | 24.19.0，复用现有运行时 |
-| BL | 顶层/core/runtime/commands均为2.1.0；实际入口输出`bl 2.1.0` |
-| npm依赖 | 锁定55个传递/直接包，全部具备registry.npmjs.org地址及完整性摘要 |
-| BL安装目录 | `.tools/bailian/` |
-| 配置 | 预留`.state/bailian/`；无凭据探针使用`.state/bailian-probe/` |
-| 临时文件/缓存 | `.runtime/tmp/`、`.runtime/npm-cache/` |
-| 结果记录 | `.state/bl-probe.json`、`.state/tests-report.json`，均不进Git |
+- Windows x64，Python3.12.1，Node24.19.0，项目内BL四个相关包均2.1.0。
+- Python直接运行依赖：`av==18.1.0`、`python-dotenv==1.2.3`。未安装NumPy、pydub、ffmpeg-python或额外Agent框架。
+- PyAV Windows wheel为cp311-abi3-win_amd64，兼容本机CPython3.12，内部附带FFmpeg库，不需要ffmpeg.exe/ffprobe.exe。
+- `requirements.txt`固定两份wheel的SHA256；`tools/bailian/package-lock.json`保留55个上游生产依赖及完整性摘要，没有可随意删去的dev-only/optional包。
+- 本机旧pip联网下载PyAV曾拿到不完整文件并因摘要不符被拒绝；随后以Node标准网络能力取得同一PyPI官方wheel，校验原摘要后交给pip本地安装。未修改摘要或增加产品内下载器。标准bootstrap的干净机联网安装仍需S5验收。
+- `bootstrap`给子进程设置项目内临时目录，禁用用户pip/npm配置继承、缓存或自动重试；现有BL流程仍通过npm复用，命令统一quiet以阻止其自动全局升级。
 
-安装使用npm原生命令与生成的锁文件；跳过安装脚本。已审阅BL的postinstall仅预下载推荐器Wiki，当前ASR探针不需要这些技能资产。不执行全局安装、`bl skill init`或`bl config agent`。
+## 媒体验证
 
-子进程环境用白名单构造，不继承DASHSCOPE/API Key、NPM_TOKEN、NODE_OPTIONS等；npm用户/全局配置指向项目内空文件。所有BL调用附`--quiet`走已核实的禁自动升级路径，遥测设置`DO_NOT_TRACK=1`。这不禁止BL检查公开版本信息；本轮看到的update-state.json只在项目探针目录中。
+`media.py`用PyAV逐帧解码、AudioResampler转换及FLAC编码，没有Python混音计算。默认处理第一个音轨，与BL首版规则一致；probe返回音轨数量供后续网页提醒，不拼接不同音轨。
 
-路径写入前解析并检查仍在项目内；不覆盖非空未知安装目录。版本元数据不足以证明安装完整，bootstrap和doctor还会实际运行BL版本入口，检测缺依赖状态。
+已通过：
 
-**限制**：尚未在干净Windows机器验证缺Python/Node时的自动安装；未做全机文件访问追踪，不将路径配置与本机观察扩张为完整安装审计。S5安装验收仍须实际执行。
+- 合成WAV立体声→单声道FLAC，采样率与有效样本时长符合检查，源文件哈希不变。
+- 左右声道分时有声，两侧都参与输出；标准5.1布局可转换为单声道。
+- 合成MP3可解码并转换；单声道输入不产生多余副本。
+- 既有输出不覆盖，源路径不能作为转换目标，损坏音频不创建成品。
 
-## 真实BL发布包的本机合约测试
+输出时长按有效解码样本数核验，容差为1个样本。此验证不等于所有模型支持格式、异常时间戳、超长或接近1GB输入均已验收。标准下混不承诺任意声道布局等权参与。
 
-测试使用真实BL 2.1.0程序、合成Key与127.0.0.1模拟ASR/结果服务；输入是虚构HTTPS URL，不上传本地文件。Python HTTP代码只存在于测试fixture，不是产品云端客户端。
+## .env与API Key验证
 
-| 场景 | 观察 |
-| --- | --- |
-| 完整成功 | 一次POST提交、一次GET查询、一次GET下载；BL的out正确保存JSON |
-| 默认成功模式task_id | stdout没有返回模拟任务ID，不能承诺总能恢复任务 |
-| 提交401/500 | 各仅一次请求；退出失败，无结果文件 |
-| 查询500 | 一次提交、一次失败查询，随后退出；没有重提 |
-| 任务FAILED | 一次提交/查询后失败退出 |
-| 子任务FAILED | BL退出0，stdout含FAILED，out为`[]`；后续业务必须检查产物 |
-| CANCELED/UNKNOWN | 查询持续至退出码5（超时），没有重新提交 |
+使用python-dotenv读取显式项目.env，关闭变量展开，不更新全局os.environ。只检查文件/配置可用性及内部空白，不发在线请求。状态中`verified_online`始终为false。
 
-这些结果证明所测CLI调用路径与本地输入/输出契约，不证明云端账号权限、OSS上传成功、真实音频识别质量或服务端JSON实际字段。
+已验证：缺失/空Key提示、成功配置不回显密钥、不使用全局环境Key、控制台模式不读.env、仅API Key模式向BL环境注入Key、多行值拒绝且错误不泄露值。测试全部使用合成字符串；本地.env仍为空。
 
-## 媒体工具安装结果
+## BL合约证据
 
-锁定FFmpeg官网列出的Gyan Windows x64 9.0.2 essentials构建，保留原始许可证文件，不向Git或系统PATH添加二进制。固定来源、大小和SHA256见`tools/media-lock.json`。
+真实BL2.1.0连接127.0.0.1模拟服务，使用合成Key与虚构URL：完整流程能保存JSON；提交401/500与查询500均未重试；任务失败后停止；子任务失败可以退出0并写`[]`；CANCELED/UNKNOWN持续查询至超时且没有重提。普通完整成功路径不返回task_id。
 
-首次下载收到13,581,313字节，预期114,768,076字节；实际SHA256为`d2571a5a94cc3ad491386121a8f2a6bfbf581f34fbe9284adc8510ae48573048`，与锁定摘要不符，且不是完整ZIP。程序拒绝解压/执行，未自动重试。失败副本保留在`.runtime/ffmpeg-9.0.2-essentials_build.zip.part`，不进入Git。具体截断原因尚未确定，不能仅凭下载失败断言发布者文件有问题。
+Python HTTP服务只在测试fixture中，不是产品ASR客户端。BL可能查询公开版本信息，因此不称整个进程完全离线。没有真实阿里云ASR请求或用户音频上传。
 
-下载处理增加进程级360秒总截止时间，避免仅依赖socket空闲超时。该截止与错误传播的单元测试通过；修正后的完整下载路径尚未再次联网执行。已实测再次启动入口会在发现既有part时立即失败，不覆盖文件、不发起重复下载。再次安装之前应检查并处理已知失败part文件，由明确的后续操作发起，不在安装器中自动循环重试。
-
-已编写合成立体声→单声道FLAC探针，检查原文件不变、采样率/时长、两侧信号参与及拒绝覆盖已有输出；由于没有可执行FFmpeg，三项实际转换测试跳过。不能声称转换方案已通过。
-
-## 自动化验证
+## 测试与清理
 
 ```powershell
 .venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -t . -v
 ```
 
-最终发现28项测试：**25项成功、3项媒体合约测试跳过、0失败、0错误**。以实际成功/跳过回调逐项核对，不单凭测试运行器的总数解释结果。核心测试覆盖环境变量隔离、路径越界拒绝、无重试、安装完整性、合成URL探针、CLI合约，以及媒体归档摘要/路径/符号链接拒绝。
+本轮发现35项用例，35项成功，0跳过/失败/错误；逐项记录位于被忽略的`.state/tests-report.json`。
 
-## 未解决事项与下一步
+已删除旧`media_setup.py`、`media_worker.py`、`media-lock.json`及专用ZIP安装测试，移除旧命令。清理失败FFmpeg下载、npm缓存、临时wheel和旧字节码等共83,277,373字节；保留正在使用的BL、Python环境、项目资料与数据。
 
-1. **媒体安装**：查明不完整下载的原因，取得通过原摘要校验的包后再运行三项媒体合约测试。
-2. **普通Key预校验**：已确认BL公开登录模式没有stdin/env入口；`model list`为匿名目录、`config ui`保存配置不做在线校验，均不能冒充有效性验证。不增加Python校验器；下一步明确产品交互与安全输入的取舍。
-3. **完整任务恢复**：已有BL模式不总暴露task_id；保留这项上游限制，不增加Python轮询器。
-4. **待定产品选择**：即时热词/预编译词表、北京地域尚未收到明确答复；探针只验证参数能力，不代表替用户选定方案。
-5. **进入S2之前**：继续解决S1剩余事项并报告，再开发网页与本地校验。真实登录、上传和识别尚未开始。
+历史：前一版曾因FFmpeg ZIP不完整而拦截安装，当时25项成功、3项跳过。这是旧方案记录，不表示该下载问题已修复；现在通过更换媒体集成方式解除依赖该下载的阻碍。
