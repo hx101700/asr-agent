@@ -1,6 +1,23 @@
 # 使用说明
 
-> 当前状态：设计阶段，尚不能通过本仓库执行转写。以下说明描述计划的首版体验；可运行入口和安装命令将在对应阶段完成后补充。
+> 当前状态：S1已有环境与探针工具，尚不能执行用户转写。下方先列已实现命令，后续用户页面流程仍为计划。
+
+## 已实现的开发命令
+
+前提：Windows x64、已有Python3.12+和带npm的Node.js18.17+，网络可访问npm官方registry。缺少基础运行时的自动安装尚未实现。
+
+```powershell
+python scripts/asr.py bootstrap
+.venv\Scripts\python.exe scripts/asr.py doctor
+.venv\Scripts\python.exe scripts/asr.py probe-bl
+.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -t . -v
+```
+
+bootstrap只向项目内创建虚拟环境、安装锁定BL；不改全局PATH或Codex配置。S1 Python只用标准库，虚拟环境暂不安装pip。doctor返回非零表示有缺失项，不能只看JSON是否打印成功。probe-bl仅用虚构URL构造请求，不读取密钥或上传音频。
+
+媒体工具安装命令为`.venv\Scripts\python.exe scripts/asr.py bootstrap-media`。本轮首次下载未通过大小/SHA256校验，未解压；再次执行前需先检查已保留的`.runtime/*.part`失败文件。程序不会自动覆盖失败副本、换源或重复下载。当前3项真实媒体工具测试会跳过，见[S1验证记录](S1_VERIFICATION.md)。
+
+安装后的工具、缓存和配置保存在`.tools/`、`.runtime/`、`.state/`，均不进入Git。未提供登录或转写命令，不能从环境检查成功推断账号已可用。
 
 ## 适用场景
 

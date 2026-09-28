@@ -1,6 +1,6 @@
 # 官方资料与能力基线
 
-> 核验日期：2026-09-28。仅采用已读取的官方文档、官方仓库和 npm 发布元数据。以下“源码确认”不等于“本机安装包实测通过”。
+> 核验日期：2026-09-28。仅采用已读取的官方资料及本机证据。部分2.1.0发布包契约已在S1验证，范围见[S1_VERIFICATION.md](S1_VERIFICATION.md)；源码确认仍不等于真实云端验收。
 
 ## 来源索引
 
@@ -144,6 +144,8 @@ bl speech recognize --model qwen-audio-3.0-asr-flash-filetrans --url <上传文�
 
 普通Key登录已包含在线有效性校验，官方明确无需再重复模型调用测试。`auth status`只反映本地配置这一事实，不能用于推导“项目必须另写在线校验”。当前要解决的是既有登录能力的安全输入方式；如果BL公开接口与项目要求冲突，应明确讨论该冲突，不复制验证逻辑。[安装与鉴权](https://help.aliyun.com/zh/model-studio/cli/installation)、[login-api-key.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/login-api-key.ts)
 
+S1补充：实际安装版登录帮助无stdin/env模式，源码只从`flags.apiKey`进入普通Key校验。`model list`为`auth:none`公开模型目录；`config ui`的Profile保存不执行在线Key校验。两者不能替代安全的登录预校验。[login.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/login.ts)、[model/list.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/model/list.ts)、[config/ui.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/config/ui.ts)
+
 ### 上传和失败次数
 
 当前上传实现使用国内端点，整体读入文件再构造 Blob；上传凭证超时15秒、上传超时120秒。大文件内存和网络耗时可能早于官方大小上限成为限制，S1/S3 必须验证，不能承诺任意接近1GB的文件都可成功。[upload.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/files/upload.ts)
@@ -158,4 +160,10 @@ bl speech recognize --model qwen-audio-3.0-asr-flash-filetrans --url <上传文�
 
 尝试查看用户已打开的浏览器标签页时，浏览器工具先返回连接失败，后续超时；未取得标签页正文、登录状态或账户配置。公开官方资料已经另行读取。没有访问密钥内容、创建资源、上传音频或产生模型调用。
 
-未安装 CLI、未执行任何真实 ASR 命令；源码事实和在线文档不能替代 S1/S3 实测。未确认的项目集中记录在 [ISSUES.md](ISSUES.md)。
+S1已安装真实CLI发布包并执行公开帮助、虚构URL dry-run及本机模拟服务识别命令。没有真实阿里云ASR调用或用户音频上传，不能据此认定云端权限/质量/媒体兼容性通过。未确认项目见[ISSUES.md](ISSUES.md)。
+
+## S1安装资料
+
+- BL使用npm生成的锁文件与`npm ci --ignore-scripts`；隔离userconfig/globalconfig/cache，禁止安装阶段重试。参数依据：[npm ci](https://docs.npmjs.com/cli/v11/commands/npm-ci/)、[npm配置](https://docs.npmjs.com/cli/v11/using-npm/config/)。
+- FFmpeg官网列出Gyan Windows构建：[官方下载入口](https://ffmpeg.org/download.html)、[Gyan构建说明](https://www.gyan.dev/ffmpeg/builds/)。固定9.0.2构建及SHA256来源见`tools/media-lock.json`，构建许可证为GPLv3，不将其记录为LGPL。
+- 本轮FFmpeg下载不完整，未通过本地摘要验证；官方元数据与实际下载结果分别记录，未更改锁值绕过检查。
