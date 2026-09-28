@@ -73,6 +73,8 @@ flowchart TD
 
 当前采用Python标准库http.server、本地原生HTML/CSS/JS和百炼CLI子进程边界；没有FastAPI/Uvicorn或前端框架。媒体使用PyAV，Excel解析使用openpyxl，Python验证使用unittest。原生目录弹窗使用Python附带的tkinter，不新增pip依赖。Word导出仍待S4实施。
 
+目录弹窗由独立短生命周期GUI进程承载，`directory_picker.py`等待并管理取消/5分钟超时，`_directory_dialog.py`只显示窗口并经私有管道返回结果。此隔离用于可终止性；可见性仍要求服务在正常交互桌面启动。网页等待期间保持其他输入可编辑，取消接口绑定当前picker_id，旧请求不影响新窗口。
+
 选择理由：浏览器确认、任务状态和文件校验均可显式控制；前端无构建链，不额外引入Node前端框架；Node服务于百炼CLI。媒体操作统一使用PyAV，格式探测不能仅看扩展名；.env解析复用python-dotenv。当前仅这两个Python运行依赖，版本与wheel摘要固定，不再维护独立FFmpeg下载器。
 
 不用独立 Agent SDK、额外模型调用或 MCP 服务。Codex承担交互推理；BL执行云端操作；Python连接本地输入与BL产物。只有出现实际无法满足的需求时再增加结构。

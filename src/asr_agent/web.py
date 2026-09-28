@@ -72,27 +72,40 @@ class Session:
         self.uploads = {}
         self.output_directories = {}
         self.picker_lock = threading.Lock()
+        self.picker_id = None
+        self.picker_cancel_event = threading.Event()
+        self.cancelled_picker_id = None
 
-    def select_directory(self, kind: str) -> dict:
+    def select_directory(self, kind: str, picker_id: str | None = None) -> dict:
         if kind not in ("json", "document"):
             raise ValidationError("未知的保存位置。", "directory")
+        picker_id = picker_id if picker_id is not None else uuid.uuid4().hex
+        if not isinstance(picker_id, str) or not 1 <= len(picker_id) <= 64:
+            raise ValidationError("目录选择请求无效。", "directory")
         if not self.picker_lock.acquire(blocking=False):
             raise ValidationError("请先关闭已打开的文件夹窗口。", f"{kind}_directory")
         try:
             with self.lock:
                 if self.receipt:
                     raise ValidationError("设置已保存，请新建任务。", "session")
+                if picker_id == self.cancelled_picker_id:
+                    self.cancelled_picker_id = None
+                    return {"ok": True, "cancelled": True}
+                self.picker_id = picker_id
+                self.picker_cancel_event.clear()
                 initial = self.output_directories.get(kind, self.project.root / "outputs")
                 while not initial.exists():
                     initial = initial.parent
             # 对话框只返回用户选择的目录，浏览器不能提交路径来扩展访问范围。
             try:
-                selected = choose_directory(initial)
+                selected = choose_directory(initial, cancel_event=self.picker_cancel_event)
             except SetupError as exc:
                 raise ValidationError(str(exc), f"{kind}_directory") from exc
             if selected is None:
                 return {"ok": True, "cancelled": True}
             with self.lock:
+                if self.picker_cancel_event.is_set():
+                    return {"ok": True, "cancelled": True}
                 if self.receipt:
                     raise ValidationError("设置已保存，请新建任务。", "session")
                 path = output_directory(self.project, str(selected), f"{kind}_directory", approved=selected)
@@ -100,7 +113,20 @@ class Session:
                 self.draft = None
                 return {"ok": True, "cancelled": False, "path": str(path)}
         finally:
+            with self.lock:
+                self.picker_id = None
             self.picker_lock.release()
+
+    def cancel_directory(self, picker_id: str) -> dict:
+        if not isinstance(picker_id, str) or not 1 <= len(picker_id) <= 64:
+            raise ValidationError("目录选择请求无效。", "directory")
+        with self.lock:
+            if self.picker_id == picker_id:
+                self.picker_cancel_event.set()
+            else:
+                # 取消请求可能先于打开请求到达；只记住这一次ID，避免误取消下一次窗口。
+                self.cancelled_picker_id = picker_id
+        return {"ok": True}
 
     def api_key_display(self) -> dict:
         """用户选择指定Key后，仅向受保护的本机页面提供；不写配置和日志。"""
@@ -182,6 +208,10 @@ class Session:
 
     def cleanup(self) -> None:
         """会话结束时清理未确认副本；已保存配置引用的文件继续保留。"""
+        self.picker_cancel_event.set()
+        # 给选择请求时间回收自己的GUI子进程，再清理会话文件。
+        if self.picker_lock.acquire(timeout=2):
+            self.picker_lock.release()
         with self.lock:
             keep = set()
             if self.receipt and self.draft:
@@ -431,7 +461,9 @@ def create_server(project: Project, port: int = 0) -> ThreadingHTTPServer:
                 elif path == "/api/api-key":
                     self.json(200, session.api_key_display())
                 elif path == "/api/select-directory":
-                    self.json(200, session.select_directory(payload.get("kind")))
+                    self.json(200, session.select_directory(payload.get("kind"), payload.get("picker_id")))
+                elif path == "/api/cancel-directory":
+                    self.json(200, session.cancel_directory(payload.get("picker_id")))
                 else:
                     self.json(404, {"ok": False, "error": "未找到此接口。"})
             except (ValidationError, SetupError, OSError) as exc:

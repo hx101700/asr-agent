@@ -100,6 +100,7 @@ function harness(overrides = {}) {
     },
     window: { location: { hash: "", pathname: "/", search: "" }, history: { replaceState() {} } },
     URLSearchParams, ResizeObserver: class { observe() {} },
+    crypto: { randomUUID: require("node:crypto").randomUUID },
     fetch: async (url, options) => {
       calls.push({ url, options });
       assert.ok(handlers[url], `未预期的请求：${url}`);
@@ -291,4 +292,44 @@ test("关闭发言人区分后，不提交先前填写的人数", async () => {
   const payload = JSON.parse(page.calls.at(-1).options.body);
   assert.equal(payload.diarization_enabled, false);
   assert.equal(payload.speaker_count, null);
+});
+
+test("等待目录窗口时仍可编辑，取消会结束当前请求并保留保存位置", async () => {
+  const selection = deferred();
+  const page = harness({
+    "/api/select-directory": () => selection.promise,
+    "/api/cancel-directory": () => {
+      selection.resolve(response({ cancelled: true }));
+      return response({ ok: true });
+    },
+  });
+  await preparePreview(page);
+  const selecting = page.node("json-browse").dispatch("click");
+  assert.equal(page.node("config-fields").disabled, false);
+  assert.equal(page.node("json-browse").disabled, true);
+  assert.equal(page.node("directory-wait").hidden, false);
+  assert.equal(page.node("cancel-directory").disabled, false);
+  page.change("speaker-count", "value", "4");
+  await page.node("cancel-directory").dispatch("click");
+  await selecting;
+  assert.equal(page.node("json-directory").value, "");
+  assert.equal(page.node("json-browse").disabled, false);
+  assert.equal(page.node("directory-wait").hidden, true);
+  assert.equal(page.node("speaker-count").value, "4");
+  const opened = page.calls.find((call) => call.url === "/api/select-directory");
+  const cancelled = page.calls.find((call) => call.url === "/api/cancel-directory");
+  assert.equal(JSON.parse(opened.options.body).picker_id, JSON.parse(cancelled.options.body).picker_id);
+  await page.submit();
+  assert.equal(JSON.parse(page.calls.at(-1).options.body).speaker_count, 4);
+});
+
+test("目录窗口超时后可继续操作，不自动重开窗口", async () => {
+  const page = harness({ "/api/select-directory": () => response({ ok: false, error: "窗口等待超时" }, 422) });
+  await preparePreview(page);
+  await page.node("json-browse").dispatch("click");
+  assert.equal(page.node("config-fields").disabled, false);
+  assert.equal(page.node("json-browse").disabled, false);
+  assert.equal(page.node("json-error").hidden, false);
+  assert.equal(page.node("directory-wait").hidden, true);
+  assert.equal(page.calls.filter((call) => call.url === "/api/select-directory").length, 1);
 });

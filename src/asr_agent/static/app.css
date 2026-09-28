@@ -113,6 +113,8 @@ summary { color: var(--muted); font-size: 13px; }
 .directory-row { display: flex; gap: 10px; align-items: center; }
 .directory-row input { min-width: 0; text-overflow: ellipsis; }
 .directory-row .button { flex: 0 0 auto; }
+.directory-wait { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 16px; color: var(--muted); font-size: 13px; }
+.directory-wait button { flex: 0 0 auto; }
 input[readonly] { background: #fafbfc; cursor: default; }
 input[readonly]::placeholder { color: #858b95; }
 .field-error { color: #b42318; font-size: 13px; margin-top: 8px; overflow-wrap: anywhere; }

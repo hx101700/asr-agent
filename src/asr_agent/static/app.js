@@ -16,6 +16,7 @@ let errorField = null;
 let errorBox = null;
 let errorTarget = null;
 let choosingDirectory = false;
+let directoryRequestId = null;
 let apiKeyLoading = false;
 let authRevision = 0;
 const directories = { json: "outputs", document: "outputs" };
@@ -137,6 +138,10 @@ function updateButtons() {
   element("confirm-button").hidden = !validationId || confirmed;
   element("edit-button").hidden = !validationId || confirmed;
   element("edit-button").disabled = locked || confirming;
+  for (const kind of ["json", "document"]) {
+    element(`${kind}-browse`).disabled = locked;
+    element(`${kind}-reset`).disabled = locked;
+  }
   element("validate-button").textContent = uploading ? "正在添加文件…" : validating ? "正在检查…" : "检查并预览";
   element("confirm-button").textContent = confirming ? "正在保存…" : confirmed ? "已保存" : "保存设置";
 }
@@ -230,13 +235,16 @@ function fileSize(bytes) {
 async function selectDirectory(kind) {
   if (element("config-fields").disabled || choosingDirectory) return;
   choosingDirectory = true;
-  element("config-fields").disabled = true;
+  directoryRequestId = crypto.randomUUID();
+  element("directory-wait").hidden = false;
+  element("cancel-directory").disabled = false;
+  element("cancel-directory").textContent = "取消等待";
   const button = element(`${kind}-browse`);
   button.textContent = "请在弹窗中选择…";
   updateButtons();
   let failure = null;
   try {
-    const result = await request("/api/select-directory", { kind });
+    const result = await request("/api/select-directory", { kind, picker_id: directoryRequestId });
     if (!result.cancelled) {
       directories[kind] = result.path;
       element(`${kind}-directory`).value = result.path;
@@ -250,12 +258,31 @@ async function selectDirectory(kind) {
     failure = error;
   } finally {
     choosingDirectory = false;
-    element("config-fields").disabled = false;
+    directoryRequestId = null;
+    element("directory-wait").hidden = true;
     button.textContent = "选择文件夹";
     updateButtons();
   }
   if (failure) showError(failure);
 }
+
+element("cancel-directory").addEventListener("click", async () => {
+  if (!directoryRequestId) return;
+  const pickerId = directoryRequestId;
+  const button = element("cancel-directory");
+  button.disabled = true;
+  button.textContent = "正在取消…";
+  try {
+    await request("/api/cancel-directory", { picker_id: pickerId });
+    // 等原请求返回取消结果再恢复目录按钮，确保旧窗口和进程已结束。
+  } catch (error) {
+    if (directoryRequestId === pickerId) {
+      button.disabled = false;
+      button.textContent = "取消等待";
+      showError(error);
+    }
+  }
+});
 
 async function uploadFile(kind, files) {
   const upload = uploads[kind];

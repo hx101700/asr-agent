@@ -4,6 +4,7 @@ import json
 import threading
 import wave
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 
 from openpyxl import Workbook
@@ -107,6 +108,36 @@ class DirectoryOptionTests(OptionsFixture):
             self.session.confirm(preview["validation_id"])
         self.assertFalse(self.project.path(".state/jobs").exists())
 
+    def test_cancel_waiting_picker_keeps_previous_preview_and_releases_lock(self):
+        preview = self.session.validate(self.payload)
+        started = threading.Event()
+
+        def blocked_picker(_initial, *, cancel_event):
+            started.set()
+            self.assertTrue(cancel_event.wait(timeout=3))
+            return self.selected  # 即使同时收到结果，也不能把已取消的选择登记下来。
+
+        with patch("asr_agent.web.choose_directory", side_effect=blocked_picker):
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                selected = pool.submit(self.session.select_directory, "json", "picker-current")
+                self.assertTrue(started.wait(timeout=3))
+                self.session.cancel_directory("picker-old")
+                self.assertFalse(self.session.picker_cancel_event.is_set())
+                self.session.cancel_directory("picker-current")
+                self.assertTrue(selected.result(timeout=3)["cancelled"])
+        self.assertEqual(self.session.output_directories, {})
+        self.assertEqual(self.session.draft["id"], preview["validation_id"])
+        self.assertFalse(self.session.picker_lock.locked())
+        self.assertFalse(self.select(self.session, "json", self.selected)["cancelled"])
+
+    def test_cancel_arriving_before_open_prevents_window_but_not_next_request(self):
+        self.session.cancel_directory("early-cancel")
+        with patch("asr_agent.web.choose_directory", return_value=self.selected) as picker:
+            self.assertTrue(self.session.select_directory("json", "early-cancel")["cancelled"])
+            picker.assert_not_called()
+            self.assertFalse(self.session.select_directory("json", "next-request")["cancelled"])
+            picker.assert_called_once()
+
     def test_language_speakers_and_combined_enhancement_survive_confirmation(self):
         workbook = Workbook()
         workbook.active.append(["text", "weight"])
@@ -178,7 +209,8 @@ class ProtectedOptionsEndpointTests(OptionsFixture):
     def test_new_routes_require_token_and_correct_origin_before_any_action(self):
         with patch("asr_agent.web.choose_directory") as picker, \
              patch("asr_agent.web.read_api_key") as read_key:
-            for route, payload in (("/api/select-directory", {"kind": "json"}), ("/api/api-key", {})):
+            for route, payload in (("/api/select-directory", {"kind": "json"}), ("/api/api-key", {}),
+                                   ("/api/cancel-directory", {"picker_id": "protected-picker"})):
                 with self.subTest(route=route):
                     self.assertEqual(self.request("POST", route, payload, token=False)[0], 403)
                     self.assertEqual(self.request("POST", route, payload, origin="https://example.invalid")[0], 403)

@@ -203,3 +203,5 @@ S1已安装真实CLI发布包并执行公开帮助、虚构URL dry-run及本机�
 已实际运行锁定BL帮助及保留域名URL的dry-run：--language zh --diarization --speaker-count 3 --channel-id 1，输出parameters包含language_hints:["zh"]、speaker_count:3、diarization_enabled:true、channel_id:[1]。无真实Key或音频。证据位于安装包bailian-cli-commands/dist/index.mjs识别命令及bailian-cli-core/dist/index.mjs语言构造函数；通用参数表不能替代发布包验证。
 
 目录窗口使用Python3.12标准库[tkinter.filedialog.askdirectory](https://docs.python.org/3.12/library/dialog.html#tkinter.filedialog.askdirectory)，支持initialdir/parent和mustexist。用户已授权选择项目外保存位置；当前只选现有目录，不用浏览器文件上传控件冒充保存位置选择。
+
+目录故障补充：Python[线程模型说明](https://docs.python.org/3.12/library/tkinter.html#threading-model)允许Tk解释器属于单独线程，不能仅凭HTTP工作线程创建Tk认定违规。本机对照确认默认受限执行与正常交互桌面的原生窗口显示结果不同；这是运行证据，不是官方文档对Codex实现的结论。独立GUI进程用于取消/超时回收，正常桌面启动解决已观察的可见性问题。
