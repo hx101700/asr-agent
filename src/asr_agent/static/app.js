@@ -12,6 +12,7 @@ let validationId = null;
 let validating = false;
 let confirming = false;
 let confirmed = false;
+let errorField = null;
 const uploads = {
   audio: { id: null, name: "", busy: false },
   hotwords: { id: null, name: "", busy: false },
@@ -59,6 +60,12 @@ async function request(path, payload, file) {
 function clearError() {
   element("error-panel").hidden = true;
   element("error-details").replaceChildren();
+  if (errorField) {
+    const descriptions = (errorField.getAttribute("aria-describedby") || "").split(" ").filter((id) => id !== "error-message");
+    errorField.setAttribute("aria-describedby", descriptions.join(" "));
+    errorField = null;
+  }
+  element("error-field-link").hidden = true;
   form.querySelectorAll('[aria-invalid="true"]').forEach((input) => input.removeAttribute("aria-invalid"));
 }
 
@@ -78,8 +85,13 @@ function showError(error) {
     audio_path: "audio-file", hotwords_path: "hotwords-file", context: "context",
     json_directory: "json-directory", document_directory: "document-directory",
   };
-  const input = element(fieldIds[error.field]);
-  if (input) input.setAttribute("aria-invalid", "true");
+  const input = error.field === "auth_mode" ? form.querySelector('input[name="auth_mode"]:checked') : element(fieldIds[error.field]);
+  if (input) {
+    input.setAttribute("aria-invalid", "true");
+    input.setAttribute("aria-describedby", `${input.getAttribute("aria-describedby") || ""} error-message`.trim());
+    errorField = input;
+    element("error-field-link").hidden = false;
+  }
   element("error-panel").hidden = false;
   element("error-panel").focus();
 }
@@ -91,10 +103,25 @@ function showStatus(message) {
 
 function updateButtons() {
   const uploading = uploads.audio.busy || uploads.hotwords.busy;
-  element("validate-button").disabled = uploading || validating || confirming || confirmed;
-  element("confirm-button").disabled = !validationId || uploading || validating || confirming || confirmed;
-  element("validate-button").textContent = uploading ? "正在传入本机…" : validating ? "正在检查本地配置…" : "检查并预览配置 →";
+  const locked = element("config-fields").disabled;
+  element("validate-button").disabled = locked || uploading || validating || confirming || confirmed;
+  element("validate-button").hidden = Boolean(validationId) || confirmed;
+  element("confirm-button").disabled = locked || !validationId || uploading || validating || confirming || confirmed;
+  element("confirm-button").hidden = !validationId || confirmed;
+  element("edit-button").hidden = !validationId || confirmed;
+  element("edit-button").disabled = locked || confirming;
+  element("validate-button").textContent = uploading ? "正在传入本机…" : validating ? "正在检查…" : "检查配置 →";
   element("confirm-button").textContent = confirming ? "正在保存…" : confirmed ? "配置已保存" : "确认并保存配置";
+}
+
+function setStep(current) {
+  ["step-config", "step-review", "step-saved"].forEach((id, index) => {
+    const step = element(id);
+    step.classList.toggle("is-current", index === current);
+    step.classList.toggle("is-done", index < current);
+    if (index === current) step.setAttribute("aria-current", "step");
+    else step.removeAttribute("aria-current");
+  });
 }
 
 function invalidatePreview() {
@@ -104,7 +131,10 @@ function invalidatePreview() {
   element("review-content").hidden = true;
   element("review-placeholder").hidden = false;
   element("review-state").textContent = "待检查";
-  element("confirmation-help").textContent = "检查通过后可保存配置。更改任何选项后，需要重新检查。";
+  element("review-state").classList.remove("is-ready");
+  element("action-title").textContent = "下一步：检查配置";
+  element("confirmation-help").textContent = "检查音频和识别选项，通过后核对并保存。";
+  setStep(0);
   showStatus("");
   updateButtons();
 }
@@ -120,6 +150,11 @@ function updateEnhancement() {
   element("hotwords-fields").hidden = !element("hotwords-enabled").checked;
   element("context-fields").hidden = !element("context-enabled").checked;
   updateContextCount();
+}
+
+function updateOutputHint() {
+  const defaults = element("json-directory").value.trim() === "outputs" && element("document-directory").value.trim() === "outputs";
+  document.querySelector(".summary-hint").textContent = defaults ? "默认：项目 outputs 目录" : "已自定义，检查后显示完整路径";
 }
 
 async function updateAuthStatus() {
@@ -139,11 +174,13 @@ async function uploadFile(kind, files) {
   const upload = uploads[kind];
   const input = element(`${kind}-file`);
   const status = element(`${kind}-file-status`);
-  if (confirming || confirmed || upload.busy || !files.length) return;
+  if (element("config-fields").disabled || confirming || confirmed || upload.busy || !files.length) return;
   clearError();
   invalidatePreview();
   upload.id = null;
   upload.name = "";
+  element(`${kind}-dropzone`).classList.remove("is-ready");
+  element(`${kind}-action`).textContent = kind === "audio" ? "点击选择音频" : "选择或拖入热词表";
   if (files.length !== 1) {
     input.value = "";
     status.textContent = "请选择一个文件，当前未传入任何新文件。";
@@ -160,19 +197,25 @@ async function uploadFile(kind, files) {
   }
   upload.busy = true;
   input.disabled = true;
-  status.textContent = `正在将“${file.name}”传入本机服务，不会发送阿里云…`;
+  element(`${kind}-progress`).hidden = false;
+  element(`${kind}-dropzone`).setAttribute("aria-busy", "true");
+  status.textContent = `正在传入本机：${file.name}…`;
   updateButtons();
   try {
     const result = await request(`/api/upload-${kind}`, undefined, file);
     upload.id = result.upload_id;
     upload.name = result.name;
-    status.textContent = `已传入本机：${result.name} · ${(result.size_bytes / 1024 / 1024).toFixed(2)} MiB。尚未发送阿里云。`;
+    status.textContent = `已就绪 · ${result.name} · ${(result.size_bytes / 1024 / 1024).toFixed(2)} MiB`;
+    element(`${kind}-action`).textContent = kind === "audio" ? "更换音频文件" : "更换热词表";
+    element(`${kind}-dropzone`).classList.add("is-ready");
   } catch (error) {
     input.value = "";
     status.textContent = "传入本机失败，未自动重试。请重新选择文件后再试。";
     showError(error);
   } finally {
     upload.busy = false;
+    element(`${kind}-progress`).hidden = true;
+    element(`${kind}-dropzone`).setAttribute("aria-busy", "false");
     input.disabled = confirmed || confirming;
     updateButtons();
   }
@@ -245,7 +288,13 @@ function showPreview(summary, config) {
   element("review-content").hidden = false;
   element("review-placeholder").hidden = true;
   element("review-state").textContent = "本地检查通过";
-  element("confirmation-help").textContent = "请核对以上信息。确认后仅保存本地配置，不代表云端权限已验证或识别已开始。";
+  element("review-state").classList.add("is-ready");
+  element("action-title").textContent = "请核对配置与处理提示";
+  element("confirmation-help").textContent = "确认后仅保存配置，尚不发送阿里云。";
+  setStep(1);
+  // 窄屏下摘要位于表单之后，检查成功应把阅读位置带到摘要而非直接跳到保存按钮。
+  element("review-card").focus({ preventScroll: true });
+  element("review-card").scrollIntoView({ block: "start" });
 }
 
 function showReceipt(receipt) {
@@ -254,6 +303,10 @@ function showReceipt(receipt) {
   element("config-fields").disabled = true;
   element("config-fields").hidden = true;
   document.querySelector(".workspace").classList.add("is-confirmed");
+  element("review-card").hidden = true;
+  element("action-bar").hidden = true;
+  document.querySelector(".skip-link").hidden = true;
+  document.querySelector(".review-column").setAttribute("aria-labelledby", "receipt-heading");
   element("review-state").textContent = "已保存";
   element("review-placeholder").hidden = true;
   element("confirmation-help").textContent = "本次配置已保存在本机。文件尚未发送阿里云，也未开始转写。";
@@ -264,17 +317,38 @@ function showReceipt(receipt) {
   if (receipt.json_directory) detailRow(details, "计划 JSON 目录", receipt.json_directory);
   if (receipt.document_directory) detailRow(details, "计划成品目录", receipt.document_directory);
   element("receipt-panel").hidden = false;
-  showStatus("配置已保存在本机。文件尚未发送阿里云，也未开始转写，可以关闭网页并返回 Codex。");
+  document.querySelector("h1").textContent = "本次配置已保存";
+  document.querySelector(".intro-description").textContent = "配置已准备好，可返回 Codex 继续。";
+  setStep(2);
+  showStatus("");
   updateButtons();
   element("receipt-panel").focus();
 }
 
+element("error-field-link").addEventListener("click", () => {
+  if (!errorField) return;
+  const section = errorField.closest("details");
+  if (section) section.open = true;
+  errorField.focus({ preventScroll: true });
+  (errorField.closest(".file-dropzone") || errorField).scrollIntoView({ block: "center" });
+});
+
+element("edit-button").addEventListener("click", () => {
+  if (element("config-fields").disabled) return;
+  invalidatePreview();
+  element("config-fields").focus({ preventScroll: true });
+  element("config-fields").scrollIntoView({ block: "start" });
+});
+
 form.addEventListener("input", () => {
+  if (element("config-fields").disabled) return;
   clearError();
   invalidatePreview();
   updateContextCount();
+  updateOutputHint();
 });
 form.addEventListener("change", (event) => {
+  if (element("config-fields").disabled) return;
   invalidatePreview();
   if (event.target.name === "auth_mode") updateAuthStatus();
   if (event.target.id === "hotwords-enabled" || event.target.id === "context-enabled") updateEnhancement();
@@ -286,12 +360,14 @@ for (const kind of ["audio", "hotwords"]) {
   const dropzone = element(`${kind}-dropzone`);
   dropzone.addEventListener("dragover", (event) => {
     event.preventDefault();
-    if (!confirmed && !confirming && !uploads[kind].busy) dropzone.classList.add("drag-over");
+    if (!element("config-fields").disabled && !uploads[kind].busy) dropzone.classList.add("drag-over");
   });
   dropzone.addEventListener("dragleave", () => dropzone.classList.remove("drag-over"));
   dropzone.addEventListener("drop", (event) => {
     event.preventDefault();
     dropzone.classList.remove("drag-over");
+    // 原生fieldset不会阻止drop事件；保存结果未知或会话未就绪时也必须禁止拖入。
+    if (element("config-fields").disabled) return;
     // 只接收浏览器提供的文件对象，不从拖入的文本或URL推断本地路径。
     if (!confirmed && !confirming && !uploads[kind].busy && event.dataTransfer.files.length === 1) {
       element(`${kind}-file`).files = event.dataTransfer.files;
@@ -302,7 +378,7 @@ for (const kind of ["audio", "hotwords"]) {
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (uploads.audio.busy || uploads.hotwords.busy || validating || confirming || confirmed) return;
+  if (element("config-fields").disabled || uploads.audio.busy || uploads.hotwords.busy || validating || confirming || confirmed) return;
   clearError();
   invalidatePreview();
   const config = configuration();
@@ -332,7 +408,7 @@ form.addEventListener("submit", async (event) => {
 });
 
 element("confirm-button").addEventListener("click", async () => {
-  if (!validationId || uploads.audio.busy || uploads.hotwords.busy || validating || confirming || confirmed) return;
+  if (element("config-fields").disabled || !validationId || uploads.audio.busy || uploads.hotwords.busy || validating || confirming || confirmed) return;
   confirming = true;
   // 保存过程中冻结表单，确保确认的内容始终对应刚才校验的配置。
   element("config-fields").disabled = true;
@@ -351,6 +427,8 @@ element("confirm-button").addEventListener("click", async () => {
       element("confirmation-help").textContent = "本次确认被拒绝，请根据提示修改并重新检查配置。";
     } else {
       element("review-state").textContent = "保存未确认";
+      element("review-state").classList.remove("is-ready");
+      element("action-title").textContent = "保存结果未知，请返回 Codex";
       element("confirmation-help").textContent = "保存未获确认。请返回 Codex 检查配置文件，勿重复提交。";
     }
   } finally {
@@ -400,3 +478,8 @@ async function start() {
 }
 
 start();
+
+// 底部操作区的高度会随窗口宽度和文字缩放变化，预留同等空间，避免遮住最后一项。
+new ResizeObserver(([entry]) => {
+  document.documentElement.style.setProperty("--action-height", `${entry.target.getBoundingClientRect().height}px`);
+}).observe(element("action-bar"));

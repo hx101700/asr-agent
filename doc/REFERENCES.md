@@ -169,3 +169,12 @@ S1已安装真实CLI发布包并执行公开帮助、虚构URL dry-run及本机�
 - BL使用npm生成的锁文件与`npm ci --ignore-scripts`；隔离userconfig/globalconfig/cache，禁止安装阶段重试。参数依据：[npm ci](https://docs.npmjs.com/cli/v11/commands/npm-ci/)、[npm配置](https://docs.npmjs.com/cli/v11/using-npm/config/)。
 - Python库版本/wheel摘要来源：[av18.1.0 PyPI元数据](https://pypi.org/pypi/av/18.1.0/json)、[python-dotenv1.2.3元数据](https://pypi.org/pypi/python-dotenv/1.2.3/json)，已写入requirements.txt；仅使用二进制wheel。
 - pip通过原生require-hashes验证安装包；项目未保留自建下载器。[pip安全安装](https://pip.pypa.io/en/stable/topics/secure-installs/)
+
+## S2界面设计依据
+
+核验日期：2026-09-28。以下为设计参考，非百炼API约束，也不表示本项目是阿里官方产品。
+
+- [Ant Design：Form Page](https://ant.design/docs/spec/research-form/)：按相关性组织表单，使用清楚的标题与提示，减少冗余说明，并提供核对和完成反馈。本项目据此采用三组表单和“填写、核对、保存”进度指示。
+- [Ant Design：Data Entry](https://ant.design/docs/spec/data-entry/)：提供合理默认值、上下文帮助；复选框支持多选；上传区说明格式、大小及传入状态。本项目保留双增强独立复选框、原生文件选择与拖拽，使用不定进度条表示正在传入，不显示未经测量的百分比。
+
+橙色强调、中性背景、字号、间距、折叠默认目录和底部操作栏是本项目设计选择，不冒充官方强制规范。采用较深橙色保证白色按钮文案可读，键盘焦点采用独立蓝色轮廓。
