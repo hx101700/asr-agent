@@ -8,14 +8,14 @@ def read_api_key(project: Project) -> str:
 
     path = project.path(".env")
     if not path.is_file():
-        raise SetupError("请先将.env.example复制为.env，并填写DASHSCOPE_API_KEY。")
+        raise SetupError("尚未配置 API Key。请将项目中的 .env.example 复制为 .env，并填写 DASHSCOPE_API_KEY。")
     # 不加载到全局os.environ，不展开${变量}，不从其他目录自动寻找.env。
     value = dotenv_values(path, encoding="utf-8-sig", interpolate=False).get("DASHSCOPE_API_KEY")
     if value is None or not value.strip():
-        raise SetupError(".env中的DASHSCOPE_API_KEY尚未填写。")
+        raise SetupError("尚未配置 API Key，请在 .env 文件中填写 DASHSCOPE_API_KEY。")
     key = value.strip()
     if any(character.isspace() for character in key):
-        raise SetupError("DASHSCOPE_API_KEY中不能包含空格或换行。")
+        raise SetupError("API Key 中含有空格或换行，请检查 .env 中填写的内容。")
     return key
 
 
@@ -23,10 +23,10 @@ def api_key_status(project: Project) -> dict:
     try:
         read_api_key(project)
     except (SetupError, OSError, UnicodeError) as exc:
-        message = str(exc) if isinstance(exc, SetupError) else "无法读取项目.env，请检查文件与编码。"
+        message = str(exc) if isinstance(exc, SetupError) else "无法读取 .env 文件，请检查文件权限，并使用 UTF-8 编码保存。"
         return {"mode": "api_key", "configured": False, "verified_online": False, "message": message}
     return {"mode": "api_key", "configured": True, "verified_online": False,
-            "message": "已读取本地配置；密钥有效性和模型权限由BL正式调用时校验。"}
+            "message": "已检测到 API Key，尚未验证可用性。"}
 
 
 def bailian_environment(project: Project, auth_mode: str) -> dict[str, str]:

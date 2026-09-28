@@ -71,7 +71,7 @@ class Session:
             return api_key_status(self.project)
         if mode == "console":
             return {"configured": None, "verified_online": False,
-                    "message": "本页仅保存登录方式，正式执行前由BL完成控制台登录。"}
+                    "message": "已选择账号登录。此预览版暂不发起登录。"}
         raise ValidationError("请选择有效的鉴权方式。", "auth_mode")
 
     def description(self) -> dict:
@@ -79,7 +79,7 @@ class Session:
             return {"model": MODEL, "region": "华北2（北京）", "stage": "S2",
                     "project_name": self.project.root.name,
                     "auth": {"console": self.auth_status("console"),
-                             "api_key": {"configured": None, "message": "选择后检查项目.env。"}},
+                             "api_key": {"configured": None, "message": "选择后检查 API Key 设置。"}},
                     "confirmed": self.receipt}
 
     def upload(self, kind: str, name: str, source, size: int) -> dict:
@@ -127,7 +127,7 @@ class Session:
 
     def uploaded(self, identifier, kind: str) -> dict:
         if not isinstance(identifier, str) or identifier not in self.uploads:
-            raise ValidationError("请先选择文件并等待传入本机完成。", f"{kind}_upload_id")
+            raise ValidationError("请先添加文件，等待添加完成后再继续。", f"{kind}_upload_id")
         record = self.uploads[identifier]
         if record["kind"] != kind:
             raise ValidationError("文件类型与所选用途不符。", f"{kind}_upload_id")
@@ -219,21 +219,21 @@ class Session:
     def confirm(self, validation_id: str) -> dict:
         with self.lock:
             if not self.draft or validation_id != self.draft["id"]:
-                raise ValidationError("预览已失效，请重新检查配置。", "confirmation")
+                raise ValidationError("转写设置已变更，请重新检查并预览。", "confirmation")
             if self.receipt:
                 return self.receipt  # 同一个确认重复送达时，不创建第二项任务。
             draft = self.draft
             config = draft["config"]
             try:
                 if self._credential_stamp(config["auth_mode"]) != draft["credential_stamp"]:
-                    raise ValidationError("鉴权配置已变化，请重新检查。", "auth_mode")
+                    raise ValidationError("账号设置已变更，请重新检查。", "auth_mode")
                 inputs = [(config["audio"], "audio_path", AUDIO_SUFFIXES)]
                 if config["enhancement"]["hotwords"]:
                     inputs.append((config["enhancement"]["hotwords"], "hotwords_path", {".xlsx"}))
                 for record, field, suffixes in inputs:
                     path = resolve_input(Project(self.upload_directory), record["path"], suffixes, field)
                     if file_fingerprint(path) != record["fingerprint"]:
-                        raise ValidationError("文件已变化，请重新检查配置后确认。", field)
+                        raise ValidationError("文件已变更，请重新检查后保存。", field)
                 output_directory(self.project, draft["json_base"], "json_directory")
                 output_directory(self.project, draft["document_base"], "document_directory")
                 relative = f".state/jobs/{config['job_id']}"

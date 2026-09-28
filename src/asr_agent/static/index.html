@@ -4,115 +4,116 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="referrer" content="no-referrer">
-    <title>asr-agent · 转写配置</title>
+    <title>asr-agent · 音频转文字</title>
     <link rel="stylesheet" href="/app.css">
     <script src="/app.js" defer></script>
   </head>
   <body>
-    <a class="skip-link" href="#config-fields">跳到配置表单</a>
+    <a class="skip-link" href="#config-fields">跳到转写设置</a>
     <header class="page-header">
       <div class="header-inner">
         <div class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>asr-agent<span class="brand-divider"></span><span class="brand-caption">语音转写</span></div>
-        <span class="stage-badge"><span class="status-dot" aria-hidden="true"></span>本地工作台</span>
+        <span class="stage-badge"><span class="status-dot" aria-hidden="true"></span>预览版</span>
       </div>
     </header>
     <div class="page-shell">
       <main>
         <div class="intro">
-          <div><h1>新建转写配置</h1><p class="intro-description">选择音频，按需补充识别信息。</p></div>
+          <div><h1>音频转文字</h1><p class="intro-description">为会议、访谈或课程录音设置转写选项。</p></div>
           <span class="region-tag">华北 2 · 北京</span>
         </div>
-        <ol class="workflow" aria-label="配置进度">
-          <li id="step-config" class="is-current" aria-current="step"><span class="workflow-number" aria-hidden="true">1</span><span>填写配置</span></li>
+        <ol class="workflow" aria-label="设置进度">
+          <li id="step-config" class="is-current" aria-current="step"><span class="workflow-number" aria-hidden="true">1</span><span>转写设置</span></li>
           <li id="step-review"><span class="workflow-number" aria-hidden="true">2</span><span>核对信息</span></li>
-          <li id="step-saved"><span class="workflow-number" aria-hidden="true">3</span><span>保存配置</span></li>
+          <li id="step-saved"><span class="workflow-number" aria-hidden="true">3</span><span>保存设置</span></li>
         </ol>
-        <div class="stage-note"><span class="info-icon" aria-hidden="true">i</span><p><strong>当前为配置预览</strong>文件仅传入本机，保存后可返回 Codex；尚不发送阿里云或生成转写成品。</p></div>
+        <div class="stage-note"><span class="info-icon" aria-hidden="true">i</span><p><strong>版本说明</strong>当前支持检查与保存转写设置，暂不支持云端转写和文档导出。所选文件仅保存在本机。</p></div>
         <div id="page-status" class="notice" role="status" aria-live="polite" hidden></div>
         <div id="error-panel" class="notice notice-error" role="alert" tabindex="-1" hidden>
           <strong id="error-message"></strong>
           <ul id="error-details" hidden></ul>
-          <button id="error-field-link" type="button" class="text-button" hidden>前往问题位置 →</button>
+          <button id="error-field-link" type="button" class="text-button" hidden>前往修改 →</button>
         </div>
         <form id="config-form" novalidate>
           <div class="workspace">
             <fieldset id="config-fields" class="form-column" tabindex="-1" disabled>
-              <legend class="visually-hidden">转写配置</legend>
+              <legend class="visually-hidden">转写设置</legend>
               <section class="card" aria-labelledby="audio-heading">
-                <div class="section-heading"><span class="step-number">01</span><h2 id="audio-heading">音频文件</h2><span class="section-aside">必填 · 单个文件</span></div>
+                <div class="section-heading"><span class="step-number">01</span><h2 id="audio-heading">添加音频</h2><span class="section-aside">每次 1 个文件</span></div>
                 <div id="audio-dropzone" class="file-dropzone">
                   <input id="audio-file" class="file-input" type="file" accept=".aac,.amr,.avi,.flac,.flv,.m4a,.mkv,.mov,.mp3,.mp4,.mpeg,.ogg,.opus,.wav,.webm,.wma,.wmv" aria-labelledby="audio-picker-title" aria-describedby="audio-file-status audio-limits">
                   <label for="audio-file" class="upload-target">
                     <svg class="upload-icon" viewBox="0 0 40 40" fill="none" aria-hidden="true"><path d="M8 24v8h24v-8M20 27V7m-8 8 8-8 8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    <strong id="audio-picker-title"><span id="audio-action">点击选择音频</span><span class="upload-or">，或拖拽文件到这里</span></strong>
+                    <strong id="audio-picker-title"><span id="audio-action">选择音频文件</span><span class="upload-or">，或拖拽至此处</span></strong>
                     <span>支持 MP3、WAV、M4A、FLAC 等格式</span>
                   </label>
-                  <progress id="audio-progress" class="upload-progress" aria-label="音频正在传入本机" hidden></progress>
+                  <progress id="audio-progress" class="upload-progress" aria-label="正在添加音频" hidden></progress>
                   <p id="audio-file-status" class="file-status" role="status">尚未选择文件</p>
                 </div>
-                <details class="format-help"><summary>文件要求</summary><p id="audio-limits" class="helper">本机接收上限 2 GB，时长不超过 12 小时。正式上传副本须不超过 1 GB；需要合并声道时，将在转换后再次检查。支持 AAC、AMR、AVI、FLAC、FLV、M4A、MKV、MOV、MP3、MP4、MPEG、OGG、OPUS、WAV、WEBM、WMA、WMV。</p></details>
+                <details class="format-help"><summary>支持格式与文件限制</summary><p id="audio-limits" class="helper">可添加不超过 2 GB、12 小时的文件。发送至阿里云的音频须不超过 1 GB；如需合并声道，将以转换后的文件大小为准。支持 AAC、AMR、AVI、FLAC、FLV、M4A、MKV、MOV、MP3、MP4、MPEG、OGG、OPUS、WAV、WEBM、WMA、WMV。</p></details>
               </section>
 
               <section class="card" aria-labelledby="enhancement-heading">
-                <div class="section-heading"><span class="step-number">02</span><h2 id="enhancement-heading">识别选项</h2><span class="section-aside">按需设置</span></div>
-                <label class="check-row"><input id="diarization-enabled" type="checkbox" checked aria-describedby="diarization-help"><span><strong>区分说话人</strong><span>在转写结果中标记不同说话人</span></span><span class="recommended-tag">默认开启</span></label>
-                <p id="diarization-help" class="helper">多声道音频将在正式执行时合并为单声道副本，原文件保留。</p>
-                <div class="field-heading"><h3>精度增强</h3><span>可选，可同时开启</span></div>
+                <div class="section-heading"><span class="step-number">02</span><h2 id="enhancement-heading">转写设置</h2><span class="section-aside">按需开启</span></div>
+                <label class="check-row"><input id="diarization-enabled" type="checkbox" checked aria-describedby="diarization-help"><span><strong>区分发言人</strong><span>按声音区分发言人，便于阅读多人对话</span></span><span class="recommended-tag">默认开启</span></label>
+                <p id="diarization-help" class="helper">开启后，多声道音频将在转写前合并为单声道副本，原文件不变。</p>
+                <div class="field-heading"><h3>识别精度增强</h3><span>可选 · 支持同时使用</span></div>
+                <p class="enhancement-description helper">补充录音中的人名、产品名或行业术语，帮助识别专有词汇。</p>
                 <div class="choice-grid" role="group" aria-label="识别增强方式，可同时选择">
-                  <label class="choice-card"><input id="hotwords-enabled" type="checkbox" aria-controls="hotwords-fields"><span><strong>即时热词</strong><span>用 Excel 提供专业词汇</span></span></label>
-                  <label class="choice-card"><input id="context-enabled" type="checkbox" aria-controls="context-fields"><span><strong>上下文</strong><span>补充录音背景与主题</span></span></label>
+                  <label class="choice-card"><input id="hotwords-enabled" type="checkbox" aria-controls="hotwords-fields"><span><strong>热词增强</strong><span>通过词表指定重点识别的词语</span></span></label>
+                  <label class="choice-card"><input id="context-enabled" type="checkbox" aria-controls="context-fields"><span><strong>上下文增强</strong><span>提供包含相关词语的参考文本</span></span></label>
                 </div>
                 <div id="hotwords-fields" class="enhancement-fields" hidden>
-                  <div class="label-action"><label for="hotwords-file">热词表</label><button id="download-template" type="button" class="text-button">下载 Excel 模板</button></div>
+                  <div class="label-action"><label for="hotwords-file">热词文件</label><button id="download-template" type="button" class="text-button">下载模板</button></div>
                   <div id="hotwords-dropzone" class="file-dropzone compact-upload">
                     <input id="hotwords-file" class="file-input" type="file" accept=".xlsx" aria-labelledby="hotwords-action" aria-describedby="hotwords-file-status hotwords-help">
-                    <label for="hotwords-file" class="upload-target"><strong id="hotwords-action">选择或拖入热词表</strong><span>.xlsx 格式 · 最大 5 MiB</span></label>
-                    <progress id="hotwords-progress" class="upload-progress" aria-label="热词表正在传入本机" hidden></progress>
-                    <p id="hotwords-file-status" class="file-status" role="status">尚未选择热词表</p>
+                    <label for="hotwords-file" class="upload-target"><strong id="hotwords-action">选择或拖入 Excel 文件</strong><span>.xlsx 格式 · 最大 5 MiB</span></label>
+                    <progress id="hotwords-progress" class="upload-progress" aria-label="正在添加热词文件" hidden></progress>
+                    <p id="hotwords-file-status" class="file-status" role="status">尚未选择文件</p>
                   </div>
-                  <p id="hotwords-help" class="helper">不符合要求时会提示具体行；热词随识别请求传入，不创建云端词表。</p>
+                  <p id="hotwords-help" class="helper">按模板填写热词及权重，最多 2,000 个热词。导入的词表仅用于本次转写。</p>
                 </div>
                 <div id="context-fields" class="enhancement-fields" hidden>
-                  <label for="context">音频背景说明</label>
-                  <textarea id="context" rows="4" placeholder="例如：这是一段关于企业财务结算流程的培训录音，涉及应收账款与核销。" aria-describedby="context-help context-count"></textarea>
-                  <div class="textarea-footer"><p id="context-help" class="helper">描述相关背景，最多 400 个字符。</p><span id="context-count" class="character-count" role="status">0 / 400</span></div>
+                  <label for="context">参考文本</label>
+                  <textarea id="context" rows="4" placeholder="例如：本次技术评审涉及 Kubernetes、容器编排和灰度发布，参会人有陈雨、林舟。" aria-describedby="context-help context-count"></textarea>
+                  <div class="textarea-footer"><p id="context-help" class="helper">请包含录音中可能出现的具体词语，最多 400 个字符。仅填写宽泛背景，增强效果有限。</p><span id="context-count" class="character-count" role="status">0 / 400</span></div>
                 </div>
               </section>
 
               <section class="card" aria-labelledby="auth-heading">
-                <div class="section-heading"><span class="step-number">03</span><h2 id="auth-heading">连接与保存</h2></div>
-                <fieldset class="auth-group"><legend>连接方式</legend>
+                <div class="section-heading"><span class="step-number">03</span><h2 id="auth-heading">账号与保存</h2></div>
+                <fieldset class="auth-group"><legend>账号连接方式</legend>
                   <div class="choice-grid">
-                    <label class="choice-card"><input type="radio" name="auth_mode" value="console" checked aria-describedby="auth-status"><span><strong>控制台登录 <small>推荐</small></strong><span>通过百炼官方页面登录</span></span></label>
-                    <label class="choice-card"><input type="radio" name="auth_mode" value="api_key" aria-describedby="auth-status api-key-help"><span><strong>使用 API Key</strong><span>读取项目 .env 中的密钥</span></span></label>
+                    <label class="choice-card"><input type="radio" name="auth_mode" value="console" checked aria-describedby="auth-status"><span><strong>百炼账号登录 <small>推荐</small></strong><span>在浏览器中登录阿里云账号</span></span></label>
+                    <label class="choice-card"><input type="radio" name="auth_mode" value="api_key" aria-describedby="auth-status api-key-help"><span><strong>使用 API Key</strong><span>使用已配置的百炼 API Key</span></span></label>
                   </div>
                 </fieldset>
-                <p id="auth-status" class="helper" role="status">正在读取本地会话…</p>
-                <p id="api-key-help" class="helper" hidden>请提前在项目 .env 中填写 DASHSCOPE_API_KEY。本地检查仅确认已配置，云端权限由正式调用验证。</p>
+                <p id="auth-status" class="helper" role="status">正在加载账号设置…</p>
+                <p id="api-key-help" class="helper" hidden>请提前在项目 .env 文件中填写 DASHSCOPE_API_KEY，页面无需输入密钥。</p>
                 <details id="output-settings" class="output-settings">
-                  <summary><span>保存位置<span class="summary-hint">默认：项目 outputs 目录</span></span><span class="summary-action">修改</span></summary>
-                  <div class="output-fields"><label for="json-directory">JSON 结果目录</label><input id="json-directory" type="text" value="outputs" autocomplete="off" spellcheck="false" aria-describedby="output-help"><label for="document-directory">转写成品目录</label><input id="document-directory" type="text" value="outputs" autocomplete="off" spellcheck="false" aria-describedby="output-help"><p id="output-help" class="helper">填写项目 outputs 或其子目录，例如 outputs/meeting。</p></div>
+                  <summary><span>保存位置<span class="summary-hint">默认：项目内 outputs 文件夹</span></span><span class="summary-action">修改</span></summary>
+                  <div class="output-fields"><label for="json-directory">原始结果（JSON）</label><input id="json-directory" type="text" value="outputs" autocomplete="off" spellcheck="false" aria-describedby="output-help"><label for="document-directory">转写文档</label><input id="document-directory" type="text" value="outputs" autocomplete="off" spellcheck="false" aria-describedby="output-help"><p id="output-help" class="helper">文件将保存到项目内的 outputs 文件夹，也可指定其子文件夹，例如 outputs/meeting。</p></div>
                 </details>
-                <div class="export-note"><span>成品格式</span><span class="format-tag">Excel</span><span class="format-tag">Word</span><span class="format-tag">Markdown</span><span>均含时间戳</span></div>
+                <div class="export-note"><span>文档格式</span><span class="format-tag">Excel</span><span class="format-tag">Word</span><span class="format-tag">Markdown</span><span>保留时间戳</span></div>
               </section>
             </fieldset>
 
             <aside class="review-column" aria-labelledby="review-heading">
               <section id="review-card" class="card review-card" tabindex="-1">
-                <div class="review-heading"><h2 id="review-heading">配置概览</h2><span id="review-state" class="subtle-badge" role="status">待检查</span></div>
+                <div class="review-heading"><h2 id="review-heading">转写信息</h2><span id="review-state" class="subtle-badge" role="status">待检查</span></div>
                 <div class="model-block"><span class="eyebrow">识别模型</span><strong id="model-name">qwen-audio-3.0-asr-flash-filetrans</strong><span id="region-name" class="helper">华北 2（北京）</span></div>
-                <div id="review-placeholder" class="review-placeholder"><h3>填写完成后，检查配置</h3><p>这里会展示音频参数、识别选项与保存位置，供你确认。</p></div>
+                <div id="review-placeholder" class="review-placeholder"><h3>预览转写信息</h3><p>完成设置后，点击“检查并预览”核对文件、识别选项和保存位置。</p></div>
                 <div id="review-content" hidden><dl id="review-details" class="review-details"></dl><div id="review-warnings" class="notice notice-warning" hidden></div></div>
               </section>
-              <section id="receipt-panel" class="card receipt-card" tabindex="-1" hidden><span class="success-icon" aria-hidden="true">✓</span><h2 id="receipt-heading">配置已保存</h2><p>可以关闭网页，返回 Codex 查看配置。文件仍在本机，尚未开始云端转写。</p><dl id="receipt-details" class="review-details"></dl></section>
+              <section id="receipt-panel" class="card receipt-card" tabindex="-1" hidden><span class="success-icon" aria-hidden="true">✓</span><h2 id="receipt-heading">转写设置已保存</h2><p>您可以关闭此页面，返回 Codex 查看本次设置。音频尚未上传至阿里云，转写尚未开始。</p><dl id="receipt-details" class="review-details"></dl></section>
             </aside>
           </div>
           <div id="action-bar" class="action-bar">
-            <div class="action-inner"><div class="action-copy"><strong id="action-title">下一步：检查配置</strong><p id="confirmation-help">检查音频和识别选项，通过后核对并保存。</p></div><div class="action-buttons"><button id="edit-button" type="button" class="button button-secondary" hidden>返回修改</button><button id="validate-button" type="submit" class="button button-primary" disabled>检查配置 →</button><button id="confirm-button" type="button" class="button button-primary" disabled hidden>确认并保存配置</button></div></div>
+            <div class="action-inner"><div class="action-copy"><strong id="action-title">下一步：核对转写信息</strong><p id="confirmation-help">检查文件规格、增强选项和保存位置。</p></div><div class="action-buttons"><button id="edit-button" type="button" class="button button-secondary" hidden>返回修改</button><button id="validate-button" type="submit" class="button button-primary" disabled>检查并预览</button><button id="confirm-button" type="button" class="button button-primary" disabled hidden>保存设置</button></div></div>
           </div>
         </form>
       </main>
-      <footer><span>asr-agent · 由百炼 CLI 提供识别能力</span><span>文件与配置仅保存于本机</span></footer>
+      <footer><span>asr-agent · 基于阿里云百炼语音识别</span><span>让录音更便于阅读与整理</span></footer>
     </div>
   </body>
 </html>

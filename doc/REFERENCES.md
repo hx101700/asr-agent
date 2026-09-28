@@ -178,3 +178,10 @@ S1已安装真实CLI发布包并执行公开帮助、虚构URL dry-run及本机�
 - [Ant Design：Data Entry](https://ant.design/docs/spec/data-entry/)：提供合理默认值、上下文帮助；复选框支持多选；上传区说明格式、大小及传入状态。本项目保留双增强独立复选框、原生文件选择与拖拽，使用不定进度条表示正在传入，不显示未经测量的百分比。
 
 橙色强调、中性背景、字号、间距、折叠默认目录和底部操作栏是本项目设计选择，不冒充官方强制规范。采用较深橙色保证白色按钮文案可读，键盘焦点采用独立蓝色轮廓。
+
+## 产品文案核验（2026-09-29）
+
+- [提升识别准确率](https://help.aliyun.com/zh/model-studio/improve-asr-accuracy)：热词与上下文均用于专有词汇增强；上下文应包含音频中待识别的原词，泛泛的语义背景效果有限。页面采用“热词增强”“上下文增强”和“参考文本”，示例给出具体术语及人名。即时热词及400字符限制不变。
+- [Filetrans HTTP API](https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-http-api)：核对固定模型支持的context、vocabulary与diarization_enabled。“区分发言人”是说话人分离的产品用语，不表示识别真实身份；单声道要求与超过2小时的建议继续明确提示。
+- [百炼CLI安装与鉴权](https://help.aliyun.com/zh/model-studio/cli/installation)：账号登录通过官方浏览器页面完成。产品页保留登录与API Key两个选择；预览版尚不执行登录，本地Key检测不能写成“验证成功”。
+- [通义听悟官网](https://tingwu.aliyun.com/)：参考以录音场景、发言人和操作动作描述用途的表达方式。仅参考公开首页，不借用其速度、实时翻译、总结等能力承诺，也未访问用户的听悟内容。

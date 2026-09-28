@@ -68,6 +68,12 @@ node --check src/asr_agent/static/app.js
 
 截图保存在忽略目录.state/ui-refined.png和.state/ui-refined-receipt.png。数据、状态与截图不进入Git。预览服务已更换为新的空白会话，便于用户检查界面。
 
+## 产品文案复核（2026-09-29）
+
+重跑`unittest tests.test_auth tests.test_web tests.test_validation -q`共48项通过；`node tests/test_web_ui.cjs`4项通过；JS语法检查通过。没有新增只匹配文案的测试。
+
+浏览器核验“音频转文字”首页、热词增强/上下文增强同时展开、具体原词示例、401字符超限提示与“前往修改”定位。现有页面有用户选择的音频，未刷新或停止其服务；另开空白预览会话，截图保存于忽略目录`.state/ui-copy-enhancement.png`。本轮未重新上传文件或运行云端识别，保存链路沿用现有回归测试。
+
 ## 已知后续工作
 
 - S3真实BL登录、上传/识别、转换副本复核及结果判断。

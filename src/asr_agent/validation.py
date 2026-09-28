@@ -138,13 +138,13 @@ def validate_audio(project: Project, path: str | Path, diarization: bool) -> dic
         warnings = []
         if requires_mono:
             warnings.append(
-                f"检测到{info.channels}个声道。开启说话人区分后，将合并为单声道FLAC副本；"
-                "保留原文件，仅上传副本。转换后须重新校验实际大小和时长。"
+                f"此音频包含 {info.channels} 个声道。为区分发言人，转写前将生成单声道 FLAC 副本，"
+                "保留原文件。副本通过大小和时长检查后才会上传。"
             )
         if diarization and duration > 2 * 60 * 60:
-            warnings.append("音频超过2小时；官方建议开启说话人区分时不超过2小时，本次保留您的选择。")
+            warnings.append("音频超过 2 小时。启用发言人区分可能导致识别失败或超时，建议使用 2 小时以内的音频。")
         if info.audio_tracks > 1:
-            warnings.append(f"检测到{info.audio_tracks}个音轨；首版仅处理第一个音轨（索引0）。")
+            warnings.append(f"此文件包含 {info.audio_tracks} 个音轨，仅转写第一个音轨（索引0），其余音轨不会转写。")
         fingerprint = file_fingerprint(source)
         after = source.stat()
         if (fingerprint["size_bytes"] != info.size_bytes
@@ -159,11 +159,11 @@ def validate_audio(project: Project, path: str | Path, diarization: bool) -> dic
 
 def validate_context(text: str) -> str:
     if not isinstance(text, str) or not text.strip():
-        raise ValidationError("请输入非空的Prompt上下文。", "context")
+        raise ValidationError("请输入参考文本，或关闭上下文增强。", "context")
     if len(text) > 400:
-        raise ValidationError(f"Prompt上下文为{len(text)}个字符，最多允许400个；请修改后重试。", "context")
+        raise ValidationError(f"参考文本共 {len(text)} 个字符，最多支持 400 个，请精简后重新检查。", "context")
     if "\x00" in text or any(0xD800 <= ord(char) <= 0xDFFF for char in text):
-        raise ValidationError("Prompt上下文含无法传入命令参数的字符，请修改。", "context")
+        raise ValidationError("参考文本中含有无法识别的特殊字符，请删除后重新检查。", "context")
     return text
 
 
@@ -255,7 +255,7 @@ def load_hotwords(project: Project, path: str | Path, allow_super: bool = False)
                 if super_count == 51:
                     details.append({"row": row_number, "field": "weight", "message": "超级热词（权重50）最多50个。"})
         if details:
-            raise ValidationError("热词Excel有不符合要求的行，请修改后重新校验。", field, details)
+            raise ValidationError("热词文件中有不符合要求的内容，请按以下行号修改后重新添加文件。", field, details)
         if not vocabulary:
             raise ValidationError("热词Excel未包含有效词条。", field)
         if ignored_blank_rows:

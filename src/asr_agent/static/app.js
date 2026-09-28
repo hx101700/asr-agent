@@ -39,13 +39,13 @@ async function request(path, payload, file) {
   try {
     response = await fetch(path, options);
   } catch {
-    throw new Error("无法连接本地服务。请检查 Codex 中的程序是否仍在运行；页面不会自动重试。");
+    throw new Error("连接已断开，请返回 Codex 检查应用是否仍在运行。本次操作不会自动重试。");
   }
   let data;
   try {
     data = await response.json();
   } catch {
-    throw new Error("本地服务返回了无法读取的响应，请返回 Codex 检查运行状态。");
+    throw new Error("暂时无法获取操作结果，请返回 Codex 查看详情。");
   }
   if (!response.ok || data.ok === false) {
     const error = new Error(data.error || "本次操作未完成，请检查输入后手动再试。");
@@ -73,9 +73,10 @@ function showError(error) {
   element("error-message").textContent = error.message;
   const details = element("error-details");
   details.replaceChildren();
+  const fieldLabels = { text: "热词", weight: "权重", header: "表头", row: "内容" };
   for (const detail of error.details || []) {
     const item = document.createElement("li");
-    const location = [detail.row ? `第 ${detail.row} 行` : "", detail.field || ""].filter(Boolean).join(" · ");
+    const location = [detail.row ? `第 ${detail.row} 行` : "", fieldLabels[detail.field] || detail.field || ""].filter(Boolean).join(" · ");
     item.textContent = `${location ? location + "：" : ""}${detail.message || "内容不符合要求"}`;
     details.append(item);
   }
@@ -110,8 +111,8 @@ function updateButtons() {
   element("confirm-button").hidden = !validationId || confirmed;
   element("edit-button").hidden = !validationId || confirmed;
   element("edit-button").disabled = locked || confirming;
-  element("validate-button").textContent = uploading ? "正在传入本机…" : validating ? "正在检查…" : "检查配置 →";
-  element("confirm-button").textContent = confirming ? "正在保存…" : confirmed ? "配置已保存" : "确认并保存配置";
+  element("validate-button").textContent = uploading ? "正在添加文件…" : validating ? "正在检查…" : "检查并预览";
+  element("confirm-button").textContent = confirming ? "正在保存…" : confirmed ? "已保存" : "保存设置";
 }
 
 function setStep(current) {
@@ -132,8 +133,8 @@ function invalidatePreview() {
   element("review-placeholder").hidden = false;
   element("review-state").textContent = "待检查";
   element("review-state").classList.remove("is-ready");
-  element("action-title").textContent = "下一步：检查配置";
-  element("confirmation-help").textContent = "检查音频和识别选项，通过后核对并保存。";
+  element("action-title").textContent = "下一步：核对转写信息";
+  element("confirmation-help").textContent = "检查文件规格、增强选项和保存位置。";
   setStep(0);
   showStatus("");
   updateButtons();
@@ -154,13 +155,13 @@ function updateEnhancement() {
 
 function updateOutputHint() {
   const defaults = element("json-directory").value.trim() === "outputs" && element("document-directory").value.trim() === "outputs";
-  document.querySelector(".summary-hint").textContent = defaults ? "默认：项目 outputs 目录" : "已自定义，检查后显示完整路径";
+  document.querySelector(".summary-hint").textContent = defaults ? "默认：项目内 outputs 文件夹" : "已自定义保存位置";
 }
 
 async function updateAuthStatus() {
   const mode = selected("auth_mode");
   element("api-key-help").hidden = mode !== "api_key";
-  element("auth-status").textContent = mode === "api_key" ? "正在检查项目 .env 配置…" : "正在读取本地状态…";
+  element("auth-status").textContent = mode === "api_key" ? "正在检查 API Key 设置…" : "正在加载账号设置…";
   try {
     const status = await request("/api/auth-status", { auth_mode: mode });
     if (selected("auth_mode") !== mode) return;
@@ -180,11 +181,11 @@ async function uploadFile(kind, files) {
   upload.id = null;
   upload.name = "";
   element(`${kind}-dropzone`).classList.remove("is-ready");
-  element(`${kind}-action`).textContent = kind === "audio" ? "点击选择音频" : "选择或拖入热词表";
+  element(`${kind}-action`).textContent = kind === "audio" ? "选择音频文件" : "选择或拖入 Excel 文件";
   if (files.length !== 1) {
     input.value = "";
-    status.textContent = "请选择一个文件，当前未传入任何新文件。";
-    showError(new Error("每个位置只支持一个文件，请重新选择。"));
+    status.textContent = "未添加文件，请每次选择 1 个文件。";
+    showError(new Error("一次只能添加 1 个文件，请重新选择。"));
     return;
   }
   const file = files[0];
@@ -192,25 +193,25 @@ async function uploadFile(kind, files) {
   if (!allowedExtensions.some((extension) => file.name.toLowerCase().endsWith(extension))) {
     input.value = "";
     status.textContent = "文件格式不符合要求，请重新选择。";
-    showError(new Error(kind === "hotwords" ? "热词表需要使用 .xlsx 文件，请重新选择。" : "当前文件扩展名不在支持的音频格式中，请重新选择。"));
+    showError(new Error(kind === "hotwords" ? "请选择 .xlsx 格式的热词文件。" : "暂不支持此文件格式，请选择支持的音频文件。"));
     return;
   }
   upload.busy = true;
   input.disabled = true;
   element(`${kind}-progress`).hidden = false;
   element(`${kind}-dropzone`).setAttribute("aria-busy", "true");
-  status.textContent = `正在传入本机：${file.name}…`;
+  status.textContent = `正在添加：${file.name}…`;
   updateButtons();
   try {
     const result = await request(`/api/upload-${kind}`, undefined, file);
     upload.id = result.upload_id;
     upload.name = result.name;
-    status.textContent = `已就绪 · ${result.name} · ${(result.size_bytes / 1024 / 1024).toFixed(2)} MiB`;
-    element(`${kind}-action`).textContent = kind === "audio" ? "更换音频文件" : "更换热词表";
+    status.textContent = `已添加 · ${result.name} · ${(result.size_bytes / 1024 / 1024).toFixed(2)} MiB`;
+    element(`${kind}-action`).textContent = kind === "audio" ? "更换音频" : "更换热词文件";
     element(`${kind}-dropzone`).classList.add("is-ready");
   } catch (error) {
     input.value = "";
-    status.textContent = "传入本机失败，未自动重试。请重新选择文件后再试。";
+    status.textContent = "文件添加失败，请重新选择。未自动重试。";
     showError(error);
   } finally {
     upload.busy = false;
@@ -260,22 +261,22 @@ function showPreview(summary, config) {
   const details = element("review-details");
   details.replaceChildren();
   const enhancementLabels = {
-    none: "不使用",
-    hotwords: `即时热词 · ${summary.enhancement.count} 个`,
-    context: `上下文 · ${summary.enhancement.context_chars} 字符`,
-    both: `即时热词 ${summary.enhancement.count} 个 + 上下文 ${summary.enhancement.context_chars} 字符`,
+    none: "未开启",
+    hotwords: `热词增强 · ${summary.enhancement.count} 个词`,
+    context: `上下文增强 · ${summary.enhancement.context_chars} 字符`,
+    both: `热词增强 ${summary.enhancement.count} 个词 + 上下文增强 ${summary.enhancement.context_chars} 字符`,
   };
   detailRow(details, "音频文件", uploads.audio.name || audio.name);
   detailRow(details, "音频时长", durationText(audio.duration_seconds));
-  detailRow(details, "源文件大小", `${(audio.size_bytes / 1024 / 1024).toFixed(2)} MiB`);
+  detailRow(details, "文件大小", `${(audio.size_bytes / 1024 / 1024).toFixed(2)} MiB`);
   detailRow(details, "格式 / 声道", `${audio.format || audio.name.split(".").pop().toUpperCase()} / ${audio.channels} 声道`);
   detailRow(details, "采样率", `${audio.sample_rate.toLocaleString("zh-CN")} Hz`);
-  detailRow(details, "连接方式", summary.auth_mode === "api_key" ? "API Key（项目 .env）" : "百炼控制台登录");
-  detailRow(details, "区分说话人", config.diarization_enabled ? "开启" : "关闭");
-  detailRow(details, "识别增强", enhancementLabels[summary.enhancement.mode]);
-  if (config.enhancement_mode === "hotwords" || config.enhancement_mode === "both") detailRow(details, "热词表", uploads.hotwords.name);
-  detailRow(details, "计划 JSON 目录", summary.json_directory);
-  detailRow(details, "计划成品目录", summary.document_directory);
+  detailRow(details, "账号连接", summary.auth_mode === "api_key" ? "API Key" : "百炼账号登录");
+  detailRow(details, "区分发言人", config.diarization_enabled ? "开启" : "关闭");
+  detailRow(details, "精度增强", enhancementLabels[summary.enhancement.mode]);
+  if (config.enhancement_mode === "hotwords" || config.enhancement_mode === "both") detailRow(details, "热词文件", uploads.hotwords.name);
+  detailRow(details, "JSON 保存位置", summary.json_directory);
+  detailRow(details, "文档保存位置", summary.document_directory);
   const warnings = element("review-warnings");
   warnings.replaceChildren();
   const messages = [...(summary.warnings || [])];
@@ -287,10 +288,10 @@ function showPreview(summary, config) {
   warnings.hidden = messages.length === 0;
   element("review-content").hidden = false;
   element("review-placeholder").hidden = true;
-  element("review-state").textContent = "本地检查通过";
+  element("review-state").textContent = "检查通过";
   element("review-state").classList.add("is-ready");
-  element("action-title").textContent = "请核对配置与处理提示";
-  element("confirmation-help").textContent = "确认后仅保存配置，尚不发送阿里云。";
+  element("action-title").textContent = "请确认本次转写设置";
+  element("confirmation-help").textContent = "保存设置不会启动转写。";
   setStep(1);
   // 窄屏下摘要位于表单之后，检查成功应把阅读位置带到摘要而非直接跳到保存按钮。
   element("review-card").focus({ preventScroll: true });
@@ -309,16 +310,16 @@ function showReceipt(receipt) {
   document.querySelector(".review-column").setAttribute("aria-labelledby", "receipt-heading");
   element("review-state").textContent = "已保存";
   element("review-placeholder").hidden = true;
-  element("confirmation-help").textContent = "本次配置已保存在本机。文件尚未发送阿里云，也未开始转写。";
+  element("confirmation-help").textContent = "转写设置已保存，尚未开始转写。";
   const details = element("receipt-details");
   details.replaceChildren();
-  detailRow(details, "本地任务编号", receipt.job_id);
-  detailRow(details, "配置文件", receipt.config_path);
-  if (receipt.json_directory) detailRow(details, "计划 JSON 目录", receipt.json_directory);
-  if (receipt.document_directory) detailRow(details, "计划成品目录", receipt.document_directory);
+  detailRow(details, "设置编号", receipt.job_id);
+  detailRow(details, "设置文件", receipt.config_path);
+  if (receipt.json_directory) detailRow(details, "JSON 保存位置", receipt.json_directory);
+  if (receipt.document_directory) detailRow(details, "文档保存位置", receipt.document_directory);
   element("receipt-panel").hidden = false;
-  document.querySelector("h1").textContent = "本次配置已保存";
-  document.querySelector(".intro-description").textContent = "配置已准备好，可返回 Codex 继续。";
+  document.querySelector("h1").textContent = "设置完成";
+  document.querySelector(".intro-description").textContent = "本次转写设置已保存。";
   setStep(2);
   showStatus("");
   updateButtons();
@@ -383,7 +384,7 @@ form.addEventListener("submit", async (event) => {
   invalidatePreview();
   const config = configuration();
   if ((config.enhancement_mode === "context" || config.enhancement_mode === "both") && Array.from(config.context).length > 400) {
-    const error = new Error("上下文超过 400 个字符，请修改后重新检查。内容不会被自动截断。");
+    const error = new Error("参考文本超过 400 个字符，请精简后重新检查。已保留您输入的全部内容。");
     error.field = "context";
     showError(error);
     return;
@@ -394,7 +395,7 @@ form.addEventListener("submit", async (event) => {
   try {
     const result = await request("/api/validate", config);
     if (currentRevision !== revision) {
-      showStatus("检查期间配置已更改，请按当前内容重新检查。");
+      showStatus("设置已修改，请重新检查并预览。");
       return;
     }
     validationId = result.validation_id;
@@ -424,12 +425,12 @@ element("confirm-button").addEventListener("click", async () => {
       // 明确拒绝没有保存成功，可以修改输入；网络结果未知则继续冻结。
       element("config-fields").disabled = false;
       invalidatePreview();
-      element("confirmation-help").textContent = "本次确认被拒绝，请根据提示修改并重新检查配置。";
+      element("confirmation-help").textContent = "未能保存，请按提示修改后重新检查。";
     } else {
-      element("review-state").textContent = "保存未确认";
+      element("review-state").textContent = "保存结果待确认";
       element("review-state").classList.remove("is-ready");
-      element("action-title").textContent = "保存结果未知，请返回 Codex";
-      element("confirmation-help").textContent = "保存未获确认。请返回 Codex 检查配置文件，勿重复提交。";
+      element("action-title").textContent = "暂时无法确认保存结果";
+      element("confirmation-help").textContent = "请返回 Codex 查看保存情况，避免重复提交。";
     }
   } finally {
     confirming = false;
@@ -443,7 +444,7 @@ element("download-template").addEventListener("click", async () => {
   clearError();
   try {
     const response = await fetch("/api/hotwords-template", { headers: sessionToken ? { "X-ASR-Token": sessionToken } : {}, cache: "no-store", credentials: "same-origin" });
-    if (!response.ok) throw new Error("热词模板下载失败，请检查本地服务后手动再试。");
+    if (!response.ok) throw new Error("模板下载失败，请确认应用仍在运行后重试。");
     const url = URL.createObjectURL(await response.blob());
     const link = document.createElement("a");
     link.href = url;
@@ -453,7 +454,7 @@ element("download-template").addEventListener("click", async () => {
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   } catch {
-    showError(new Error("热词模板下载失败，请检查本地服务后手动再试。"));
+    showError(new Error("模板下载失败，请确认应用仍在运行后重试。"));
   } finally {
     button.disabled = confirmed;
   }
