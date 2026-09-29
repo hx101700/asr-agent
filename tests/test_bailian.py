@@ -280,6 +280,19 @@ class BailianTests(ProjectTestCase):
                 with self.assertRaisesRegex(SetupError, "登录状态"):
                     console_status(self.project)
 
+    def test_console_only_callback_is_reported_without_telling_user_to_login_again(self):
+        self.process.communicate.return_value = (json.dumps({
+            "authenticated": True, "console": {"source": "config", "masked": "synthetic-masked"},
+        }), "")
+        report = console_status(self.project)
+        self.assertTrue(report["console_configured"])
+        self.assertFalse(report["configured"])
+        self.assertFalse(report["verified_online"])
+        self.assertIn("控制台凭据已保存", report["message"])
+        self.assertIn("未配置模型 API Key", report["message"])
+        self.assertNotIn("请先运行login", report["message"])
+        self.assertNotIn("synthetic-masked", json.dumps(report))
+
     def test_successful_login_process_still_checks_public_status(self):
         self.process.communicate.side_effect = [(None, ""), (json.dumps({"authenticated": False}), "")]
         report = login_console(self.project)

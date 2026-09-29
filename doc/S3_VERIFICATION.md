@@ -1,6 +1,6 @@
 # S3 执行入口与验证
 
-核验日期：2026-09-29。S3精简及本机合约已完成，API Key单样本的真实临时上传/固定模型识别通过。真实控制台登录及其他云端场景待验收，未开始S4导出。
+核验日期：2026-09-29。API Key无增强和联合增强两次真实识别通过；控制台实际尝试后缺模型Key，账号ASR未通过。未开始S4导出。
 
 ## 已实现入口
 
@@ -54,3 +54,13 @@ BL --timeout=3600同时影响请求和等待，不覆盖最后原生fetch下载�
 本地验收确认原音频SHA-256与选择时副本一致、配置摘要未变、结果对象可读且所有句子时间和可选说话人字段满足当前契约。具体统计和路径保存在被忽略的.state/jobs/*/acceptance-summary.json及相邻执行记录；正文、文件URL、文件名和凭据不写入版本库。没有人工参考文本，不声称准确率或说话人标签数量等于真实人数。
 
 本次结果根字段为file_url、properties、transcripts；音轨字段包含channel_id、content_duration_in_milliseconds、text和sentences；句子包含begin_time/end_time、sentence_id、speaker_id、text、words。此证据支持后续S4对当前样本导出，不擅自增加未见字段别名兼容。
+
+## 热词＋上下文联合增强及账号模式测试
+
+用户最新授权本项目合理实际测试无需逐次询问。采用已有样本和.env Key，在本地由先前转写的候选领域词生成Excel与参考文本，通过真实Session校验并保存both配置，再启动一次BL真实识别，正常返回JSON_READY。原无增强结果保留。具体词汇、上下文、计数对比及结果路径只保存在.state/enhancement-acceptance-*，不进入Git。
+
+使用固定虚构URL、隔离探针环境核对同一组增强输入，BL request中的parameters.vocabulary和input.context均与保存配置一致。此检查不再次上传音频，不使用真实凭据；修正了临时测试脚本误把dry-run外层对象当作request的读取错误，产品代码和实际识别未重试。候选词来自自动转写，不是人工真值，分段和词频变化不能当作准确率改善证据。
+
+随后只运行一次官方BL控制台登录。结束后通过公开auth status读取到国内/北京控制台凭据、authenticated=true，但api_key缺失，因此没有发起账号模式ASR，也没有复制.env作为替代。官方实现允许只收到access_token时保存并结束，不能从退出0认定模型Key已获得；本次未配置Key的具体原因尚未确认。浏览器连接工具不可用，未取得官方页面状态，正在等待用户页面反馈。
+
+修正本地状态说明：console_configured与configured分别表示控制台凭据和模型Key配置，存在前者但缺后者时说明具体缺口，不再一概要求重新登录。对应22项适配器回归通过；本轮未重跑全量180项。真实账号模式不能记为已验收通过。

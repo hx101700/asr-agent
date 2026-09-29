@@ -150,6 +150,8 @@ bl speech recognize --model qwen-audio-3.0-asr-flash-filetrans --url <上传文�
 
 recognize的模型鉴权优先级为显式--api-key、DASHSCOPE_API_KEY、profile的api_key；项目不使用明文argv Key，API Key模式由.env环境注入覆盖已有控制台配置，控制台模式不读.env。固定default profile避免继承其他活动配置。
 
+本次真实控制台尝试印证了状态差别：BL本地authenticated=true、console凭据存在，但api_key缺失。login-console.ts允许只收到access_token时保存并结束，因此包装器分别报告控制台凭据与模型Key，而不把前者当作ASR可用。具体为何未收到/保存模型Key尚未取得官方页面证据，不推断原因，也不修改BL协议。
+
 最后下载JSON使用原生fetch而没有独立AbortSignal；S3外层3900秒终止并回收BL进程，不能称为取消云端。--out单份下载写对象、零份写[]、多份写列表；顶层results为空时甚至不写文件。S3只验收单文件对象的稳定句子字段，空/异常结果保留且不重提；该JSON不包含子任务元数据，不能声称Python验证了所有云端子状态。[recognize.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/speech/recognize.ts)
 
 2026-09-29经用户明确授权的API Key单样本真实验收：BL完整命令成功落盘，结果为对象，根包含file_url/properties/transcripts；音轨全文字段实际为text，时长为content_duration_in_milliseconds。句子含begin_time/end_time、sentence_id、speaker_id、text、words。原始响应仅保存在忽略目录，详见S3_VERIFICATION；这一样本不证明所有格式、无语音或多音轨场景。

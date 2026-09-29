@@ -137,8 +137,15 @@ def console_status(project: Project) -> dict:
         raise SetupError("BL未返回可解析的本地登录状态。") from exc
     # authenticated也可能只代表控制台token/AK，识别必须存在模型API Key。
     configured = isinstance(status.get("api_key"), dict)
-    return {"mode": "console", "configured": configured, "verified_online": False,
-            "message": "已配置项目内模型凭据。" if configured else "项目内尚无模型凭据，请先运行login完成百炼控制台登录。"}
+    console_configured = isinstance(status.get("console"), dict)
+    if configured:
+        message = "已配置项目内模型凭据。"
+    elif console_configured:
+        message = "控制台凭据已保存，但未配置模型 API Key，暂时无法执行语音识别。请检查官方授权结果。"
+    else:
+        message = "项目内尚无模型凭据，请先运行login完成百炼控制台登录。"
+    return {"mode": "console", "configured": configured, "console_configured": console_configured,
+            "verified_online": False, "message": message}
 
 
 def login_console(project: Project) -> dict:

@@ -1,6 +1,6 @@
 # 当前状态
 
-更新时间：2026-09-29。S3重复校验已精简，API Key单样本真实云端验收通过；控制台登录及其他云端场景待验，尚未开始S4导出。
+更新时间：2026-09-29。API Key无增强及联合增强真实验收通过；控制台尝试后有控制台凭据但缺模型Key，账号ASR未通过。尚未开始S4导出。
 
 ## 当前目标与完成情况
 
@@ -16,6 +16,7 @@
 - S3：transcription.py承担复核、声道准备、一次执行占用和JSON验收；bailian.py只管公开CLI进程，error_catalog.json提供有来源的解释。
 - 新命令：login、console-status、transcribe --job ID --authorize-upload、job-status --job ID。启动记录独占且保留，重复执行不会重新提交。
 - T33已整改：配置摘要+文件指纹后复用S2快照；argv/环境/Key只准备一次；不再执行前auth status；新FLAC复用转换器返回的实测信息。API Key模式不需要login，已有项目BL凭据直接复用。
+- 本轮修正console-status：分别返回模型Key配置与控制台凭据状态；控制台已有凭据时，不再笼统提示重新登录。具体缺Key原因待官方页面信息确认，见T34。
 
 ## 已确认边界
 
@@ -30,11 +31,12 @@
 
 ## 最新验证
 
-- 本轮全量180项Python测试通过，无跳过；20项前端测试通过。受限环境既有连接差异见ISSUES T30，本轮全量使用正常桌面。
+- 最近一次全量回归为180项Python、20项前端通过。本轮仅改登录状态投影/提示，22项BL适配器相关测试通过，未重跑全量；受限环境既有连接差异见T30。
 - bootstrap返回already_installed，未重复安装；python -S scripts/asr.py --help通过，安装入口保持标准库可加载。
 - 真实BL连接127.0.0.1模拟ASR，完整执行入口的JSON成功、空结果与401路径通过；重复调用不增加云端模拟请求。
-- 真实BL本地auth status用隔离合成配置验证；无GUI合成等待进程的超时回收通过。真实控制台浏览器登录尚未验收。
+- 实际运行一次BL控制台登录，结束后官方本地状态为authenticated=true、console存在、api_key缺失；包装器正确拒绝把它作为可识别配置。没有再次登录、没有把.env复制进该模式，也没有用此模式发起ASR。
 - 用户明确授权后，使用项目.env Key、固定模型/北京、单声道样本、说话人开启、无增强，真实执行一次并返回JSON_READY。原音频内容未改、配置摘要一致，实际JSON符合当前句子结构检查；不把这次成功当作所有场景或识别质量通过。
+- 用户授权合理实际测试后，再完成一次API Key热词+上下文联合调用；输入合法，BL请求构造同时保留vocabulary/context，真实返回JSON_READY。测试词汇来自先前转写，不是人工真值，不据此声称精度改善。
 - 真实Session/PyAV覆盖双增强、单双声道、转换后超限、输入变更及关闭网页会话后执行；详见S3_VERIFICATION。
 - 既有浏览器布局/交互证据见S2_VERIFICATION，本轮仅更新阶段提示，没有重新进行整页视觉验收。
 
@@ -42,6 +44,6 @@
 
 先读AGENTS、本文件和S3_VERIFICATION，再检查Git与运行服务。旧页面可能仍加载前一阶段文案，不要擅自刷新用户未保存的表单。
 
-下一步可推进S4规范化与三格式导出，复用本次已保存JSON，不重复识别。真实验收统计在被忽略的.state/jobs/*/acceptance-summary.json；由相邻status/config确定本地结果位置，不把原始JSON或正文提交Git。控制台登录、增强/多声道云端场景与质量另按用户选择验收。BL缺task_id、未知子状态等边界见REFERENCES/ISSUES，不删除execution占用记录重提。S5 ZIP/Skill、S6完整验收尚未实施。
+本轮联合增强统计及账号诊断保存在被忽略的.state/enhancement-acceptance-*/；初次无增强统计在.state/jobs/*/acceptance-summary.json。可复用这些JSON推进S4，不重复识别。账号模式缺Key需先确认官方授权页面结果；浏览器连接工具本轮不可用，不猜测权限/额度等原因。多声道云端及人工质量尚未覆盖。S5 ZIP/Skill、S6完整验收尚未实施。
 
 整改在dev形成检查点，不推送或合并master；准确提交号以git log为准。数据、凭据、截图和合成结果均不入Git。
