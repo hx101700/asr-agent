@@ -1,5 +1,6 @@
 """BL薄适配器合约：只用合成凭据和本地进程，不登录或访问真实ASR。"""
 
+import io
 import json
 import os
 import shutil
@@ -294,7 +295,9 @@ class BailianTests(ProjectTestCase):
         self.assertNotIn("synthetic-masked", json.dumps(report))
 
     def test_successful_login_process_still_checks_public_status(self):
-        self.process.communicate.side_effect = [(None, ""), (json.dumps({"authenticated": False}), "")]
+        self.process.stdout = io.StringIO("")
+        self.process.stderr = io.StringIO("")
+        self.process.communicate.return_value = (json.dumps({"authenticated": False}), "")
         report = login_console(self.project)
         self.assertFalse(report["configured"])
         self.assertEqual(self.popen.call_count, 2)
@@ -307,7 +310,8 @@ class BailianTests(ProjectTestCase):
 
     def test_failed_login_does_not_repeat_login_or_request_status(self):
         self.process.returncode = 6
-        self.process.communicate.return_value = (None, '{"error":{"code":6,"message":"synthetic network failure"}}')
+        self.process.stdout = io.StringIO("")
+        self.process.stderr = io.StringIO('{"error":{"code":6,"message":"synthetic network failure"}}')
         with self.assertRaises(BailianFailure):
             login_console(self.project)
         self.popen.assert_called_once()

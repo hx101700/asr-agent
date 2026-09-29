@@ -4,8 +4,10 @@ import json
 import os
 import re
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 from .auth import bailian_environment
 from .environment import Project, SetupError, bl_command
@@ -93,13 +95,76 @@ def explain_cli_error(returncode: int, stderr: str, private_values: list[str]) -
     }
 
 
+def _open_console_fallback(url: str) -> None:
+    """只转交BL自己输出的官方登录URL，不构造state、不保存或打印链接。"""
+    try:
+        parsed = urlsplit(url)
+        query = parse_qs(parsed.query, strict_parsing=True, keep_blank_values=True)
+        notice = query.get("notice", [])
+        callback = re.fullmatch(r"127\.0\.0\.1:(\d{1,5})\?state=[0-9a-f]{32}", notice[0]) if len(notice) == 1 else None
+        valid = (parsed.scheme == "https" and parsed.netloc == "bailian.console.aliyun.com"
+                 and parsed.path == "/console-login" and not parsed.fragment
+                 and not any(character.isspace() for character in url)
+                 and set(query) <= {"notice", "needapikey"}
+                 and ("needapikey" not in query or query["needapikey"] == ["true"])
+                 and callback is not None and 1 <= int(callback[1]) <= 65535)
+    except ValueError:
+        valid = False
+    if not valid:
+        raise SetupError("BL返回的登录链接不符合已核实的官方格式，本次登录已停止。")
+    try:
+        # BL 2.1.0的cmd/start会拆开&needapikey；ShellExecute不经过cmd。
+        os.startfile(url)
+    except OSError as exc:
+        raise SetupError("无法打开BL提供的完整登录页面，本次登录已停止，未重试。") from exc
+
+
+def _communicate_login(process, timeout: float) -> tuple[None, str]:
+    """登录仍在等待回调时消费备用链接，同时排空stderr，避免管道堵塞。"""
+    def read_links():
+        opened = False
+        try:
+            with process.stdout:
+                while line := process.stdout.readline(4097):
+                    if len(line) > 4096:
+                        raise SetupError("BL登录输出超出预期长度，本次登录已停止。")
+                    line = line.strip()
+                    if not opened and line.startswith(("https://", "http://")):
+                        if process.poll() is not None:
+                            raise SetupError("BL登录进程已结束，本次链接已不可继续使用；未重新发起登录。")
+                        opened = True
+                        _open_console_fallback(line)
+        except (SetupError, OSError):
+            if process.poll() is None:
+                process.kill()
+            raise
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as readers:
+            links = readers.submit(read_links)
+            errors = readers.submit(process.stderr.read)
+            try:
+                process.wait(timeout=timeout)
+            except (subprocess.TimeoutExpired, KeyboardInterrupt, OSError):
+                if process.poll() is None:
+                    process.kill()
+                process.wait()
+                raise
+            # 进程结束后管道得到EOF；线程回收完成后才返回，不遗留监听线程。
+            links.result()
+            return None, errors.result()
+    finally:
+        process.stderr.close()
+
+
 def _run_bl(project: Project, command: PreparedCommand,
-            private_values: list[str], *, timeout: float, capture_stdout: bool = False) -> str:
+            private_values: list[str], *, timeout: float, capture_stdout: bool = False,
+            console_login: bool = False) -> str:
     private_values = [*private_values, command.env.get("DASHSCOPE_API_KEY", "")]
     try:
         process = subprocess.Popen(
             command.argv, cwd=project.root, env=command.env, stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE if capture_stdout else subprocess.DEVNULL, stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE if capture_stdout or console_login else subprocess.DEVNULL, stderr=subprocess.PIPE,
             text=True, encoding="utf-8", errors="replace", shell=False,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
         )
@@ -107,10 +172,14 @@ def _run_bl(project: Project, command: PreparedCommand,
         raise BailianFailure({"source": "local", "code": "LOCAL_PROCESS_START_FAILED",
                               "explanation": "无法启动BL进程，尚未执行云端操作。"}, started=False) from exc
     try:
-        stdout, stderr = process.communicate(timeout=timeout)
+        if console_login:
+            stdout, stderr = _communicate_login(process, timeout)
+        else:
+            stdout, stderr = process.communicate(timeout=timeout)
     except (subprocess.TimeoutExpired, KeyboardInterrupt, OSError) as exc:
-        process.kill()
-        process.communicate()
+        if not console_login:
+            process.kill()
+            process.communicate()
         # 这里只说明进程中断；是否已提交识别，由调用用例解释。
         raise BailianFailure({"source": "local", "code": "LOCAL_WAIT_INTERRUPTED",
                               "explanation": "BL进程等待已中断，未自动重试。"},
@@ -152,6 +221,6 @@ def login_console(project: Project) -> dict:
     project.prepare()
     command = prepare_command(project, ["auth", "login", "--console", "--console-site", "domestic",
                                         "--config", "default", "--output", "json"], "console")
-    _run_bl(project, command, [], timeout=15 * 60 + 30)
+    _run_bl(project, command, [], timeout=15 * 60 + 30, console_login=True)
     # BL登录空等超时也可能退出0，必须再核对公开的本地状态命令。
     return console_status(project)

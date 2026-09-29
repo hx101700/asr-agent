@@ -16,10 +16,13 @@
 | A08 | [百炼错误码](https://www.alibabacloud.com/help/zh/model-studio/error-code) | 通用错误；页面更新于 2026-09-25 |
 | A09 | [本模型系列 Python SDK 参考](https://help.aliyun.com/zh/model-studio/funauidio-asr-recorded-speech-recognition-python-sdk) | 状态/错误示例，仅作为资料，不采用 SDK 实现 |
 | A10 | [CLI 安装与鉴权](https://help.aliyun.com/zh/model-studio/cli/installation) | 安装要求和官方鉴权流程 |
+| A10b | [用户提供的新版安装与鉴权文档](https://docs.bailian.console.aliyun.com/zh/model-studio/cli/installation) | 控制台登录应自动配置模型鉴权，登录后只查状态，无需重复模型调用 |
 | A11 | [CLI 快速开始](https://help.aliyun.com/zh/model-studio/cli/quickstart) | Agent 调用范式 |
 | A12 | [CLI 配置与工具](https://help.aliyun.com/zh/model-studio/cli/config) | 文件上传和配置命令 |
 | A13 | [CLI 语音合成与识别](https://help.aliyun.com/zh/model-studio/cli/speech) | --url本地文件、识别选项与--out |
 | W01 | [Windows CreateProcessW](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw) | 完整Unicode命令行32767字符（含终止NUL） |
+| W02 | [Windows cmd](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/cmd) | &作为命令分隔符，参数中的特殊字符需要正确转义/引用 |
+| W03 | [Python os.startfile](https://docs.python.org/3.12/library/os.html#os.startfile) | 通过Windows ShellExecute打开URL，不经过cmd |
 | O01 | [Codex AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md) | 项目指令发现与优先级 |
 | O02 | [Codex Skills](https://learn.chatgpt.com/docs/build-skills) | SKILL.md、发现路径和渐进加载 |
 | M01 | [PyAV18.1.0安装文档](https://github.com/PyAV-Org/PyAV/blob/v18.1.0/docs/overview/installation.rst) | Windows wheel包含FFmpeg库 |
@@ -151,6 +154,16 @@ bl speech recognize --model qwen-audio-3.0-asr-flash-filetrans --url <上传文�
 recognize的模型鉴权优先级为显式--api-key、DASHSCOPE_API_KEY、profile的api_key；项目不使用明文argv Key，API Key模式由.env环境注入覆盖已有控制台配置，控制台模式不读.env。固定default profile避免继承其他活动配置。
 
 本次真实控制台尝试印证了状态差别：BL本地authenticated=true、console凭据存在，但api_key缺失。login-console.ts允许只收到access_token时保存并结束，因此包装器分别报告控制台凭据与模型Key，而不把前者当作ASR可用。具体为何未收到/保存模型Key尚未取得官方页面证据，不推断原因，也不修改BL协议。
+
+用户随后提供A10b。已实际读取该页：官方预期是控制台登录同时配置模型调用所需凭据，用户无需手动复制Key；成功后只需auth status，不应重复模型调用来校验登录。因此本项目观察到的“页面成功但模型Key缺失”应作为集成异常，不能描述成账号登录正常要求用户另填Key。通过官方config list/show核对，本项目只有default且为当前配置，配置文件在项目隔离目录，包含控制台令牌但无api_key；没有输出凭据值，尚未确定未写入模型Key的根因。
+
+### Windows登录链接问题：已复现并修复
+
+以下记录补充并解决上述缺Key观察。2.1.0的[local-server.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/shared/local-server.ts)在Windows使用execFile(cmd, ['/c', 'start', '', url])；[login-console.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/login-console.ts)在需要模型Key时追加&needapikey=true。实际传给cmd的URL未按cmd规则引用，&后的参数被当作第二条命令。[W02](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/cmd)
+
+本机以echo替代start、使用固定合成URL复现：stdout链接截止state参数，退出1，stderr提示needapikey不是命令；没有打开浏览器或访问合成URL。这与旧登录页面只完成控制台授权的结果一致。BL在打开失败时会把完整登录URL单独写入stdout，并继续保持原回调服务；旧Python包装却丢弃了stdout。
+
+修复仅转交这一公开备用链接：登录期间消费stdout，校验固定官方origin/path、127.0.0.1回调端口、32位hex state及已知参数；使用os.startfile打开一次。链接只在内存，不输出/保存，不构造state，不修改BL源代码或自建回调服务。真实修复后BL公开状态返回模型Key和控制台凭据均存在；没有额外模型调用验证登录。[W03](https://docs.python.org/3.12/library/os.html#os.startfile)
 
 最后下载JSON使用原生fetch而没有独立AbortSignal；S3外层3900秒终止并回收BL进程，不能称为取消云端。--out单份下载写对象、零份写[]、多份写列表；顶层results为空时甚至不写文件。S3只验收单文件对象的稳定句子字段，空/异常结果保留且不重提；该JSON不包含子任务元数据，不能声称Python验证了所有云端子状态。[recognize.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/speech/recognize.ts)
 

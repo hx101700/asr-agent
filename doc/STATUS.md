@@ -1,6 +1,6 @@
 # 当前状态
 
-更新时间：2026-09-29。API Key无增强及联合增强真实验收通过；控制台尝试后有控制台凭据但缺模型Key，账号ASR未通过。尚未开始S4导出。
+更新时间：2026-09-29。API Key无增强及联合增强真实验收通过；控制台登录的Windows链接问题已修复，实际登录取得模型Key。尚未开始S4导出。
 
 ## 当前目标与完成情况
 
@@ -16,7 +16,8 @@
 - S3：transcription.py承担复核、声道准备、一次执行占用和JSON验收；bailian.py只管公开CLI进程，error_catalog.json提供有来源的解释。
 - 新命令：login、console-status、transcribe --job ID --authorize-upload、job-status --job ID。启动记录独占且保留，重复执行不会重新提交。
 - T33已整改：配置摘要+文件指纹后复用S2快照；argv/环境/Key只准备一次；不再执行前auth status；新FLAC复用转换器返回的实测信息。API Key模式不需要login，已有项目BL凭据直接复用。
-- 本轮修正console-status：分别返回模型Key配置与控制台凭据状态；控制台已有凭据时，不再笼统提示重新登录。具体缺Key原因待官方页面信息确认，见T34。
+- T34已定位并修复：BL2.1.0通过cmd/start传URL会丢掉&needapikey参数，Python原封装又丢弃完整备用链接。现在运行中读取该官方链接，校验格式后用os.startfile打开一次，继续使用原BL回调服务。
+- 实际修复后登录返回configured=true、console_configured=true，模型Key由BL官方流程配置，未复制.env或自建取Key逻辑。正常账号登录无需手填第二次Key。
 
 ## 已确认边界
 
@@ -31,10 +32,10 @@
 
 ## 最新验证
 
-- 最近一次全量回归为180项Python、20项前端通过。本轮仅改登录状态投影/提示，22项BL适配器相关测试通过，未重跑全量；受限环境既有连接差异见T30。
+- 本轮192项Python全量回归通过，无跳过；前端未改动，最近20项前端回归仍为前轮结果。新测试覆盖完整链接、运行中打开、stderr排空、错误/超时回收和不泄露state。受限环境既有连接差异见T30。
 - bootstrap返回already_installed，未重复安装；python -S scripts/asr.py --help通过，安装入口保持标准库可加载。
 - 真实BL连接127.0.0.1模拟ASR，完整执行入口的JSON成功、空结果与401路径通过；重复调用不增加云端模拟请求。
-- 实际运行一次BL控制台登录，结束后官方本地状态为authenticated=true、console存在、api_key缺失；包装器正确拒绝把它作为可识别配置。没有再次登录、没有把.env复制进该模式，也没有用此模式发起ASR。
+- 已实际验证修复后的控制台登录：BL保存了控制台凭据及模型Key。按官方文档只查询公开状态，没有为验证登录重复识别；账号凭据下的独立ASR调用未另行进行。
 - 用户明确授权后，使用项目.env Key、固定模型/北京、单声道样本、说话人开启、无增强，真实执行一次并返回JSON_READY。原音频内容未改、配置摘要一致，实际JSON符合当前句子结构检查；不把这次成功当作所有场景或识别质量通过。
 - 用户授权合理实际测试后，再完成一次API Key热词+上下文联合调用；输入合法，BL请求构造同时保留vocabulary/context，真实返回JSON_READY。测试词汇来自先前转写，不是人工真值，不据此声称精度改善。
 - 真实Session/PyAV覆盖双增强、单双声道、转换后超限、输入变更及关闭网页会话后执行；详见S3_VERIFICATION。
@@ -44,6 +45,6 @@
 
 先读AGENTS、本文件和S3_VERIFICATION，再检查Git与运行服务。旧页面可能仍加载前一阶段文案，不要擅自刷新用户未保存的表单。
 
-本轮联合增强统计及账号诊断保存在被忽略的.state/enhancement-acceptance-*/；初次无增强统计在.state/jobs/*/acceptance-summary.json。可复用这些JSON推进S4，不重复识别。账号模式缺Key需先确认官方授权页面结果；浏览器连接工具本轮不可用，不猜测权限/额度等原因。多声道云端及人工质量尚未覆盖。S5 ZIP/Skill、S6完整验收尚未实施。
+本轮联合增强统计在被忽略的.state/enhancement-acceptance-*/；其中旧console-diagnostic是修复前历史，不能当作当前登录状态。当前凭据状态以console-status为准。可复用已有JSON推进S4，不重复识别。多声道云端及人工质量尚未覆盖。S5 ZIP/Skill、S6完整验收尚未实施。
 
 整改在dev形成检查点，不推送或合并master；准确提交号以git log为准。数据、凭据、截图和合成结果均不入Git。
