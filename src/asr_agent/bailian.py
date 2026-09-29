@@ -4,6 +4,7 @@ import json
 import os
 import re
 import subprocess
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .auth import bailian_environment
@@ -12,6 +13,20 @@ from .environment import Project, SetupError, bl_command
 BEIJING_BASE_URL = "https://dashscope.aliyuncs.com"
 WAIT_SECONDS = 3600
 PROCESS_SECONDS = WAIT_SECONDS + 300
+
+
+@dataclass(frozen=True)
+class PreparedCommand:
+    """一次准备的实际命令与环境；repr也不能包含Key、上下文或热词。"""
+
+    argv: tuple[str, ...] = field(repr=False)
+    env: dict[str, str] = field(repr=False)
+
+
+def prepare_command(project: Project, arguments: list[str], auth_mode: str) -> PreparedCommand:
+    argv = bl_command(project, arguments)
+    check_command_length(argv)
+    return PreparedCommand(tuple(argv), bailian_environment(project, auth_mode))
 
 
 class BailianFailure(Exception):
@@ -78,15 +93,12 @@ def explain_cli_error(returncode: int, stderr: str, private_values: list[str]) -
     }
 
 
-def _run_bl(project: Project, arguments: list[str], auth_mode: str,
+def _run_bl(project: Project, command: PreparedCommand,
             private_values: list[str], *, timeout: float, capture_stdout: bool = False) -> str:
-    argv = bl_command(project, arguments)
-    check_command_length(argv)
-    env = bailian_environment(project, auth_mode)
-    private_values = [*private_values, env.get("DASHSCOPE_API_KEY", "")]
+    private_values = [*private_values, command.env.get("DASHSCOPE_API_KEY", "")]
     try:
         process = subprocess.Popen(
-            argv, cwd=project.root, env=env, stdin=subprocess.DEVNULL,
+            command.argv, cwd=project.root, env=command.env, stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE if capture_stdout else subprocess.DEVNULL, stderr=subprocess.PIPE,
             text=True, encoding="utf-8", errors="replace", shell=False,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
@@ -108,15 +120,15 @@ def _run_bl(project: Project, arguments: list[str], auth_mode: str,
     return stdout or ""
 
 
-def run_recognition(project: Project, arguments: list[str], auth_mode: str,
+def run_recognition(project: Project, command: PreparedCommand,
                     private_values: list[str]) -> None:
-    _run_bl(project, arguments, auth_mode, private_values, timeout=PROCESS_SECONDS)
+    _run_bl(project, command, private_values, timeout=PROCESS_SECONDS)
 
 
 def console_status(project: Project) -> dict:
     project.prepare()
-    output = _run_bl(project, ["auth", "status", "--config", "default", "--output", "json"],
-                     "console", [], timeout=60, capture_stdout=True)
+    command = prepare_command(project, ["auth", "status", "--config", "default", "--output", "json"], "console")
+    output = _run_bl(project, command, [], timeout=60, capture_stdout=True)
     try:
         status = json.loads(output)
         if not isinstance(status, dict):
@@ -131,8 +143,8 @@ def console_status(project: Project) -> dict:
 
 def login_console(project: Project) -> dict:
     project.prepare()
-    _run_bl(project, ["auth", "login", "--console", "--console-site", "domestic",
-                      "--config", "default", "--output", "json"],
-            "console", [], timeout=15 * 60 + 30)
+    command = prepare_command(project, ["auth", "login", "--console", "--console-site", "domestic",
+                                        "--config", "default", "--output", "json"], "console")
+    _run_bl(project, command, [], timeout=15 * 60 + 30)
     # BL登录空等超时也可能退出0，必须再核对公开的本地状态命令。
     return console_status(project)

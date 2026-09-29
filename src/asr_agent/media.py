@@ -45,13 +45,13 @@ def probe_audio(path: Path) -> AudioInfo:
         raise MediaError("无法读取音频，请检查文件是否损坏或格式是否支持。") from exc
 
 
-def convert_to_mono(source: Path, destination: Path) -> Path:
-    """流式生成第一个音轨的单声道FLAC副本；UI确认与模型限额校验由调用方负责。"""
+def convert_to_mono(source: Path, destination: Path) -> AudioInfo:
+    """生成并检测单声道FLAC，返回实测信息供模型限额检查复用；单声道输入不另建副本。"""
     source = source.resolve(strict=True)
     destination = destination.resolve()
     info = probe_audio(source)
     if info.channels == 1:
-        return source
+        return info
     if destination == source or destination.suffix.lower() != ".flac":
         raise MediaError("单声道副本必须使用不同于源文件的.flac路径。")
 
@@ -85,7 +85,7 @@ def convert_to_mono(source: Path, destination: Path) -> Path:
                 or converted.duration_seconds is None
                 or abs(converted.duration_seconds - samples / info.sample_rate) > 1 / info.sample_rate):
             raise MediaError("转换后的声道、采样率或有效样本时长检查失败。")
-        return destination
+        return converted
     except (av.FFmpegError, OSError, ValueError):
         # 只删除本次以xb新建的失败副本，原文件及已存在目标不受影响。
         if created:

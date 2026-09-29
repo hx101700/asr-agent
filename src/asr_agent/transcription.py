@@ -1,5 +1,6 @@
 """按已保存配置执行一次转写；云端流程完全交给BL。"""
 
+import hashlib
 import json
 import os
 import re
@@ -7,11 +8,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import MODEL
-from .auth import api_key_status
-from .bailian import BEIJING_BASE_URL, WAIT_SECONDS, BailianFailure, check_command_length, console_status, run_recognition
-from .environment import Project, SetupError, bl_command
+from .bailian import BEIJING_BASE_URL, WAIT_SECONDS, BailianFailure, PreparedCommand, prepare_command, run_recognition
+from .environment import Project, SetupError
 from .media import MediaError, convert_to_mono
-from .validation import MAX_UPLOAD_BYTES, ValidationError, file_fingerprint, load_hotwords, validate_audio, validate_context, validate_options
+from .validation import ValidationError, check_audio_limits, file_fingerprint
 
 
 def job_directory(project: Project, job_id: str) -> Path:
@@ -25,10 +25,16 @@ def job_directory(project: Project, job_id: str) -> Path:
 
 def read_config(project: Project, job_id: str) -> dict:
     path = job_directory(project, job_id) / "config.json"
-    if path.is_symlink():
+    checksum = path.with_suffix(".sha256")
+    if path.resolve() != path or checksum.resolve() != checksum:
         raise SetupError("任务配置不能使用符号链接。")
+    if not checksum.is_file():
+        raise SetupError("此设置缺少确认摘要，请在当前网页重新检查并保存；不会自动补签或上传。")
     try:
-        config = json.loads(path.read_text(encoding="utf-8"))
+        content = path.read_bytes()
+        if hashlib.sha256(content).hexdigest() != checksum.read_text(encoding="ascii").strip():
+            raise SetupError("已保存的配置发生变化，请重新检查并确认；未执行转写。")
+        config = json.loads(content)
         valid = (config["schema_version"] == 1 and config["job_id"] == job_id
                  and config["model"] == MODEL and config["region"] == "cn-beijing"
                  and config["status"] == "CONFIGURED"
@@ -74,13 +80,15 @@ def job_status(project: Project, job_id: str) -> dict:
     return report
 
 
-def _upload_root(project: Project, record: dict) -> Project:
+def _check_input(project: Project, record: dict) -> Path:
     path = Path(record["path"])
     base = project.path(".state/web-uploads")
     if (not path.is_absolute() or not path.is_relative_to(base)
             or len(path.relative_to(base).parts) != 2 or path.resolve() != path):
         raise SetupError("输入文件不是网页保存的本机会话副本，请重新选择。")
-    return Project(path.parent)
+    if file_fingerprint(path) != record["fingerprint"]:
+        raise SetupError("保存设置后的输入文件已改变，请重新选择并确认；未上传。")
+    return path
 
 
 def _output_path(config: dict) -> Path:
@@ -91,27 +99,18 @@ def _output_path(config: dict) -> Path:
     return directory / "transcription.json"
 
 
-def prepare_input(project: Project, config: dict, execution: Path) -> tuple[list[str], list[str], Path]:
-    """复用S2校验；不信任旧媒体元信息，也不静默省略增强参数。"""
+def prepare_input(project: Project, config: dict, execution: Path) -> tuple[PreparedCommand, list[str], Path]:
+    """复用未变更的S2快照；只复核输入指纹，并验收新生成的音频副本。"""
     mode = config["auth_mode"]
     if mode not in ("console", "api_key"):
         raise SetupError("配置的鉴权方式无效。")
-    status = api_key_status(project) if mode == "api_key" else console_status(project)
-    if not status["configured"]:
-        raise SetupError(status["message"])
     audio_record = config["audio"]
-    upload_root = _upload_root(project, audio_record)
-    audio = validate_audio(upload_root, audio_record["path"], config["diarization_enabled"])
-    if audio["fingerprint"] != audio_record["fingerprint"]:
-        raise SetupError("保存设置后的音频已改变，请重新选择并确认；未上传。")
+    source = _check_input(project, audio_record)
     options = config["recognition_options"]
     languages = options["language_hints"]
     if not isinstance(languages, list) or len(languages) > 1:
         raise SetupError("当前BL仅支持一个语言提示，请重新配置。")
-    validate_options({"language_hint": languages[0] if languages else None,
-                      "speaker_count": options["speaker_count"]}, config["diarization_enabled"])
-    source = Path(audio["path"])
-    prepared = execution / "mono.flac" if audio["requires_mono"] else source
+    prepared = execution / "mono.flac" if audio_record["requires_mono"] else source
     destination = _output_path(config)
     arguments = ["speech", "recognize", "--config", "default", "--model", MODEL, "--url", str(prepared),
                  "--base-url", BEIJING_BASE_URL, "--out", str(destination),
@@ -131,28 +130,24 @@ def prepare_input(project: Project, config: dict, execution: Path) -> tuple[list
     if (hotwords is not None) != (enhancement_mode in ("hotwords", "both")):
         raise SetupError("热词配置不完整，请重新确认。")
     if hotwords is not None:
-        words = load_hotwords(_upload_root(project, hotwords), hotwords["path"])
-        if words["fingerprint"] != hotwords["fingerprint"]:
-            raise SetupError("保存设置后的词表已改变，请重新选择并确认；未上传。")
-        arguments.extend(["--vocabulary", json.dumps(words["vocabulary"], ensure_ascii=False, separators=(",", ":"))])
-        private.extend(words["vocabulary"])
+        _check_input(project, hotwords)
+        arguments.extend(["--vocabulary", json.dumps(hotwords["vocabulary"], ensure_ascii=False, separators=(",", ":"))])
+        private.extend(hotwords["vocabulary"])
     context = enhancement["context"]
     if (context is not None) != (enhancement_mode in ("context", "both")):
         raise SetupError("上下文配置不完整，请重新确认。")
     if context is not None:
-        arguments.extend(["--context", validate_context(context)])
+        arguments.extend(["--context", context])
         private.append(context)
-    check_command_length(bl_command(project, arguments))
+    command = prepare_command(project, arguments, mode)
     # 先拒绝不可启动的参数；通过后才做可能耗时的本地声道合并。
-    if audio["requires_mono"]:
-        convert_to_mono(source, prepared)
-        converted = validate_audio(Project(execution), prepared, True)
-        if converted["metadata"]["channels"] != 1 or converted["metadata"]["size_bytes"] > MAX_UPLOAD_BYTES:
-            raise SetupError("单声道副本检查不通过，未上传。")
-        if file_fingerprint(source) != audio["fingerprint"]:
+    if audio_record["requires_mono"]:
+        converted = convert_to_mono(source, prepared)
+        check_audio_limits(converted, True)
+        if file_fingerprint(source) != audio_record["fingerprint"]:
             raise SetupError("声道处理期间源文件改变，未上传。")
     destination.parent.mkdir(parents=True, exist_ok=False)
-    return arguments, private, destination
+    return command, private, destination
 
 
 def inspect_result(path: Path) -> dict:
@@ -202,10 +197,10 @@ def transcribe(project: Project, job_id: str, *, authorize_upload: bool = False)
     destination = None
     try:
         project.prepare()
-        arguments, private, destination = prepare_input(project, config, execution)
+        command, private, destination = prepare_input(project, config, execution)
         report.update(status="RUNNING", cloud_outcome="unknown", message="BL正在执行上传、识别、等待及结果保存。")
         _save_status(execution, report)
-        run_recognition(project, arguments, config["auth_mode"], private)
+        run_recognition(project, command, private)
         result = inspect_result(destination)
         report.update(status="JSON_READY", cloud_outcome="result_received", json_path=str(destination), result=result,
                       message="BL已结束，转写JSON已保存并通过结构检查；Excel、Word和Markdown导出尚未接入。")

@@ -13,7 +13,7 @@ from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 
 from .environment import Project
-from .media import MediaError, probe_audio
+from .media import AudioInfo, MediaError, probe_audio
 
 
 # 官方模型/临时OSS限制见doc/REFERENCES.md A02、A04、A06。
@@ -117,6 +117,19 @@ def _check_unchanged(path: Path, fingerprint: dict, field: str) -> None:
         raise ValidationError("文件在校验期间发生变化，请重新校验。", field)
 
 
+def check_audio_limits(info: AudioInfo, diarization: bool) -> None:
+    """对实测信息应用模型/临时上传限制；不再次打开或探测音频。"""
+    if not set(info.format_name.split(",")) & SUPPORTED_CONTAINERS:
+        raise ValidationError("实际媒体格式不在固定模型支持范围内。", "audio_path")
+    duration = info.duration_seconds
+    if duration is None or not math.isfinite(duration) or duration <= 0:
+        raise ValidationError("无法确定有效音频时长，不能完成上传前校验。", "audio_path")
+    if duration > MAX_DURATION_SECONDS:
+        raise ValidationError("音频时长超过模型允许的12小时。", "audio_path")
+    if not (diarization and info.channels > 1) and info.size_bytes > MAX_UPLOAD_BYTES:
+        raise ValidationError("待上传音频超过临时OSS的1 GB上限。", "audio_path")
+
+
 def validate_audio(project: Project, path: str | Path, diarization: bool) -> dict:
     """只探测原文件；需要合并时留到确认后，并再次校验实际上传副本。"""
     field = "audio_path"
@@ -128,16 +141,9 @@ def validate_audio(project: Project, path: str | Path, diarization: bool) -> dic
         if before.st_size == 0:
             raise ValidationError("音频文件为空。", field)
         info = probe_audio(source)
-        if not set(info.format_name.split(",")) & SUPPORTED_CONTAINERS:
-            raise ValidationError("实际媒体格式不在固定模型支持范围内。", field)
+        check_audio_limits(info, diarization)
         duration = info.duration_seconds
-        if duration is None or not math.isfinite(duration) or duration <= 0:
-            raise ValidationError("无法确定有效音频时长，不能完成上传前校验。", field)
-        if duration > MAX_DURATION_SECONDS:
-            raise ValidationError("音频时长超过模型允许的12小时。", field)
         requires_mono = diarization and info.channels > 1
-        if not requires_mono and info.size_bytes > MAX_UPLOAD_BYTES:
-            raise ValidationError("待上传音频超过临时OSS的1 GB上限。", field)
         warnings = []
         if requires_mono:
             warnings.append(

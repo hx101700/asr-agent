@@ -25,8 +25,8 @@ class MediaContractTests(ProjectTestCase):
 
     def test_mono_flac_preserves_rate_duration_and_source(self):
         original = hashlib.sha256(self.source.read_bytes()).digest()
-        self.assertEqual(convert_to_mono(self.source, self.output), self.output)
-        info = probe_audio(self.output)
+        info = convert_to_mono(self.source, self.output)
+        self.assertEqual(info, probe_audio(self.output))
         self.assertEqual(info.channels, 1)
         self.assertEqual(info.sample_rate, 16000)
         self.assertAlmostEqual(info.duration_seconds, 1.0, places=5)
@@ -56,7 +56,7 @@ class MediaContractTests(ProjectTestCase):
     def test_mono_input_is_used_without_another_copy(self):
         convert_to_mono(self.source, self.output)
         unused = self.project.path("unneeded.flac")
-        self.assertEqual(convert_to_mono(self.output, unused), self.output)
+        self.assertEqual(convert_to_mono(self.output, unused), probe_audio(self.output))
         self.assertFalse(unused.exists())
 
     def test_corrupt_audio_does_not_create_output(self):

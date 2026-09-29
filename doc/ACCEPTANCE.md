@@ -1,6 +1,6 @@
 # 测试与验收
 
-> 当前为整体验收计划。最新执行记录见[S1验证记录](S1_VERIFICATION.md)和[S2验证记录](S2_VERIFICATION.md)，不在本表重复维护测试数量。云端端到端流程尚未验收。
+> 当前为整体验收计划。最新执行记录见[S1验证记录](S1_VERIFICATION.md)、[S2验证记录](S2_VERIFICATION.md)和[S3验证记录](S3_VERIFICATION.md)，不在本表重复维护测试数量。已通过一次API Key单样本云端转写，ZIP到三格式文件的完整流程尚未验收。
 
 ## 验收目标
 

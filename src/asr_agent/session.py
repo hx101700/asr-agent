@@ -1,5 +1,6 @@
 """本地配置用例与会话状态；不依赖HTTP处理器或浏览器元素。"""
 
+import hashlib
 import json
 import os
 import secrets
@@ -333,11 +334,16 @@ class Session:
                 config["confirmed_at"] = datetime.now(timezone.utc).isoformat()
                 temporary = directory / "config.json.tmp"
                 destination = directory / "config.json"
-                with temporary.open("x", encoding="utf-8") as output:
-                    json.dump(config, output, ensure_ascii=False, indent=2)
-                    output.write("\n")
+                content = (json.dumps(config, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+                with temporary.open("xb") as output:
+                    output.write(content)
                     output.flush()
                     os.fsync(output.fileno())
+                # 先保存确认摘要，再发布配置；S3据此复用本次已校验快照。
+                with (directory / "config.sha256").open("x", encoding="ascii") as checksum:
+                    checksum.write(hashlib.sha256(content).hexdigest() + "\n")
+                    checksum.flush()
+                    os.fsync(checksum.fileno())
                 temporary.replace(destination)
             except (OSError, SetupError, ValidationError):
                 self.draft = None

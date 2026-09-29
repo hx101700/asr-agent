@@ -206,3 +206,34 @@ recognition_options.py的少量规则合并入validation.py，消除为了导入
 4. 简化固定模型规则，统一文档与验收，再决定进入S3。
 
 每阶段都应有独立可审阅差异和验证结果，不将功能新增混入整改。dev用于整改，master仅接收已验收里程碑；本次仅给出方案，不改业务代码、不启停服务、不提交Git。
+
+## S3职责与重复校验复核（2026-09-29，adeea98）
+
+用户追问S1登录状态、login包装入口意义及BL能力是否重复。本轮只读核对代码、S1历史提交3077622、锁定BL2.1.0发布包和最新官方安装/语音文档；没有读取真实凭据、登录或执行转写。
+
+S1项目入口只有bootstrap、doctor、probe-bl和api-key-status。auth.py完成.env本地读取/注入与合成测试，S1_VERIFICATION明确真实登录未验收。不能把浏览器已有登录、.env已配置与项目隔离BL控制台登录混为一项，也不能据此断言用户未在别处登录。
+
+S3的login_console实际调用BL auth login --console，未实现登录协议；它仅适用于控制台模式的首次/主动重新登录。API Key模式不需要此命令。transcribe没有自动调用login，只在控制台模式先调用BL auth status。将login列成所有用户必做步骤是不准确的交付表述。
+
+| 已核实重叠 | 当前位置 | 调整建议（未实施） |
+| --- | --- | --- |
+| API Key在准备阶段检查后，启动BL时再次读取 | transcription.prepare_input → api_key_status；bailian._run_bl → bailian_environment | 一次读取/准备环境，启动使用同一结果；不增加在线验证 |
+| 构造argv和Windows长度检查做两遍 | prepare_input末尾；_run_bl开头 | 生成一份实际argv，检查一次，再执行同一份参数 |
+| 转换后大小限制重复判断 | validate_audio已检查单声道上传上限，prepare_input再次比较同一上限 | 保留一处权威检查及必要的单声道结果断言 |
+| 执行前完整重跑音频/Excel/上下文/选项校验 | prepare_input | 区分不可省的指纹/执行边界/新转换产物检查与已确认输入规则，减少重复解析；不能直接删掉全部输入保护 |
+| 发言人数依赖diarization的语义与BL相同 | validation.validate_options；BL recognize的speaker-count检查 | 网页保留必要交互，执行层避免平行维护BL已有参数规则 |
+| 每次执行另起BL auth status检查凭据存在 | prepare_input | 不是重写BL，但增加一次进程与前置检查；应明确是否仅登录收尾/用户查看时需要，由BL正式调用处理凭据解析 |
+
+需要保留的项目能力：Excel行级提示/转换、未由当前异步CLI完整检查的模型热词/上下文限制、网页来源/路径控制、输入指纹、必要的单声道转换、项目配置到argv的映射、本地防重复提交和产物验收。当前BL即时词解析只检查JSON对象及有限数字权重；上下文构造函数只包装消息；BL退出0可能写[]，所以不能把这些项目检查全部归为已由BL完成。
+
+S3没有Python云端鉴权、OSS上传、ASR提交/轮询或下载客户端；主要工作是将S2配置接到已有BL完整命令。以上实际重叠仍应收敛，不能用“薄适配器”名称代替对重复工作的审查。
+
+### 本轮整改完成记录
+
+上述表格保留adeea98基线问题；当前已按用户要求修改。prepare_command一次构造实际argv、检查Windows长度并读取环境，PreparedCommand交给执行器原样使用，repr隐藏参数和环境。移除每次转写前auth status；login只用于首次/主动重新登录。
+
+Session以同一份UTF-8字节保存config.json和config.sha256。执行层先检查配置摘要及输入指纹，直接复用S2媒体/词表/上下文/选项快照，不重跑这些业务规则。缺摘要的旧配置明确要求重新确认，不自动补签。摘要仅用于发现修改或损坏，不是安全签名。
+
+convert_to_mono返回已经实测的AudioInfo；check_audio_limits是唯一的模型/上传限额函数，供S2探测信息及S3新副本信息使用。S3不再重新探测副本或重复比较上传大小，必要的转换中源文件指纹检查保留。
+
+全量180项Python和20项前端测试通过。随后经用户明确授权完成一次API Key、固定模型/北京、说话人开启、无增强的真实单声道样本转写，结果JSON通过检查；原始数据及统计只保存在忽略目录。控制台登录、其他真实场景与文档导出不在本次通过范围。

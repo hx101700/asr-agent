@@ -91,6 +91,10 @@ flowchart TD
 
 S1仍使用普通函数和顺序编排。requirements.txt是运行依赖版本检查基准，pyproject声明由测试与之核对；doctor实际加载并比对版本，bootstrap仅在需要时安装并复核，probe只用保留域名构造真实BL请求。PyAV、dotenv、openpyxl及解析依赖以实际锁文件为准，不另行维护一份版本数字。
 
+S2输出已校验的配置快照及其精确字节SHA-256摘要；S3核对摘要和文件指纹后直接使用快照，不重解析Excel或重复原输入业务校验。只对新转换的FLAC应用模型/上传限额，复用convert_to_mono返回的AudioInfo，不重复探测。摘要用于本地一致性，不承担授权或签名功能。
+
+PreparedCommand是仅含实际argv和环境的内存数据对象（repr隐藏两者）。prepare_command在本地准备阶段一次构造并检查，_run_bl只执行该对象；没有缓存服务、第二套配置或重试层。控制台模式的凭据解析由BL正式识别命令负责，auth status只用于显式查看及登录收尾。
+
 ### BL优先复用规则
 
 **用户已明确要求：BL已有功能不得用Python二次实现。** 默认执行路径是一次 `bl speech recognize ... --out <结果路径>`，复用内部上传、提交、等待、下载和落盘。`--async`仅作为待验证的替代模式，不因其输出更易解析而默认接管后续云端流程。

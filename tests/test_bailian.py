@@ -9,11 +9,12 @@ import unittest
 from unittest.mock import Mock, patch
 
 from asr_agent import BAILIAN_VERSION, MODEL
+from asr_agent.auth import read_api_key
 from asr_agent.bailian import (
-    BailianFailure, check_command_length, console_status, explain_cli_error,
-    login_console, redact_message, run_recognition,
+    BailianFailure, PreparedCommand, check_command_length, console_status, explain_cli_error,
+    login_console, prepare_command, redact_message, run_recognition,
 )
-from asr_agent.environment import SetupError
+from asr_agent.environment import SetupError, bl_command
 from tests.support import ProjectTestCase, ROOT
 
 
@@ -51,10 +52,11 @@ class BailianTests(ProjectTestCase):
         self.addCleanup(process_patch.stop)
 
     def test_recognition_uses_local_entry_and_public_arguments_without_shell(self):
-        run_recognition(self.project, self.arguments, "api_key", [])
+        command = prepare_command(self.project, self.arguments, "api_key")
+        run_recognition(self.project, command, [])
         self.popen.assert_called_once()
         argv = self.popen.call_args.args[0]
-        self.assertEqual(argv, [str(self.node), str(self.project.bl_entry), *self.arguments, "--quiet"])
+        self.assertEqual(argv, (str(self.node), str(self.project.bl_entry), *self.arguments, "--quiet"))
         self.assertNotIn("--file", argv)
         self.assertNotIn("--async", argv)
         self.assertFalse(self.popen.call_args.kwargs["shell"])
@@ -63,7 +65,8 @@ class BailianTests(ProjectTestCase):
     def test_api_key_only_reaches_child_environment_and_transcript_is_not_captured(self):
         with patch.dict(os.environ, {"DASHSCOPE_API_KEY": "unrelated-synthetic-key",
                                      "NODE_OPTIONS": "--require unwanted.cjs"}):
-            result = run_recognition(self.project, self.arguments, "api_key", [])
+            command = prepare_command(self.project, self.arguments, "api_key")
+            result = run_recognition(self.project, command, [])
         self.assertIsNone(result)
         kwargs = self.popen.call_args.kwargs
         self.assertEqual(kwargs["stdin"], subprocess.DEVNULL)
@@ -76,10 +79,34 @@ class BailianTests(ProjectTestCase):
 
     def test_console_mode_does_not_inherit_api_key(self):
         with patch.dict(os.environ, {"DASHSCOPE_API_KEY": "unrelated-synthetic-key"}):
-            run_recognition(self.project, self.arguments, "console", [])
+            command = prepare_command(self.project, self.arguments, "console")
+            run_recognition(self.project, command, [])
         self.assertNotIn("DASHSCOPE_API_KEY", self.popen.call_args.kwargs["env"])
         self.assertEqual(self.popen.call_args.kwargs["env"]["BAILIAN_CONFIG_DIR"],
                          str(self.project.path(".state/bailian")))
+
+    def test_prepare_and_run_use_one_checked_snapshot_without_rereading_secrets(self):
+        with patch("asr_agent.auth.read_api_key", wraps=read_api_key) as read_key, \
+             patch("asr_agent.bailian.bl_command", wraps=bl_command) as build_command, \
+             patch("asr_agent.bailian.check_command_length", wraps=check_command_length) as check_length:
+            command = prepare_command(self.project, self.arguments, "api_key")
+            self.assertIsInstance(command, PreparedCommand)
+            self.assertIsInstance(command.argv, tuple)
+            original_context = self.arguments[self.arguments.index("--context") + 1]
+            # 准备后源配置变化，执行必须使用已经校验过的参数与凭据快照。
+            self.arguments[self.arguments.index("--context") + 1] = "准备后的合成变更"
+            self.project.path(".env").write_text("DASHSCOPE_API_KEY=changed-synthetic-key\n", encoding="utf-8")
+            run_recognition(self.project, command, [])
+        read_key.assert_called_once_with(self.project)
+        build_command.assert_called_once()
+        check_length.assert_called_once()
+        self.popen.assert_called_once()
+        self.assertIs(self.popen.call_args.args[0], command.argv)
+        self.assertIs(self.popen.call_args.kwargs["env"], command.env)
+        self.assertEqual(command.env["DASHSCOPE_API_KEY"], self.key)
+        self.assertEqual(command.argv[command.argv.index("--context") + 1], original_context)
+        for private in (self.key, original_context, "合成词", str(self.project.root)):
+            self.assertNotIn(private, repr(command))
 
     def test_command_length_includes_terminating_nul(self):
         check_command_length(["a" * 32766])
@@ -102,14 +129,15 @@ class BailianTests(ProjectTestCase):
     def test_oversized_command_stops_before_loading_credentials_or_starting_bl(self):
         with patch("asr_agent.bailian.bailian_environment") as environment:
             with self.assertRaises(SetupError):
-                run_recognition(self.project, [*self.arguments, "--context", "a" * 32767], "api_key", [])
+                prepare_command(self.project, [*self.arguments, "--context", "a" * 32767], "api_key")
         self.popen.assert_not_called()
         environment.assert_not_called()
 
     def test_process_start_failure_is_distinct_from_unknown_cloud_result(self):
         self.popen.side_effect = OSError("synthetic process start failure")
+        command = prepare_command(self.project, self.arguments, "api_key")
         with self.assertRaises(BailianFailure) as caught:
-            run_recognition(self.project, self.arguments, "api_key", [])
+            run_recognition(self.project, command, [])
         self.assertFalse(caught.exception.started)
         self.assertEqual(caught.exception.report["code"], "LOCAL_PROCESS_START_FAILED")
         self.popen.assert_called_once()
@@ -120,8 +148,9 @@ class BailianTests(ProjectTestCase):
             "code": 1, "api_code": "InvalidApiKey", "http_status": 401,
             "message": f"rejected {self.key}", "request_id": "synthetic-request",
         }}))
+        command = prepare_command(self.project, self.arguments, "api_key")
         with self.assertRaises(BailianFailure) as caught:
-            run_recognition(self.project, self.arguments, "api_key", [])
+            run_recognition(self.project, command, [])
         self.assertTrue(caught.exception.started)
         self.assertEqual(caught.exception.report["http_status"], 401)
         self.assertEqual(caught.exception.report["code"], "InvalidApiKey")
@@ -131,6 +160,7 @@ class BailianTests(ProjectTestCase):
         self.process.kill.assert_not_called()
 
     def test_interrupted_wait_kills_and_reaps_the_existing_process_without_retry(self):
+        command = prepare_command(self.project, self.arguments, "api_key")
         for failure in (subprocess.TimeoutExpired("synthetic", 1), KeyboardInterrupt(),
                         OSError("synthetic pipe failure")):
             with self.subTest(failure=type(failure).__name__):
@@ -138,7 +168,7 @@ class BailianTests(ProjectTestCase):
                 self.popen.reset_mock()
                 self.process.communicate.side_effect = [failure, (None, "private output")]
                 with self.assertRaises(BailianFailure) as caught:
-                    run_recognition(self.project, self.arguments, "api_key", [])
+                    run_recognition(self.project, command, [])
                 self.assertTrue(caught.exception.started)
                 self.assertEqual(caught.exception.report["code"], "LOCAL_WAIT_INTERRUPTED")
                 self.assertIn("中断", str(caught.exception))
@@ -162,10 +192,11 @@ class BailianTests(ProjectTestCase):
             return child
 
         self.popen.side_effect = start_waiter
+        command = prepare_command(self.project, self.arguments, "console")
         try:
             with patch("asr_agent.bailian.PROCESS_SECONDS", 0.05):
                 with self.assertRaises(BailianFailure) as caught:
-                    run_recognition(self.project, self.arguments, "console", [])
+                    run_recognition(self.project, command, [])
             self.assertTrue(caught.exception.started)
             self.assertEqual(len(children), 1)
             self.assertIsNotNone(children[0].poll())
@@ -240,7 +271,7 @@ class BailianTests(ProjectTestCase):
                 self.assertNotIn("masked", json.dumps(report))
         self.assertEqual(self.popen.call_args.kwargs["stdout"], subprocess.PIPE)
         argv = self.popen.call_args.args[0]
-        self.assertEqual(argv[2:], ["auth", "status", "--config", "default", "--output", "json", "--quiet"])
+        self.assertEqual(argv[2:], ("auth", "status", "--config", "default", "--output", "json", "--quiet"))
 
     def test_console_status_rejects_nonobject_or_invalid_json(self):
         for output in ("not json", "[]", "null", "true"):
@@ -255,10 +286,10 @@ class BailianTests(ProjectTestCase):
         self.assertFalse(report["configured"])
         self.assertEqual(self.popen.call_count, 2)
         first, second = self.popen.call_args_list
-        self.assertEqual(first.args[0][2:], ["auth", "login", "--console", "--console-site", "domestic",
-                                             "--config", "default", "--output", "json", "--quiet"])
+        self.assertEqual(first.args[0][2:], ("auth", "login", "--console", "--console-site", "domestic",
+                                             "--config", "default", "--output", "json", "--quiet"))
         self.assertNotIn("--base-url", first.args[0])
-        self.assertEqual(second.args[0][2:4], ["auth", "status"])
+        self.assertEqual(second.args[0][2:4], ("auth", "status"))
         self.assertNotIn("DASHSCOPE_API_KEY", first.kwargs["env"])
 
     def test_failed_login_does_not_repeat_login_or_request_status(self):

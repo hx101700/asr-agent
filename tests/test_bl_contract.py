@@ -14,7 +14,7 @@ from asr_agent import MODEL
 from asr_agent.auth import bailian_environment
 from asr_agent.environment import Project, bl_command
 from asr_agent.probe import SYNTHETIC_AUDIO_URL
-from asr_agent.bailian import run_recognition
+from asr_agent.bailian import PreparedCommand, run_recognition
 from asr_agent.session import Session
 from asr_agent.transcription import job_status, transcribe
 from tests.support import ROOT, ProjectTestCase
@@ -178,19 +178,18 @@ class BailianContractTests(ProjectTestCase):
         })
         job_id = session.confirm(preview["validation_id"])["job_id"]
 
-        def local_recognition(project, arguments, auth_mode, private):
+        def local_recognition(project, command, private):
             # 仅fixture改端点和输入URL；产品入口不开放端点覆盖，也不使用真实音频URL。
-            arguments = list(arguments)
+            arguments = list(command.argv)
             for flag, value in (("--url", SYNTHETIC_AUDIO_URL), ("--base-url", self.base_url),
                                 ("--timeout", "1"), ("--poll-interval", "0.1")):
                 arguments[arguments.index(flag) + 1] = value
-            run_recognition(project, arguments, auth_mode, private)
+            run_recognition(project, PreparedCommand(tuple(arguments), command.env), private)
 
         def installed_command(project, arguments):
             return bl_command(Project(ROOT), arguments)
 
-        with patch("asr_agent.transcription.bl_command", side_effect=installed_command), \
-                patch("asr_agent.bailian.bl_command", side_effect=installed_command), \
+        with patch("asr_agent.bailian.bl_command", side_effect=installed_command), \
                 patch("asr_agent.transcription.run_recognition", side_effect=local_recognition):
             report = transcribe(self.project, job_id, authorize_upload=True)
             calls = len(self.calls)

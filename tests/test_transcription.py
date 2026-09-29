@@ -1,5 +1,6 @@
 """S3用例：使用真实网页配置和媒体处理，只替代BL进程边界。"""
 
+import hashlib
 import io
 import json
 import threading
@@ -11,6 +12,7 @@ from unittest.mock import patch
 from openpyxl import Workbook
 
 from asr_agent import MODEL
+from asr_agent.auth import read_api_key
 from asr_agent.bailian import BailianFailure
 from asr_agent.environment import SetupError
 from asr_agent.media import probe_audio
@@ -36,7 +38,7 @@ class TranscriptionTests(ProjectTestCase):
             f"DASHSCOPE_API_KEY={self.secret}\n", encoding="utf-8"
         )
         # 用例测试不安装或运行另一个CLI；参数长度检查仍走生产实现。
-        command = patch("asr_agent.transcription.bl_command", side_effect=lambda project, args: [
+        command = patch("asr_agent.bailian.bl_command", side_effect=lambda project, args: [
             "node", str(project.bl_entry), *args, "--quiet"
         ])
         command.start()
@@ -87,8 +89,8 @@ class TranscriptionTests(ProjectTestCase):
     def output_path(arguments):
         return Path(arguments[arguments.index("--out") + 1])
 
-    def write_result(self, project, arguments, mode, private):
-        self.output_path(arguments).write_text(
+    def write_result(self, project, command, private):
+        self.output_path(command.argv).write_text(
             json.dumps(transcript_result(), ensure_ascii=False), encoding="utf-8"
         )
 
@@ -99,6 +101,41 @@ class TranscriptionTests(ProjectTestCase):
         self.cli.assert_not_called()
         self.assertFalse(self.project.path(f".state/jobs/{job_id}/execution").exists())
         self.assertFalse(job_status(self.project, job_id)["execution_authorized"])
+
+    def test_confirmation_checksum_matches_the_saved_utf8_bytes(self):
+        job_id, _ = self.make_job(enhancement="both")
+        path = self.project.path(f".state/jobs/{job_id}/config.json")
+        checksum = path.with_suffix(".sha256").read_text(encoding="ascii").strip()
+        self.assertEqual(checksum, hashlib.sha256(path.read_bytes()).hexdigest())
+
+    def test_modified_snapshot_is_rejected_before_execution_is_claimed(self):
+        for changed in ("context", "vocabulary", "audio_metadata", "recognition_options"):
+            with self.subTest(changed=changed):
+                job_id, config = self.make_job(enhancement="both")
+                if changed == "context":
+                    config["enhancement"]["context"] = "保存后修改的上下文。"
+                elif changed == "vocabulary":
+                    config["enhancement"]["hotwords"]["vocabulary"] = {"替换后的词": 5}
+                elif changed == "audio_metadata":
+                    config["audio"]["metadata"]["sample_rate"] = 8000
+                else:
+                    config["recognition_options"]["language_hints"] = ["en"]
+                path = self.project.path(f".state/jobs/{job_id}/config.json")
+                path.write_text(json.dumps(config, ensure_ascii=False), encoding="utf-8")
+                with self.assertRaisesRegex(SetupError, "配置发生变化"):
+                    transcribe(self.project, job_id, authorize_upload=True)
+                self.assertFalse(path.parent.joinpath("execution").exists())
+                self.cli.assert_not_called()
+
+    def test_legacy_configuration_without_checksum_is_not_automatically_accepted(self):
+        job_id, _ = self.make_job()
+        path = self.project.path(f".state/jobs/{job_id}/config.sha256")
+        path.unlink()
+        with self.assertRaisesRegex(SetupError, "缺少确认摘要"):
+            transcribe(self.project, job_id, authorize_upload=True)
+        self.assertFalse(path.exists())
+        self.assertFalse(path.parent.joinpath("execution").exists())
+        self.cli.assert_not_called()
 
     def test_success_records_json_only_and_never_reexecutes_the_saved_job(self):
         job_id, _ = self.make_job()
@@ -127,6 +164,39 @@ class TranscriptionTests(ProjectTestCase):
         self.assertEqual(report["cloud_outcome"], "result_received")
         self.assertTrue(audio.is_file())
         self.assertTrue(hotwords.is_file())
+        self.cli.assert_called_once()
+
+    def test_unchanged_snapshot_avoids_excel_parsing_and_original_audio_probe(self):
+        job_id, config = self.make_job(enhancement="both", language_hint="zh", speaker_count=3)
+        # 原文件已通过S2检查；这里任何再次打开媒体或解析Excel都应暴露为回归。
+        with patch("asr_agent.validation.probe_audio", side_effect=AssertionError("重复探测原音频")), \
+                patch("asr_agent.media.probe_audio", side_effect=AssertionError("重复探测原音频")), \
+                patch("asr_agent.validation.load_workbook", side_effect=AssertionError("重复解析Excel")):
+            report = transcribe(self.project, job_id, authorize_upload=True)
+        self.assertEqual(report["status"], "JSON_READY")
+        arguments = self.cli.call_args.args[1].argv
+        self.assertEqual(arguments[arguments.index("--context") + 1], config["enhancement"]["context"])
+        self.assertEqual(json.loads(arguments[arguments.index("--vocabulary") + 1]),
+                         config["enhancement"]["hotwords"]["vocabulary"])
+
+    def test_api_key_is_read_once_for_the_prepared_command(self):
+        job_id, _ = self.make_job()
+        with patch("asr_agent.auth.read_api_key", wraps=read_api_key) as read_key:
+            report = transcribe(self.project, job_id, authorize_upload=True)
+        self.assertEqual(report["status"], "JSON_READY")
+        read_key.assert_called_once_with(self.project)
+        command = self.cli.call_args.args[1]
+        self.assertEqual(command.env["DASHSCOPE_API_KEY"], self.secret)
+        self.assertNotIn(self.secret, repr(command))
+
+    def test_console_execution_does_not_run_auth_status_or_read_dotenv(self):
+        job_id, _ = self.make_job(auth_mode="console")
+        with patch("asr_agent.bailian.console_status", side_effect=AssertionError("重复查询鉴权状态")), \
+                patch("asr_agent.bailian._run_bl", side_effect=AssertionError("执行识别前启动了额外BL命令")), \
+                patch("asr_agent.auth.read_api_key", side_effect=AssertionError("控制台模式读取了.env")):
+            report = transcribe(self.project, job_id, authorize_upload=True)
+        self.assertEqual(report["status"], "JSON_READY")
+        self.assertNotIn("DASHSCOPE_API_KEY", self.cli.call_args.args[1].env)
         self.cli.assert_called_once()
 
     def test_concurrent_execution_enters_bl_only_once(self):
@@ -186,7 +256,7 @@ class TranscriptionTests(ProjectTestCase):
         original_bytes = original.read_bytes()
         report = transcribe(self.project, job_id, authorize_upload=True)
         self.assertEqual(report["status"], "JSON_READY")
-        arguments = self.cli.call_args.args[1]
+        arguments = self.cli.call_args.args[1].argv
         uploaded = Path(arguments[arguments.index("--url") + 1])
         self.assertNotEqual(uploaded, original)
         self.assertEqual(uploaded.suffix, ".flac")
@@ -204,7 +274,7 @@ class TranscriptionTests(ProjectTestCase):
                 job_id, config = self.make_job(channels=channels, diarization=diarization)
                 report = transcribe(self.project, job_id, authorize_upload=True)
                 self.assertEqual(report["status"], "JSON_READY")
-                arguments = self.cli.call_args.args[1]
+                arguments = self.cli.call_args.args[1].argv
                 self.assertEqual(arguments[arguments.index("--url") + 1], config["audio"]["path"])
                 self.assertEqual("--diarization" in arguments, diarization)
                 self.assertNotIn("--speaker-count", arguments)
@@ -213,7 +283,7 @@ class TranscriptionTests(ProjectTestCase):
     def test_actual_upload_size_limit_applies_after_mono_conversion(self):
         job_id, _ = self.make_job(channels=2)
         # 降低阈值以覆盖超限，不创建1GB测试文件；探测和FLAC转换仍真实执行。
-        with patch("asr_agent.validation.MAX_UPLOAD_BYTES", 1), patch("asr_agent.transcription.MAX_UPLOAD_BYTES", 1):
+        with patch("asr_agent.validation.MAX_UPLOAD_BYTES", 1):
             report = transcribe(self.project, job_id, authorize_upload=True)
         self.assertEqual(report["status"], "STOPPED")
         self.assertEqual(report["cloud_outcome"], "not_started")
@@ -225,8 +295,9 @@ class TranscriptionTests(ProjectTestCase):
         job_id, config = self.make_job(enhancement="both", language_hint="zh", speaker_count=3)
         report = transcribe(self.project, job_id, authorize_upload=True)
         self.assertEqual(report["status"], "JSON_READY")
-        _, arguments, mode, private = self.cli.call_args.args
-        self.assertEqual(mode, "api_key")
+        _, command, private = self.cli.call_args.args
+        arguments = command.argv
+        self.assertEqual(command.env["DASHSCOPE_API_KEY"], self.secret)
         values = lambda flag: arguments[arguments.index(flag) + 1]
         self.assertEqual(values("--model"), MODEL)
         self.assertEqual(values("--language"), "zh")
@@ -258,9 +329,9 @@ class TranscriptionTests(ProjectTestCase):
                 self.cli.reset_mock()
                 job_id, config = self.make_job()
 
-                def save_unusable(project, arguments, mode, private):
+                def save_unusable(project, command, private):
                     if content is not None:
-                        self.output_path(arguments).write_text(content, encoding="utf-8")
+                        self.output_path(command.argv).write_text(content, encoding="utf-8")
 
                 self.cli.side_effect = save_unusable
                 report = transcribe(self.project, job_id, authorize_upload=True)
@@ -280,8 +351,8 @@ class TranscriptionTests(ProjectTestCase):
                 result = transcript_result()
                 result["transcripts"][0]["sentences"][0].update(begin_time=begin, end_time=end)
 
-                def write_invalid(project, arguments, mode, private):
-                    self.output_path(arguments).write_text(json.dumps(result), encoding="utf-8")
+                def write_invalid(project, command, private):
+                    self.output_path(command.argv).write_text(json.dumps(result), encoding="utf-8")
 
                 self.cli.side_effect = write_invalid
                 report = transcribe(self.project, job_id, authorize_upload=True)
@@ -294,8 +365,8 @@ class TranscriptionTests(ProjectTestCase):
         result["provider_extension"] = {"preserve": True}
         text = json.dumps(result, ensure_ascii=False, indent=4) + "\n"
 
-        def write_tracks(project, arguments, mode, private):
-            self.output_path(arguments).write_text(text, encoding="utf-8")
+        def write_tracks(project, command, private):
+            self.output_path(command.argv).write_text(text, encoding="utf-8")
 
         self.cli.side_effect = write_tracks
         report = transcribe(self.project, job_id, authorize_upload=True)
