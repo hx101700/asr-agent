@@ -21,6 +21,8 @@ python scripts/asr.py bootstrap
 .venv\Scripts\python.exe scripts/asr.py serve
 ```
 
-`serve`打开本机网页；如由Codex内置浏览器打开，可加`--no-browser`并使用启动时的会话链接。网页中的确认只保存本地配置，不发送阿里云。`doctor`发现缺失环境会返回非零退出码。使用API Key时，先在项目`.env`填写`DASHSCOPE_API_KEY`，可用`api-key-status`检查本地配置，密钥不会回显。完整说明见[HELP.md](doc/HELP.md)。
+`serve`打开本机网页；如由Codex内置浏览器打开，可加`--no-browser`并使用启动时的会话链接。原生目录窗口需要正常Windows交互桌面。网页确认只保存本地配置，不发送阿里云。`doctor`发现依赖缺失或版本不匹配会返回非零；完整环境再次执行bootstrap会跳过安装。API Key预填项目`.env`，`api-key-status`只返回脱敏状态；网页在勾选指定Key后可只读查看。完整说明见[HELP.md](doc/HELP.md)。
+
+代码采用前端MVP、后端应用服务与本地能力边界。实际模块职责见[开发文档](doc/DEVELOPMENT.md)，审查整改记录见[代码审查](doc/CODE_REVIEW.md)。
 
 测试数据、凭据和转写结果仅在本地保存，不进入 Git 和发布包。

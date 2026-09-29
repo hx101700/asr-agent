@@ -11,7 +11,8 @@ from openpyxl import Workbook
 
 from asr_agent.environment import Project
 from asr_agent.validation import ValidationError
-from asr_agent.web import Session, create_server
+from asr_agent.web import create_server
+from asr_agent.session import Session
 from tests.support import ProjectTestCase
 
 
@@ -44,7 +45,7 @@ class OptionsFixture(ProjectTestCase):
         }
 
     def select(self, session, kind, destination):
-        with patch("asr_agent.web.choose_directory", return_value=destination) as picker:
+        with patch("asr_agent.directory_picker.choose_directory", return_value=destination) as picker:
             result = session.select_directory(kind)
         picker.assert_called_once()
         return result
@@ -111,28 +112,29 @@ class DirectoryOptionTests(OptionsFixture):
     def test_cancel_waiting_picker_keeps_previous_preview_and_releases_lock(self):
         preview = self.session.validate(self.payload)
         started = threading.Event()
+        cancellation_events = []
 
         def blocked_picker(_initial, *, cancel_event):
+            cancellation_events.append(cancel_event)
             started.set()
             self.assertTrue(cancel_event.wait(timeout=3))
             return self.selected  # 即使同时收到结果，也不能把已取消的选择登记下来。
 
-        with patch("asr_agent.web.choose_directory", side_effect=blocked_picker):
+        with patch("asr_agent.directory_picker.choose_directory", side_effect=blocked_picker):
             with ThreadPoolExecutor(max_workers=1) as pool:
                 selected = pool.submit(self.session.select_directory, "json", "picker-current")
                 self.assertTrue(started.wait(timeout=3))
                 self.session.cancel_directory("picker-old")
-                self.assertFalse(self.session.picker_cancel_event.is_set())
+                self.assertFalse(cancellation_events[0].is_set())
                 self.session.cancel_directory("picker-current")
                 self.assertTrue(selected.result(timeout=3)["cancelled"])
         self.assertEqual(self.session.output_directories, {})
         self.assertEqual(self.session.draft["id"], preview["validation_id"])
-        self.assertFalse(self.session.picker_lock.locked())
         self.assertFalse(self.select(self.session, "json", self.selected)["cancelled"])
 
     def test_cancel_arriving_before_open_prevents_window_but_not_next_request(self):
         self.session.cancel_directory("early-cancel")
-        with patch("asr_agent.web.choose_directory", return_value=self.selected) as picker:
+        with patch("asr_agent.directory_picker.choose_directory", return_value=self.selected) as picker:
             self.assertTrue(self.session.select_directory("json", "early-cancel")["cancelled"])
             picker.assert_not_called()
             self.assertFalse(self.session.select_directory("json", "next-request")["cancelled"])
@@ -195,7 +197,7 @@ class ProtectedOptionsEndpointTests(OptionsFixture):
             connection.close()
 
     def test_directory_route_uses_native_selection_and_ignores_browser_path(self):
-        with patch("asr_agent.web.choose_directory", return_value=self.selected) as picker:
+        with patch("asr_agent.directory_picker.choose_directory", return_value=self.selected) as picker:
             status, _, body = self.request("POST", "/api/select-directory", {
                 "kind": "document", "path": str(self.other),
             })
@@ -207,8 +209,8 @@ class ProtectedOptionsEndpointTests(OptionsFixture):
         self.assertEqual(list(self.other.iterdir()), [])
 
     def test_new_routes_require_token_and_correct_origin_before_any_action(self):
-        with patch("asr_agent.web.choose_directory") as picker, \
-             patch("asr_agent.web.read_api_key") as read_key:
+        with patch("asr_agent.directory_picker.choose_directory") as picker, \
+             patch("asr_agent.session.read_api_key") as read_key:
             for route, payload in (("/api/select-directory", {"kind": "json"}), ("/api/api-key", {}),
                                    ("/api/cancel-directory", {"picker_id": "protected-picker"})):
                 with self.subTest(route=route):

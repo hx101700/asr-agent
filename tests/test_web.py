@@ -11,7 +11,8 @@ from unittest.mock import patch
 from openpyxl import Workbook, load_workbook
 
 from asr_agent.validation import ValidationError
-from asr_agent.web import Session, create_server, output_directory
+from asr_agent.web import create_server
+from asr_agent.session import Session, output_directory
 from tests.support import ProjectTestCase
 
 
@@ -93,7 +94,7 @@ class SessionTests(WebFixture):
             self.session.confirm(preview["validation_id"])
 
     def test_session_and_console_do_not_read_dotenv(self):
-        with patch("asr_agent.web.api_key_status", side_effect=AssertionError("must not read")):
+        with patch("asr_agent.session.api_key_status", side_effect=AssertionError("must not read")):
             self.session.description()
             self.session.auth_status("console")
             self.session.validate(self.payload)

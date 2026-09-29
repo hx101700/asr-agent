@@ -41,7 +41,7 @@
 
 使用python-dotenv读取显式项目.env，关闭变量展开，不更新全局os.environ。只检查文件/配置可用性及内部空白，不发在线请求。状态中`verified_online`始终为false。
 
-已验证：缺失/空Key提示、成功配置不回显密钥、不使用全局环境Key、控制台模式不读.env、仅API Key模式向BL环境注入Key、多行值拒绝且错误不泄露值。测试全部使用合成字符串；本地.env仍为空。
+已验证：缺失/空Key提示、成功配置不回显密钥、不使用全局环境Key、控制台模式不读.env、仅API Key模式向BL环境注入Key、多行值拒绝且错误不泄露值。测试全部使用合成字符串，不记录用户实际.env的内容或配置状态。
 
 ## BL合约证据
 
@@ -60,3 +60,15 @@ Python HTTP服务只在测试fixture中，不是产品ASR客户端。BL可能查
 已删除旧`media_setup.py`、`media_worker.py`、`media-lock.json`及专用ZIP安装测试，移除旧命令。清理失败FFmpeg下载、npm缓存、临时wheel和旧字节码等共83,277,373字节；保留正在使用的BL、Python环境、项目资料与数据。
 
 历史：前一版曾因FFmpeg ZIP不完整而拦截安装，当时25项成功、3项跳过。这是旧方案记录，不表示该下载问题已修复；现在通过更换媒体集成方式解除依赖该下载的阻碍。
+
+## 第一阶段代码复审与修正（2026-09-29）
+
+本轮复审bootstrap/environment/probe及测试，修复以下可验证问题：
+
+- doctor原先只列包版本，现从requirements读取锁定值，实际加载项目venv依赖并逐项比对。
+- 完整环境再次bootstrap跳过pip；BL版本冲突/安装不完整先于Python修改被拒绝。
+- 安装完成后复核版本和可加载性，不把pip退出0等同于环境已准备好。
+- 损坏BL元数据/锁文件及异常依赖检查结构转为明确SetupError，不抛出无上下文TypeError。
+- probe加入中文和3人参数，继续同时验证固定模型、上下文与即时热词；pyproject与requirements的一致性有回归检查。
+
+实际doctor退出0，issues为空；实际probe-bl为passed，使用固定example.invalid URL、专用探针环境，不读真实Key或音频。安装流程用mock验证跳过、冲突、安装后复核与失败不重试，没有执行真实安装或宣称干净机验收通过。S1用例纳入本轮全量134项Python测试，全部通过。

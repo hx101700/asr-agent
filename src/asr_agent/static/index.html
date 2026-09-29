@@ -6,7 +6,7 @@
     <meta name="referrer" content="no-referrer">
     <title>asr-agent · 音频转文字</title>
     <link rel="stylesheet" href="/app.css">
-    <script src="/app.js" defer></script>
+    <script type="module" src="/app.mjs"></script>
   </head>
   <body>
     <a class="skip-link" href="#config-fields">跳到转写设置</a>
@@ -32,7 +32,6 @@
         <div id="error-panel" class="notice notice-error" role="alert" tabindex="-1" hidden>
           <strong id="error-message"></strong>
           <ul id="error-details" hidden></ul>
-          <button id="error-field-link" type="button" class="text-button" hidden>前往修改 →</button>
         </div>
         <form id="config-form" novalidate>
           <div class="workspace">
@@ -58,7 +57,7 @@
                 <div class="section-heading"><span class="step-number">02</span><h2 id="settings-heading">转写设置</h2></div>
                 <div class="setting-grid">
                   <div class="field-target"><label for="language-hint">音频语言</label><select id="language-hint"><option value="">自动识别</option></select><div id="language-error" class="field-error" role="alert" hidden></div></div>
-                  <div id="speaker-fields" class="field-target"><label for="speaker-count">发言人数 <span class="optional-label">选填</span></label><input id="speaker-count" type="number" min="2" max="100" step="1" placeholder="自动判断" aria-describedby="speaker-help"><p id="speaker-help" class="helper">可指定 2–100 人，供识别参考。</p><div id="speaker-error" class="field-error" role="alert" hidden></div></div>
+                  <div id="speaker-fields" class="field-target"><label for="speaker-count">发言人数 <span class="optional-label">选填</span></label><input id="speaker-count" type="number" step="1" placeholder="自动判断" aria-describedby="speaker-help"><p id="speaker-help" class="helper"></p><div id="speaker-error" class="field-error" role="alert" hidden></div></div>
                 </div>
                 <label class="check-row"><input id="diarization-enabled" type="checkbox" checked aria-describedby="diarization-help"><span><strong>区分发言人</strong></span></label>
                 <p id="diarization-help" class="helper">多声道音频将合并为单声道副本，保留原文件。</p>
@@ -72,7 +71,7 @@
                     <div class="label-action"><label for="hotwords-file">热词表</label><button id="download-template" type="button" class="text-button">下载模板</button></div>
                     <div id="hotwords-dropzone" class="file-dropzone compact-upload">
                       <input id="hotwords-file" class="file-input" type="file" accept=".xlsx" aria-labelledby="hotwords-action" aria-describedby="hotwords-file-status hotwords-help">
-                      <label for="hotwords-file" class="upload-target"><strong id="hotwords-action">选择 Excel 文件</strong><span>或拖拽至此处 · .xlsx · 最大 5 MB</span></label>
+                      <label for="hotwords-file" class="upload-target"><strong id="hotwords-action">选择 Excel 文件</strong><span id="hotwords-file-limit">或拖拽至此处 · .xlsx</span></label>
                       <progress id="hotwords-progress" class="upload-progress" aria-label="正在添加热词文件" hidden></progress>
                       <p id="hotwords-file-status" class="file-status" role="status">尚未选择文件</p>
                     </div>
@@ -85,7 +84,7 @@
                   <div id="context-fields" class="enhancement-fields field-target" hidden>
                     <label for="context">参考文本</label>
                     <textarea id="context" rows="4" placeholder="例如：本次技术评审涉及 Kubernetes、容器编排和灰度发布，参会人有陈雨、林舟。" aria-describedby="context-help context-count"></textarea>
-                    <div class="textarea-footer"><p id="context-help" class="helper">包含录音中可能出现的具体词语，最多 400 字符。</p><span id="context-count" class="character-count" role="status">0 / 400</span></div>
+                    <div class="textarea-footer"><p id="context-help" class="helper">包含录音中可能出现的具体词语。</p><span id="context-count" class="character-count" role="status">0</span></div>
                     <div id="context-error" class="field-error" role="alert" hidden></div>
                   </div>
                 </div>

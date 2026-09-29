@@ -1,6 +1,6 @@
 import unittest
 
-from asr_agent.recognition_options import LANGUAGES, validate_options
+from asr_agent.validation import LANGUAGES, validate_options
 from asr_agent.validation import ValidationError
 
 

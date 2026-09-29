@@ -28,6 +28,9 @@ SUPPORTED_CONTAINERS = frozenset({
 MAX_UPLOAD_BYTES = 1_000_000_000
 MAX_DURATION_SECONDS = 12 * 60 * 60
 MAX_HOTWORDS = 2000
+MAX_CONTEXT_CHARS = 400
+MIN_SPEAKERS = 2
+MAX_SPEAKERS = 100
 # 以下是本地解析资源上限，不是阿里云接口限制。
 MAX_XLSX_BYTES = 5_000_000
 MAX_XLSX_UNCOMPRESSED_BYTES = 20 * 1024 * 1024
@@ -160,8 +163,8 @@ def validate_audio(project: Project, path: str | Path, diarization: bool) -> dic
 def validate_context(text: str) -> str:
     if not isinstance(text, str) or not text.strip():
         raise ValidationError("请输入参考文本，或关闭上下文增强。", "context")
-    if len(text) > 400:
-        raise ValidationError(f"参考文本共 {len(text)} 个字符，最多支持 400 个，请精简后重新检查。", "context")
+    if len(text) > MAX_CONTEXT_CHARS:
+        raise ValidationError(f"参考文本共 {len(text)} 个字符，最多支持 {MAX_CONTEXT_CHARS} 个，请精简后重新检查。", "context")
     if "\x00" in text or any(0xD800 <= ord(char) <= 0xDFFF for char in text):
         raise ValidationError("参考文本中含有无法识别的特殊字符，请删除后重新检查。", "context")
     return text
@@ -179,7 +182,7 @@ def _check_xlsx_archive(path: Path) -> None:
             raise ValidationError("不支持加密的热词Excel，请保存为普通.xlsx文件。", "hotwords_path")
 
 
-def load_hotwords(project: Project, path: str | Path, allow_super: bool = False) -> dict:
+def load_hotwords(project: Project, path: str | Path) -> dict:
     """读取固定两列Excel，错误逐行返回；不执行公式、不默默修剪或丢弃词条。"""
     field = "hotwords_path"
     source = resolve_input(project, path, {".xlsx"}, field)
@@ -229,10 +232,10 @@ def load_hotwords(project: Project, path: str | Path, allow_super: bool = False)
                 row_errors.append(("text", "含非ASCII字符时，热词总长度最多15个字符。"))
             elif text.isascii() and len([part for part in text.split(" ") if part]) > 7:
                 row_errors.append(("text", "纯ASCII热词按空格切分后最多7段。"))
-            allowed_weights = (1, 2, 3, 4, 5, 50) if allow_super else (1, 2, 3, 4, 5)
+            allowed_weights = (1, 2, 3, 4, 5, 50)
             if (isinstance(weight, bool) or not isinstance(weight, (int, float))
                     or weight not in allowed_weights):
-                message = "权重必须为1至5的整数" + ("或50。" if allow_super else "。")
+                message = "权重必须为1至5的整数或50。"
                 row_errors.append(("weight", message))
             if row_errors:
                 details.extend({"row": row_number, "field": name, "message": message}
@@ -273,3 +276,38 @@ def load_hotwords(project: Project, path: str | Path, allow_super: bool = False)
     finally:
         if workbook is not None:
             workbook.close()
+
+
+# 语言代码来自 Filetrans HTTP API；CLI 的 --language 当前只接受单个值。
+LANGUAGES = [
+    ("zh", "中文"), ("en", "英语"), ("ja", "日语"), ("ko", "韩语"),
+    ("vi", "越南语"), ("th", "泰语"), ("id", "印尼语"), ("ms", "马来语"),
+    ("tl", "菲律宾语"), ("hi", "印地语"), ("ar", "阿拉伯语"), ("fr", "法语"),
+    ("de", "德语"), ("es", "西班牙语"), ("pt", "葡萄牙语"), ("ru", "俄语"),
+    ("it", "意大利语"), ("nl", "荷兰语"), ("sv", "瑞典语"), ("da", "丹麦语"),
+    ("fi", "芬兰语"), ("no", "挪威语"), ("el", "希腊语"), ("pl", "波兰语"),
+    ("cs", "捷克语"), ("hu", "匈牙利语"), ("ro", "罗马尼亚语"),
+    ("bg", "保加利亚语"), ("hr", "克罗地亚语"), ("sk", "斯洛伐克语"),
+]
+LANGUAGE_CODES = frozenset(code for code, _ in LANGUAGES)
+
+
+def validate_options(payload: dict, diarization: bool) -> dict:
+    language = payload.get("language_hint")
+    if language is not None and (
+        not isinstance(language, str) or language not in LANGUAGE_CODES
+    ):
+        raise ValidationError("请选择一种语言，或使用自动识别。", "language_hint")
+
+    speaker_count = payload.get("speaker_count")
+    if speaker_count is not None:
+        if not diarization:
+            raise ValidationError("设置发言人数前，请开启区分发言人。", "speaker_count")
+        # bool 是 int 的子类，但不能把勾选状态当作人数。
+        if type(speaker_count) is not int or not MIN_SPEAKERS <= speaker_count <= MAX_SPEAKERS:
+            raise ValidationError(f"发言人数需为 {MIN_SPEAKERS}–{MAX_SPEAKERS} 的整数，或使用自动识别。", "speaker_count")
+
+    return {
+        "language_hints": [] if language is None else [language],
+        "speaker_count": speaker_count,
+    }

@@ -108,17 +108,17 @@
 
 依据：[middleware.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/runtime/src/middleware.ts)、[update-checker.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/runtime/src/utils/update-checker.ts)。
 
-### ASR 命令契约（源码确认，尚未执行）
+### ASR 命令契约（发布包/本机合约已验证，真实云端待验）
 
 2026-09-28再次核对：`handleAsyncMode`在未指定`--async`时内置提交、`poll(...)`、结果下载及`--out`写文件；本地文件上传亦在同一命令内完成。**因此首选复用完整命令，不能把这些已有功能归为Python待开发项。**
 
-首选待测模板：
+S3正式流程采用的命令模板：
 
 ```text
 bl speech recognize --model qwen-audio-3.0-asr-flash-filetrans --url <上传文件绝对路径> --diarization --out <JSON绝对路径> --quiet
 ```
 
-模板对应项目默认开启说话人；若需要合并，上传路径为已通过校验的单声道副本，用户关闭说话人时省略`--diarization`。Python读取`--out`文件而非把stdout当JSON。stdout可能含识别正文，应在本地受控捕获，不直接回传Codex。还需验证完整模式下任务ID的可见性、异常输出、超时以及产物判定；存在接口限制不代表CLI没有相应云端能力。
+模板对应项目默认开启说话人；若需要合并，上传路径为已通过校验的单声道副本，用户关闭说话人时省略`--diarization`。Python读取`--out`文件而非把stdout当JSON。stdout可能含识别正文，应在本地受控捕获，不直接回传Codex。本机真实CLI合约已确认完整模式不暴露task_id、子任务失败可能退出0并写空数组，以及取消/未知状态超时；真实云端鉴权、音频和结果格式仍须S3验收。存在接口限制不代表CLI没有相应云端能力。
 
 以下`--async`只是待研究的另一模式，不是默认实现路线：
 

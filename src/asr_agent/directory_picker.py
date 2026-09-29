@@ -6,12 +6,70 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from threading import Event
+from threading import Event, Lock
 
 from .environment import SetupError
 
 DIALOG_TIMEOUT_SECONDS = 5 * 60
 WAIT_SLICE_SECONDS = 0.2
+
+
+class DirectoryPicker:
+    """只管理一个目录窗口的生命周期；取消不经过上传/校验所用的会话锁。"""
+
+    def __init__(self):
+        self._lock = Lock()
+        self._active_id = None
+        self._cancel_event = None
+        self._cancelled_id = None
+        self._closed = False
+        self._finished = Event()
+        self._finished.set()
+
+    @staticmethod
+    def _check_id(request_id: str) -> None:
+        if not isinstance(request_id, str) or not 1 <= len(request_id) <= 64:
+            raise SetupError("目录选择请求无效。")
+
+    def select(self, initial: Path, request_id: str) -> Path | None:
+        self._check_id(request_id)
+        with self._lock:
+            if self._closed:
+                raise SetupError("当前会话已关闭。")
+            if self._active_id is not None:
+                raise SetupError("请先关闭已打开的文件夹窗口。")
+            if request_id == self._cancelled_id:
+                self._cancelled_id = None
+                return None
+            cancel_event = Event()
+            self._active_id = request_id
+            self._cancel_event = cancel_event
+            self._finished.clear()
+        try:
+            selected = choose_directory(initial, cancel_event=cancel_event)
+            with self._lock:
+                return None if self._closed or cancel_event.is_set() else selected
+        finally:
+            with self._lock:
+                self._active_id = None
+                self._cancel_event = None
+                self._finished.set()
+
+    def cancel(self, request_id: str) -> None:
+        self._check_id(request_id)
+        with self._lock:
+            if request_id == self._active_id:
+                self._cancel_event.set()
+            else:
+                # 允许取消先于打开抵达；仅作用于这个ID，不影响下一次选择。
+                self._cancelled_id = request_id
+
+    def close(self) -> None:
+        with self._lock:
+            self._closed = True
+            if self._cancel_event is not None:
+                self._cancel_event.set()
+        self._finished.wait(timeout=2)
 
 
 def validate_directory(path: Path) -> Path:

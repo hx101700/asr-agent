@@ -14,7 +14,7 @@ python scripts/asr.py bootstrap
 .venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -t . -v
 ```
 
-bootstrap只向项目内创建虚拟环境，安装锁定BL、PyAV和python-dotenv；不改全局PATH或Codex配置。PyAV wheel自带FFmpeg库，无需下载ffmpeg.exe或ffprobe.exe。doctor返回非零表示有缺失项，不能只看JSON是否打印成功。probe-bl仅用虚构URL构造请求，不读取密钥或上传音频。
+bootstrap只向项目内创建虚拟环境并安装requirements中锁定的运行依赖与BL，不改全局PATH或Codex配置。依赖可加载且版本匹配时跳过重复安装；已有BL冲突在修改Python环境前停止。PyAV wheel自带FFmpeg库，无需独立程序。doctor返回非零表示有缺失或版本不符，不能只看JSON是否打印成功。probe-bl仅用虚构URL构造固定模型、语言、人数及双增强请求，不读取密钥或上传音频。
 
 旧bootstrap-media命令已移除。媒体与配置验证见[S1验证记录](S1_VERIFICATION.md)。
 

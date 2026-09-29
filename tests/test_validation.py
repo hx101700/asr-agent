@@ -206,14 +206,12 @@ class ValidationTests(ProjectTestCase):
             load_hotwords(self.project, invalid)
         self.assertEqual([error["row"] for error in caught.exception.details], [2, 3])
 
-    def test_super_words_are_explicit_and_limited(self):
+    def test_fixed_model_accepts_super_words_and_limits_their_count(self):
         path = self.hotwords([(f"term{i}", 50) for i in range(50)])
-        with self.assertRaises(ValidationError):
-            load_hotwords(self.project, path)
-        self.assertEqual(load_hotwords(self.project, path, allow_super=True)["super_count"], 50)
+        self.assertEqual(load_hotwords(self.project, path)["super_count"], 50)
         path = self.hotwords([(f"term{i}", 50) for i in range(51)])
         with self.assertRaises(ValidationError) as caught:
-            load_hotwords(self.project, path, allow_super=True)
+            load_hotwords(self.project, path)
         self.assertEqual(caught.exception.details[0]["row"], 52)
 
     def test_hotword_count_limit(self):

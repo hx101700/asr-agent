@@ -19,4 +19,4 @@ dependencies = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-asr_agent = ["static/*.html", "static/*.css", "static/*.js"]
+asr_agent = ["static/*.html", "static/*.css", "static/*.mjs"]

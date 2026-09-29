@@ -104,7 +104,6 @@
 | `LOCAL_WAIT_INTERRUPTED` | 进程/有界等待中断 | 有task_id时可人工恢复查询 |
 | `LOCAL_RESULT_SCHEMA_INVALID` | 返回JSON无法按已核实契约解释 | 保留原始JSON，修复映射，不重跑识别 |
 | `LOCAL_EXPORT_FAILED` | 一种或多种导出失败 | 保留已完成结果，只重新导出 |
-| `LOCAL_CLEANUP_FAILED` | 本任务词表清理未完成 | 单独列出待清理ID；不重跑识别 |
 
 ## 错误记录字段
 
