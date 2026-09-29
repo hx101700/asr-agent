@@ -38,7 +38,7 @@
             <fieldset id="config-fields" class="form-column" tabindex="-1" disabled>
               <legend class="visually-hidden">转写设置</legend>
               <section class="card" aria-labelledby="audio-heading">
-                <div class="section-heading"><span class="step-number">01</span><h2 id="audio-heading">添加音频</h2><span class="section-aside">每次 1 个文件</span></div>
+                <div class="section-heading"><span class="step-number">01</span><h2 id="audio-heading" tabindex="-1">添加音频</h2><span class="section-aside">每次 1 个文件</span></div>
                 <div id="audio-dropzone" class="file-dropzone">
                   <input id="audio-file" class="file-input" type="file" accept=".aac,.amr,.avi,.flac,.flv,.m4a,.mkv,.mov,.mp3,.mp4,.mpeg,.ogg,.opus,.wav,.webm,.wma,.wmv" aria-labelledby="audio-picker-title" aria-describedby="audio-file-status audio-limits">
                   <label for="audio-file" class="upload-target">
@@ -54,7 +54,7 @@
               </section>
 
               <section class="card" aria-labelledby="settings-heading">
-                <div class="section-heading"><span class="step-number">02</span><h2 id="settings-heading">转写设置</h2></div>
+                <div class="section-heading"><span class="step-number">02</span><h2 id="settings-heading" tabindex="-1">转写设置</h2></div>
                 <div class="setting-grid">
                   <div class="field-target"><label for="language-hint">音频语言</label><select id="language-hint"><option value="">自动识别</option></select><div id="language-error" class="field-error" role="alert" hidden></div></div>
                   <div id="speaker-fields" class="field-target"><label for="speaker-count">发言人数 <span class="optional-label">选填</span></label><input id="speaker-count" type="number" step="1" placeholder="自动判断" aria-describedby="speaker-help"><p id="speaker-help" class="helper"></p><div id="speaker-error" class="field-error" role="alert" hidden></div></div>
@@ -64,7 +64,7 @@
               </section>
 
               <section class="card" aria-labelledby="enhancement-heading">
-                <div class="section-heading"><span class="step-number">03</span><h2 id="enhancement-heading">精度增强</h2><span class="section-aside">可同时使用</span></div>
+                <div class="section-heading"><span class="step-number">03</span><h2 id="enhancement-heading" tabindex="-1">精度增强</h2><span class="section-aside">可同时使用</span></div>
                 <div class="enhancement-option">
                   <label class="option-toggle"><input id="hotwords-enabled" type="checkbox" aria-controls="hotwords-fields"><span><strong>添加热词</strong><span>人名、产品名称、专业术语</span></span></label>
                   <div id="hotwords-fields" class="enhancement-fields" hidden>
@@ -91,7 +91,7 @@
               </section>
 
               <section class="card" aria-labelledby="output-heading">
-                <div class="section-heading"><span class="step-number">04</span><h2 id="output-heading">保存位置</h2></div>
+                <div class="section-heading"><span class="step-number">04</span><h2 id="output-heading" tabindex="-1">保存位置</h2></div>
                 <div class="field-target"><div class="label-action"><label for="json-directory">原始结果（JSON）</label><button id="json-reset" type="button" class="text-button" hidden>恢复默认</button></div><div class="directory-row"><input id="json-directory" type="text" readonly placeholder="outputs" aria-label="JSON保存文件夹"><button id="json-browse" type="button" class="button button-secondary">选择文件夹</button></div><div id="json-error" class="field-error" role="alert" hidden></div></div>
                 <div class="field-target output-fields"><div class="label-action"><label for="document-directory">转写文档</label><button id="document-reset" type="button" class="text-button" hidden>恢复默认</button></div><div class="directory-row"><input id="document-directory" type="text" readonly placeholder="outputs" aria-label="文档保存文件夹"><button id="document-browse" type="button" class="button button-secondary">选择文件夹</button></div><div id="document-error" class="field-error" role="alert" hidden></div></div>
                 <div class="export-note"><span>文档格式</span><span class="format-tag">Excel</span><span class="format-tag">Word</span><span class="format-tag">Markdown</span><span>保留时间戳</span></div>
@@ -107,15 +107,23 @@
             <aside class="review-column" aria-labelledby="review-heading">
               <section id="review-card" class="card review-card" tabindex="-1">
                 <div class="review-heading"><h2 id="review-heading">转写信息</h2><span id="review-state" class="subtle-badge" role="status">待检查</span></div>
-                <div class="model-block"><span class="eyebrow">识别模型</span><strong id="model-name">qwen-audio-3.0-asr-flash-filetrans</strong><span id="region-name" class="helper">华北 2（北京）</span></div>
-                <div id="review-placeholder" class="review-placeholder"><h3>预览转写信息</h3><p>完成设置后，点击“检查并预览”核对文件、识别选项和保存位置。</p></div>
-                <div id="review-content" hidden><dl id="review-details" class="review-details"></dl><div id="review-warnings" class="notice notice-warning" hidden></div></div>
+                <div id="review-scroll" class="review-scroll" tabindex="0" role="region" aria-label="转写信息详情">
+                  <div id="review-draft"><dl id="draft-details" class="review-details"></dl><p class="helper">检查后显示时长、声道等音频信息。</p></div>
+                  <div id="review-content" hidden><dl id="review-details" class="review-details"></dl><div id="review-warnings" class="notice notice-warning" hidden></div></div>
+                  <details class="model-block"><summary>模型与地域</summary><strong id="model-name">qwen-audio-3.0-asr-flash-filetrans</strong><span id="region-name" class="helper">华北 2（北京）</span></details>
+                </div>
+                <nav class="review-shortcuts" aria-label="快速定位设置">
+                  <button type="button" class="text-button" data-section-target="audio-heading">01 添加音频</button>
+                  <button type="button" class="text-button" data-section-target="settings-heading">02 转写设置</button>
+                  <button type="button" class="text-button" data-section-target="enhancement-heading">03 精度增强</button>
+                  <button type="button" class="text-button" data-section-target="output-heading">04 保存位置</button>
+                </nav>
               </section>
               <section id="receipt-panel" class="card receipt-card" tabindex="-1" hidden><span class="success-icon" aria-hidden="true">✓</span><h2 id="receipt-heading">转写设置已保存</h2><p>您可以关闭此页面，返回 Codex 查看本次设置。音频尚未上传至阿里云，转写尚未开始。</p><dl id="receipt-details" class="review-details"></dl></section>
             </aside>
           </div>
           <div id="action-bar" class="action-bar">
-            <div class="action-inner"><div class="action-copy"><strong id="action-title">下一步：核对转写信息</strong><p id="confirmation-help">检查文件规格、增强选项和保存位置。</p></div><div class="action-buttons"><button id="edit-button" type="button" class="button button-secondary" hidden>返回修改</button><button id="validate-button" type="submit" class="button button-primary" disabled>检查并预览</button><button id="confirm-button" type="button" class="button button-primary" disabled hidden>保存设置</button></div></div>
+            <div class="action-inner"><div class="action-copy"><strong id="action-title">下一步：核对转写信息</strong><p id="confirmation-help">检查文件规格、增强选项和保存位置。</p></div><div class="action-buttons"><button id="show-review" type="button" class="button button-secondary compact-review-button" disabled>查看转写信息</button><button id="edit-button" type="button" class="button button-secondary" hidden>返回修改</button><button id="validate-button" type="submit" class="button button-primary" disabled>检查并预览</button><button id="confirm-button" type="button" class="button button-primary" disabled hidden>保存设置</button></div></div>
           </div>
         </form>
       </main>

@@ -45,6 +45,15 @@ node --check src/asr_agent/static/view.mjs
 
 验收截图位于忽略目录.state/mvp-verified-receipt.png。新的干净预览不覆盖用户旧会话，数据和截图不进入Git。
 
+## 摘要滚动与长表单补充验证（2026-09-29）
+
+- 基线：1280px视口中review-column为static，页面滚动约432px后卡片顶部约-132px，确认不是浏览器偶发卡顿。
+- 修改后：滚动到精度增强时卡片顶部约20px；可用高度扣除实际操作栏。完整摘要内部可用键盘滚动，末尾路径可到达；保存路径使用整行布局。
+- 表单选择中文、参考3人、21字符上下文后，未检查摘要同步展示；检查后显示音频详情，改成英语后恢复待检查且保存按钮隐藏。
+- 390×844视口无横向溢出；摘要入口聚焦卡片，滚动稳定后卡片底部约671px，操作栏顶部约747px；栏目入口把焦点移回标题。1280×400视口取消吸顶和内部高度限制。
+- 20项Model/Presenter测试通过，view.mjs语法检查通过；正常桌面执行tests.test_web和tests.test_web_options共32项通过。受限环境连接异常详见ISSUES T30，本轮未重跑全量134项。
+- 设计参考：[Ant Design 在页面中完成](https://ant.design/docs/spec/stay/)，技术行为参考：[MDN position](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/position)。实现仍为现有View与CSS，不引入组件库。
+
 ## 未验证范围
 
 本轮未重新进行干净机安装、真实Key权限、云端上传/识别、三格式导出、原生拖拽回放或大文件压力测试。S3/S4/S5/S6仍按ACCEPTANCE推进，不能把本地配置成功当成转写完成。

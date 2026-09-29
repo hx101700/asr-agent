@@ -28,6 +28,7 @@ export function createView(document) {
     text.textContent = String(value);
     row.append(title, text);
     parent.append(row);
+    return row;
   }
 
   function focusRegion(id, block = "start") {
@@ -35,10 +36,30 @@ export function createView(document) {
     element(id).scrollIntoView({ block });
   }
 
+  function renderDraft(model, values) {
+    // 摘要直接派生自表单与上传状态，不保存第二份配置，也不把选择当作校验成功。
+    const details = element("draft-details");
+    details.replaceChildren();
+    const uploadLabel = (upload) => ({
+      empty: "尚未添加", uploading: "正在添加…", failed: "添加失败", ready: upload.name,
+    })[upload.status];
+    let speaker = "人数自动判断";
+    if (values.speaker.badInput) speaker = "人数待检查";
+    else if (values.speaker.value) speaker = `${values.speaker.value} 人（参考）`;
+    const context = values.context.trim() ? `${Array.from(values.context).length} 字符` : "待填写";
+    detailRow(details, "音频文件", uploadLabel(model.uploads.audio));
+    detailRow(details, "音频语言", values.language ? new Map(session.languages).get(values.language) : "自动识别");
+    detailRow(details, "区分发言人", values.diarizationEnabled ? `开启 · ${speaker}` : "关闭");
+    detailRow(details, "热词增强", values.hotwordsEnabled ? uploadLabel(model.uploads.hotwords) : "未开启");
+    detailRow(details, "上下文增强", values.contextEnabled ? context : "未开启");
+    detailRow(details, "账号连接", values.useApiKey ? "API Key" : "百炼账号登录");
+  }
+
   function renderPreview(preview, uploads) {
     if (preview === renderedPreview) return;
     renderedPreview = preview;
     if (!preview) return;
+    element("review-scroll").scrollTop = 0;
     const { summary, configuration: config } = preview;
     const audio = summary.audio;
     const details = element("review-details");
@@ -59,8 +80,8 @@ export function createView(document) {
     if (config.diarization_enabled) detailRow(details, "发言人数", config.speaker_count === null ? "自动判断" : `${config.speaker_count} 人（参考）`);
     detailRow(details, "精度增强", enhancementLabels[summary.enhancement.mode]);
     if (["hotwords", "both"].includes(config.enhancement_mode)) detailRow(details, "热词文件", uploads.hotwords.name);
-    detailRow(details, "JSON 保存位置", summary.json_directory);
-    detailRow(details, "文档保存位置", summary.document_directory);
+    detailRow(details, "JSON 保存位置", summary.json_directory).classList.add("path-detail");
+    detailRow(details, "文档保存位置", summary.document_directory).classList.add("path-detail");
     const warnings = element("review-warnings");
     warnings.replaceChildren();
     for (const message of summary.warnings || []) {
@@ -139,6 +160,9 @@ export function createView(document) {
       element("confirm-button").textContent = saving ? "正在保存…" : "保存设置";
       element("edit-button").hidden = !hasPreview || saved;
       element("edit-button").disabled = !available.editable;
+      element("show-review").hidden = hasPreview || saved;
+      element("show-review").disabled = !available.editable;
+      document.querySelectorAll("[data-section-target]").forEach((button) => { button.disabled = !available.editable; });
       element("download-template").disabled = !available.template;
       element("speaker-count").disabled = !available.editable || !values.diarizationEnabled;
       element("speaker-fields").hidden = !values.diarizationEnabled;
@@ -182,9 +206,10 @@ export function createView(document) {
         element("context").setAttribute("aria-invalid", String(overLimit || errorField === element("context")));
       }
       element("review-content").hidden = !hasPreview;
-      element("review-placeholder").hidden = hasPreview;
-      element("review-state").textContent = saved ? "已保存" : unknown ? "保存结果待确认" : hasPreview ? "检查通过" : "待检查";
-      element("review-state").classList.toggle("is-ready", hasPreview);
+      element("review-draft").hidden = hasPreview;
+      const reviewLabels = { saved: "已保存", save_unknown: "保存结果待确认", saving: "正在保存", validating: "正在检查" };
+      element("review-state").textContent = reviewLabels[model.phase] || (hasPreview ? "检查通过" : "待检查");
+      element("review-state").classList.toggle("is-ready", hasPreview && !unknown);
       element("action-title").textContent = unknown ? "暂时无法确认保存结果" : hasPreview ? "请确认本次转写设置" : "下一步：核对转写信息";
       element("confirmation-help").textContent = unknown ? "请返回 Codex 查看保存情况，避免重复提交。" : hasPreview ? "保存设置不会启动转写。" : "检查文件规格、增强选项和保存位置。";
       element("page-status").textContent = model.statusMessage;
@@ -197,6 +222,7 @@ export function createView(document) {
         else element(id).removeAttribute("aria-current");
       });
       renderPreview(model.preview, model.uploads);
+      if (session && !hasPreview && !saved) renderDraft(model, values);
       renderReceipt(model.receipt);
     },
 
@@ -288,6 +314,12 @@ export function createView(document) {
       form.addEventListener("submit", (event) => { event.preventDefault(); actions.validate(); });
       element("confirm-button").addEventListener("click", actions.confirm);
       element("edit-button").addEventListener("click", actions.edit);
+      element("show-review").addEventListener("click", () => view.focusPreview());
+      document.querySelectorAll("[data-section-target]").forEach((button) => {
+        button.addEventListener("click", () => {
+          if (controls.editable) focusRegion(button.dataset.sectionTarget);
+        });
+      });
       element("cancel-directory").addEventListener("click", actions.cancelDirectory);
       element("download-template").addEventListener("click", actions.downloadTemplate);
       for (const kind of ["json", "document"]) {

@@ -118,21 +118,29 @@ input[readonly]::placeholder { color: #858b95; }
 .output-fields { padding-top: 16px; }
 .export-note { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; color: var(--muted); font-size: 12px; margin-top: 16px; }
 .format-tag { background: #f5f6f8; border: 1px solid var(--border); padding: 1px 6px; border-radius: 4px; color: #505865; }
-.review-column { min-width: 0; }
-.review-card { scroll-margin-top: 20px; }
+.review-column { min-width: 0; position: sticky; top: 20px; }
+/* 高度扣除实际操作栏；长摘要在卡片内滚动，不被底部按钮遮住。 */
+.review-card { display: flex; flex-direction: column; max-height: calc(100dvh - var(--action-height, 100px) - 40px); scroll-margin-top: 20px; }
+.review-scroll { min-height: 0; overflow-y: auto; scrollbar-width: thin; padding-inline: 4px; margin-inline: -4px; }
 .review-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.review-heading, .review-shortcuts { flex-shrink: 0; }
+.review-heading { padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.review-shortcuts { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; border-top: 1px solid var(--border); padding-top: 12px; margin-top: 16px; }
+.review-shortcuts .text-button { text-align: left; padding-block: 6px; }
+.section-heading h2 { scroll-margin-top: 20px; }
+.action-buttons .compact-review-button { display: none; }
 .subtle-badge { font-size: 12px; color: var(--muted); background: #f1f3f5; padding: 2px 8px; border-radius: 4px; white-space: nowrap; }
 .subtle-badge.is-ready { color: #24643f; background: #edf8f1; }
-.model-block { margin-top: 20px; padding-block: 16px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-.eyebrow { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.model-block { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+.model-block summary { margin-bottom: 8px; }
 .model-block strong { display: block; font-family: Consolas, monospace; font-size: 13px; overflow-wrap: anywhere; font-weight: 500; }
 .model-block .helper { display: block; margin-top: 4px; font-size: 12px; }
-.review-placeholder { padding-top: 20px; }
-.review-placeholder p { font-size: 13px; margin-top: 8px; color: var(--muted); }
-.review-details { margin: 16px 0 0; }
+.review-details { margin: 8px 0 0; }
 .review-details > div { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 12px; padding-block: 8px; font-size: 13px; }
 .review-details dt { color: var(--muted); }
 .review-details dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.review-details .path-detail { display: block; }
+.review-details .path-detail dd { margin-top: 4px; text-align: left; }
 .notice { padding: 12px 16px; margin: 0 0 20px; border: 1px solid #b7d7c4; border-radius: 6px; background: #f2faf5; color: #24643f; font-size: 13px; line-height: 1.8; overflow-wrap: anywhere; }
 .notice-error { background: #fff3f1; color: #b42318; border-color: #f0bbb5; scroll-margin-top: 20px; }
 .notice-error ul { padding-left: 20px; margin: 8px 0 0; }
@@ -144,6 +152,7 @@ input[readonly]::placeholder { color: #858b95; }
 .receipt-card .review-details { text-align: left; border-top: 1px solid var(--border); padding-top: 16px; margin-top: 24px; }
 .success-icon { display: inline-grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: #edf8f1; color: var(--success); font-size: 26px; }
 .workspace.is-confirmed { grid-template-columns: minmax(0, 1fr); max-width: 760px; margin-inline: auto; }
+.workspace.is-confirmed .review-column { position: static; }
 .action-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 5; background: #fff; border-top: 1px solid #dce0e6; box-shadow: 0 -4px 16px #23324d06; }
 .action-inner { min-height: 84px; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-block: 16px; }
 .action-copy { min-width: 0; }
@@ -160,8 +169,19 @@ footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8p
 .skip-link:focus { top: 8px; }
 @media (max-width: 960px) {
   .workspace { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .review-column { position: static; }
+  .review-card { max-height: none; }
+  .review-scroll { overflow: visible; }
+  .action-buttons .compact-review-button { display: inline-flex; }
   .header-inner, .page-shell, .action-inner { padding-inline: 24px; }
   .review-details > div { grid-template-columns: 110px minmax(0, 1fr); }
+}
+/* 极矮窗口保留正常文档流，让标题和内容都可通过页面滚动到达。 */
+@media (max-height: 480px) {
+  .review-column { position: static; }
+  .review-card { max-height: none; }
+  .review-scroll { overflow: visible; }
+  .action-buttons .compact-review-button { display: inline-flex; }
 }
 @media (max-width: 600px) {
   .header-inner, .page-shell, .action-inner { padding-inline: 16px; }
