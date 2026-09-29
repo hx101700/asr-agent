@@ -1,15 +1,22 @@
 """真实BL发布包+本机模拟服务；不向阿里云提交任务，不使用用户音频/凭据。"""
 
 import json
+import io
 import subprocess
 import threading
 import unittest
+import wave
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from unittest.mock import patch
 
 from asr_agent import MODEL
 from asr_agent.auth import bailian_environment
 from asr_agent.environment import Project, bl_command
 from asr_agent.probe import SYNTHETIC_AUDIO_URL
+from asr_agent.bailian import run_recognition
+from asr_agent.session import Session
+from asr_agent.transcription import job_status, transcribe
 from tests.support import ROOT, ProjectTestCase
 
 
@@ -149,3 +156,72 @@ class BailianContractTests(ProjectTestCase):
         self.assertGreaterEqual(sum(call[0] == "GET" for call in self.calls), 2)
         self.assertEqual(sum(call[0] == "POST" for call in self.calls), 1)
         self.assertFalse(output.exists())
+
+    def invoke_saved_job(self, mode):
+        self.mode = mode
+        self.project.path(".env").write_text("DASHSCOPE_API_KEY=asr-agent-synthetic-test-key\n", encoding="utf-8")
+        content = io.BytesIO()
+        with wave.open(content, "wb") as audio:
+            audio.setnchannels(1)
+            audio.setsampwidth(2)
+            audio.setframerate(16000)
+            audio.writeframes(b"\0\0" * 16000)
+        data = content.getvalue()
+        session = Session(self.project)
+        self.addCleanup(session.cleanup)
+        upload = session.upload("audio", "合成样本.wav", io.BytesIO(data), len(data))
+        preview = session.validate({
+            "auth_mode": "api_key", "audio_upload_id": upload["upload_id"],
+            "diarization_enabled": True, "language_hint": "zh", "speaker_count": 3,
+            "enhancement_mode": "context", "context": "本机合约验证", "hotwords_upload_id": "",
+            "json_directory": "outputs", "document_directory": "outputs",
+        })
+        job_id = session.confirm(preview["validation_id"])["job_id"]
+
+        def local_recognition(project, arguments, auth_mode, private):
+            # 仅fixture改端点和输入URL；产品入口不开放端点覆盖，也不使用真实音频URL。
+            arguments = list(arguments)
+            for flag, value in (("--url", SYNTHETIC_AUDIO_URL), ("--base-url", self.base_url),
+                                ("--timeout", "1"), ("--poll-interval", "0.1")):
+                arguments[arguments.index(flag) + 1] = value
+            run_recognition(project, arguments, auth_mode, private)
+
+        def installed_command(project, arguments):
+            return bl_command(Project(ROOT), arguments)
+
+        with patch("asr_agent.transcription.bl_command", side_effect=installed_command), \
+                patch("asr_agent.bailian.bl_command", side_effect=installed_command), \
+                patch("asr_agent.transcription.run_recognition", side_effect=local_recognition):
+            report = transcribe(self.project, job_id, authorize_upload=True)
+            calls = len(self.calls)
+            repeated = transcribe(self.project, job_id, authorize_upload=True)
+        self.assertEqual(len(self.calls), calls)
+        self.assertEqual(repeated, job_status(self.project, job_id))
+        return report
+
+    def test_saved_config_runs_once_through_real_cli_and_checks_json(self):
+        report = self.invoke_saved_job("success")
+        self.assertEqual(report["status"], "JSON_READY")
+        self.assertFalse(report["documents_ready"])
+        self.assertIsNone(report["task_id"])
+        self.assertTrue(Path(report["json_path"]).is_file())
+        self.assertNotIn("本地模拟转写", json.dumps(report, ensure_ascii=False))
+        self.assertEqual([call[0] for call in self.calls], ["POST", "GET", "GET"])
+        parameters = self.calls[0][2]["parameters"]
+        self.assertEqual(parameters["language_hints"], ["zh"])
+        self.assertEqual(parameters["speaker_count"], 3)
+
+    def test_saved_config_rejects_cli_zero_exit_with_no_transcript(self):
+        report = self.invoke_saved_job("subtask_failed")
+        self.assertEqual(report["status"], "STOPPED")
+        self.assertEqual(report["cloud_outcome"], "unknown")
+        self.assertEqual(json.loads(Path(report["json_path"]).read_text(encoding="utf-8")), [])
+        self.assertEqual(len(self.calls), 2)
+
+    def test_saved_config_preserves_structured_cli_failure_without_resubmitting(self):
+        report = self.invoke_saved_job("submit_401")
+        self.assertEqual(report["status"], "STOPPED")
+        self.assertEqual(report["error"]["http_status"], 401)
+        self.assertEqual(report["error"]["code"], "TestFailure")
+        self.assertNotIn("asr-agent-synthetic-test-key", json.dumps(report))
+        self.assertEqual(len(self.calls), 1)

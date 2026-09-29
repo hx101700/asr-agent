@@ -1,6 +1,6 @@
 # 状态与错误说明
 
-> 核验日期：2026-09-28；CLI 源码基线：`8bbbbc722d70fb200641ef22b6f6d033aeae9f74`。本文件是首版错误字典的设计依据，机器可读字典在实现阶段生成并与本文件校验一致。
+> 核验日期：2026-09-29；CLI源码基线：`8bbbbc722d70fb200641ef22b6f6d033aeae9f74`。运行时解释的唯一字典为[error_catalog.json](../src/asr_agent/error_catalog.json)，包含核验日期、CLI版本、官方来源及中文含义。本文解释适用边界，不另维护一份运行时映射。
 
 ## 适用范围
 
@@ -23,26 +23,15 @@
 
 出现文档未列出的状态时保留原值，停止自动推进并提示“任务状态未被当前版本识别”。不能用默认分支把未知状态当成功。
 
+当前BL 2.1.0完整命令不会向包装器持续暴露这些状态，且CANCELED/UNKNOWN仍轮询到超时。上述是状态解释，不是当前Python能即时识别全部终态的承诺；S3采用有界等待并记录未知结果，详见REFERENCES。
+
 ## HTTP/API 错误
 
 ### 百炼通用错误
 
 以下映射来自[百炼错误码](https://www.alibabacloud.com/help/zh/model-studio/error-code)（页面更新于2026-09-25）。错误码、HTTP状态与message需一起解释；同名错误的具体原因可能不同。
 
-| HTTP | code | 简明解释 | 建议用户动作 |
-| --- | --- | --- | --- |
-| 400 | `InvalidParameter` | 参数不符合要求 | 根据具体message检查本模型参数 |
-| 401 | `InvalidApiKey` / `invalid_api_key` | Key或鉴权配置有误 | 检查Key、地域和endpoint，重新验证 |
-| 401 | `NOT AUTHORIZED` | 账号/业务空间未授权 | 检查实际权限与空间归属 |
-| 403 | `AccessDenied` | 访问被拒 | 结合message确认原因 |
-| 403 | `Model.AccessDenied` | 没有模型访问权限 | 检查模型开通与授权 |
-| 404 | `WorkSpaceNotFound` | 业务空间不可用/配置错误 | 检查Workspace配置 |
-| 429 | `Throttling` / `Throttling.RateQuota` | 请求频率受限 | 停止；由用户决定何时恢复 |
-| 429 | `Throttling.Concurrency` | 并发受限 | 检查同账号其他任务 |
-| 429 | `BudgetLimitExceeded` | 预算触发停止调用 | 用户检查预算设置 |
-| 500 | `InternalError` | 服务内部错误 | 保存request_id，按需联系支持 |
-| 500 | `InternalError.FileUpload` | 文件上传失败 | 检查message与上传阶段 |
-| 500/503 | `ServiceUnavailable` | 服务暂不可用/容量不足 | 停止，保留诊断信息 |
+具体code及中文含义见[字典的api_codes](../src/asr_agent/error_catalog.json)。HTTP状态取BL实际返回值，不从退出码推断。
 
 这些是通用错误的初始子集，不声称完整枚举所有ASR错误。文档给出的“稍后重试”等建议只转述为用户可选择的下一步，不触发程序重试。
 
@@ -65,23 +54,13 @@
 
 以下取自[官方退出码定义](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/errors/codes.ts)。
 
-| 数值 | 常量 | 用户可读说明 |
-| --- | --- | --- |
-| 0 | `SUCCESS` | CLI进程正常结束，仍需检查业务结果 |
-| 1 | `GENERAL` | 一般错误，读取结构化错误详情 |
-| 2 | `USAGE` | 命令或参数使用错误 |
-| 3 | `AUTH` | CLI鉴权类别错误 |
-| 4 | `QUOTA` | CLI配额类别错误 |
-| 5 | `TIMEOUT` | CLI等待或请求超时 |
-| 6 | `NETWORK` | CLI网络类别错误 |
-| 7 | `CONFIRMATION_REQUIRED` | 命令要求确认 |
-| 10 | `CONTENT_FILTER` | 内容过滤类别错误 |
+数值、官方常量及中文解释见[字典的cli_exit_codes](../src/asr_agent/error_catalog.json)。未列值按未知退出码解释，不能冒充服务端API错误码。
 
 **映射限制**：当前[API错误映射](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/errors/api.ts)可能把HTTP错误统一归为`GENERAL=1`，并保留 `httpStatus/apiCode/requestId`。不能从401推断退出3，也不能从429推断退出4。错误JSON通常在stderr，解析位置见[error-handler.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/runtime/src/error-handler.ts)。
 
 进程被终止、无法启动或收到未列数值时，单独记录平台/进程状态，不强塞到上述官方常量。CLI版本升级时复核。
 
-## 项目自定义错误（设计）
+## 项目自定义状态与错误
 
 ### S2本机网页HTTP状态
 
@@ -89,24 +68,31 @@
 
 确认返回明确4xx时可修改输入、重新检查；网络结果未知时不自动重发，刷新只查询保存回执。配置本身始终带execution_authorized=false，S3需要新的云端执行授权。
 
-下表使用 `LOCAL_` 前缀，明确不是阿里云状态码。最终是否需要独立退出数值在实现阶段决定，当前不编造已存在的命令协议。
+### S3本地执行记录
 
-| 自定义code | 含义 | 恢复边界 |
-| --- | --- | --- |
-| `LOCAL_ENVIRONMENT_INVALID` | 依赖/版本/入口不符合要求 | 修复环境，不发云端请求 |
-| `LOCAL_AUDIO_INVALID` | 本地媒体探测或限制不通过 | 换文件/修改选择后再确认 |
-| `LOCAL_AUDIO_PREPARE_FAILED` | 已确认的单声道准备失败或副本检查不通过 | 保留源文件，说明转换/副本校验原因，不上传、不自动重试或关闭说话人 |
-| `LOCAL_HOTWORDS_INVALID` | Excel结构或热词规则错误 | 按行修改，不自动删词 |
-| `LOCAL_CONTEXT_INVALID` | 上下文为空或超过所选模式限制 | 用户修改，不自动截断 |
-| `LOCAL_OUTPUT_UNWRITABLE` | 输出目录不可写 | 修改目录后重新确认 |
-| `LOCAL_APPROVAL_STALE` | 确认后的输入发生变化 | 重新校验与确认 |
-| `LOCAL_SUBMISSION_UNCERTAIN` | 提交结果未知 | 不重提；先核实原任务 |
-| `LOCAL_WAIT_INTERRUPTED` | 进程/有界等待中断 | 有task_id时可人工恢复查询 |
-| `LOCAL_RESULT_SCHEMA_INVALID` | 返回JSON无法按已核实契约解释 | 保留原始JSON，修复映射，不重跑识别 |
-| `LOCAL_EXPORT_FAILED` | 一种或多种导出失败 | 保留已完成结果，只重新导出 |
+| 状态 | 含义 |
+| --- | --- |
+| CONFIGURED | 已保存设置，未授权执行 |
+| PREPARING | 已占用本次执行，正在本地准备；记录不保证进程仍存活 |
+| RUNNING | 最近进入BL执行阶段，不能据此细分上传/排队/识别/下载 |
+| JSON_READY | BL结束且JSON通过本地结构检查，三种文档尚未生成 |
+| STOPPED | 本地准备、BL执行或JSON检查停止；失败不重试 |
+| OUTCOME_UNKNOWN | 执行已被占用但记录不可读，不得重新启动 |
+
+cloud_outcome分别记录not_started、unknown、result_received，不将本地成功等同于已核实所有云端子状态。完整BL模式未稳定暴露task_id，保持null；本地job_id不能代填云端task_id。
+
+实际LOCAL错误来自[本项目进程适配器](../src/asr_agent/bailian.py)与[执行用例](../src/asr_agent/transcription.py)：
+
+| code | 含义 |
+| --- | --- |
+| LOCAL_PROCESS_START_FAILED | 本地BL进程无法启动，识别未开始 |
+| LOCAL_WAIT_INTERRUPTED | 本机等待超时、中断或管道故障，进程已停止；不能当作云端取消 |
+| LOCAL_EXECUTION_STOPPED | 本地输入/媒体/路径准备或结果检查未完成，具体原因见中文说明 |
+
+命令入口参数/配置错误也可能直接返回failed及message，没有伪造阿里云code。任何已有execution目录都会阻止重新启动，包括本地准备失败；用户修正后须新建配置，不自动恢复未知云端任务。
 
 ## 错误记录字段
 
-计划保存：`stage`、`source`（cli/http/task/local）、`cli_exit_code`、`http_status`、`code`、脱敏`message`、`task_id`、`request_id`、时间、`source_url`、`applicability`、已保存文件和明确下一步。云端字段只记录BL实际暴露的值，未暴露则为空/未知，不补造，也不增加网络请求。`http/task`表示错误来源，不表示Python承担HTTP调用。运行记录在`.state/`，BL保存的转写JSON在`outputs/`，均排除Git。
+已实现的CLI错误字段：source、cli_exit_code、http_status、code（服务端api_code）、脱敏message、explanation、request_id、source_url。只保留BL实际暴露的值，不补造cause/hint/stack或失败所在云端阶段。非JSON stderr不原样透传，保留实际退出码和通用说明。
 
-将字典与用户说明做成同一份数据的生成结果，避免代码和文档维护两套含义。每个官方条目必须有URL和核验版本/日期；测试至少包含未知code、stderr JSON、退出0但子任务失败和状态未知四类情况。
+本机status.json包含任务编号、最近状态/时间、执行器PID、授权来源、cloud_outcome、task_id（当前通常为空）、JSON位置及可用性计数；不包含转写正文、Key、上下文或热词。状态位于.state/jobs/ID/execution，BL原始JSON位于用户选择的JSON目录，均排除Git。未识别的官方code保留脱敏拼写，并明确字典未收录，不借用Paraformer含义。

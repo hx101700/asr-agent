@@ -199,7 +199,7 @@ def doctor(project: Project) -> dict:
         "platform": sys.platform,
         "python": sys.version.split()[0],
         "project": str(project.root),
-        "transcription_available": False,
+        "transcription_available": True,
         "issues": [],
     }
     if os.name != "nt":

@@ -27,7 +27,7 @@
           <li id="step-review"><span class="workflow-number" aria-hidden="true">2</span><span>核对信息</span></li>
           <li id="step-saved"><span class="workflow-number" aria-hidden="true">3</span><span>保存设置</span></li>
         </ol>
-        <div class="stage-note"><span class="info-icon" aria-hidden="true">i</span><p><strong>版本说明</strong>当前支持检查与保存转写设置，暂不支持云端转写和文档导出。所选文件仅保存在本机。</p></div>
+        <div class="stage-note"><span class="info-icon" aria-hidden="true">i</span><p><strong>版本说明</strong>此页面检查并保存转写设置。返回 Codex 确认上传后，可执行转写并保存 JSON；文档导出尚未开放。</p></div>
         <div id="page-status" class="notice" role="status" aria-live="polite" hidden></div>
         <div id="error-panel" class="notice notice-error" role="alert" tabindex="-1" hidden>
           <strong id="error-message"></strong>
@@ -119,7 +119,7 @@
                   <button type="button" class="text-button" data-section-target="output-heading">04 保存位置</button>
                 </nav>
               </section>
-              <section id="receipt-panel" class="card receipt-card" tabindex="-1" hidden><span class="success-icon" aria-hidden="true">✓</span><h2 id="receipt-heading">转写设置已保存</h2><p>您可以关闭此页面，返回 Codex 查看本次设置。音频尚未上传至阿里云，转写尚未开始。</p><dl id="receipt-details" class="review-details"></dl></section>
+              <section id="receipt-panel" class="card receipt-card" tabindex="-1" hidden><span class="success-icon" aria-hidden="true">✓</span><h2 id="receipt-heading">转写设置已保存</h2><p>您可以关闭此页面，返回 Codex 确认上传并执行转写。本次保存操作没有将音频发送至阿里云。</p><dl id="receipt-details" class="review-details"></dl></section>
             </aside>
           </div>
           <div id="action-bar" class="action-bar">

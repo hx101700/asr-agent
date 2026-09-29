@@ -1,4 +1,4 @@
-"""项目工具入口；serve只打开S2本地配置页面。"""
+"""本地配置、明确授权的BL转写，以及仅查看本地执行记录的入口。"""
 
 import argparse
 import json
@@ -9,6 +9,7 @@ from .bootstrap import bootstrap
 from .auth import api_key_status
 from .environment import Project, SetupError, doctor
 from .probe import probe
+from .bailian import BailianFailure, console_status, login_console
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -16,10 +17,18 @@ def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")
-    parser = argparse.ArgumentParser(description="asr-agent本地工具；当前尚不执行云端转写。")
-    parser.add_argument("command", choices=("doctor", "bootstrap", "probe-bl", "api-key-status", "serve"))
-    parser.add_argument("--port", type=int, default=0, help="本地网页端口，默认自动选择")
-    parser.add_argument("--no-browser", action="store_true", help="不自动打开系统浏览器")
+    parser = argparse.ArgumentParser(description="asr-agent本地工具；转写须明确授权上传。")
+    commands = parser.add_subparsers(dest="command", required=True)
+    for name in ("doctor", "bootstrap", "probe-bl", "api-key-status", "console-status", "login"):
+        commands.add_parser(name)
+    serve_parser = commands.add_parser("serve", help="打开本地配置网页")
+    serve_parser.add_argument("--port", type=int, default=0, help="本地网页端口，默认自动选择")
+    serve_parser.add_argument("--no-browser", action="store_true", help="不自动打开系统浏览器")
+    for name in ("transcribe", "job-status"):
+        command = commands.add_parser(name)
+        command.add_argument("--job", required=True, help="网页保存回执中的设置编号")
+        if name == "transcribe":
+            command.add_argument("--authorize-upload", action="store_true", help="用户明确同意将本次音频及所选增强内容发送至阿里云")
     args = parser.parse_args(argv)
     project = Project(Path(__file__).resolve().parents[2])
     try:
@@ -27,19 +36,29 @@ def main(argv: list[str] | None = None) -> int:
             from .web import serve
             serve(project, port=args.port, open_browser=not args.no_browser)
             return 0
-        actions = {
-            "doctor": doctor,
-            "bootstrap": bootstrap,
-            "api-key-status": api_key_status,
-            "probe-bl": probe,
-        }
-        action = actions[args.command]
-        report = action(project)
+        if args.command == "transcribe":
+            from .transcription import transcribe
+            report = transcribe(project, args.job, authorize_upload=args.authorize_upload)
+        elif args.command == "job-status":
+            from .transcription import job_status
+            report = job_status(project, args.job)
+        else:
+            if args.command == "login":
+                print(json.dumps({"status": "WAITING_FOR_LOGIN", "message": "BL将尝试打开系统浏览器。请在官方页面完成登录；若未打开可按Ctrl+C停止。最多等待15分钟。"}, ensure_ascii=False), flush=True)
+            actions = {
+                "doctor": doctor, "bootstrap": bootstrap, "api-key-status": api_key_status,
+                "console-status": console_status, "login": login_console, "probe-bl": probe,
+            }
+            report = actions[args.command](project)
+    except BailianFailure as exc:
+        print(json.dumps({"status": "STOPPED", "error": exc.report}, ensure_ascii=False))
+        return 1
     except (SetupError, OSError, ValueError, KeyError) as exc:
         print(json.dumps({"status": "failed", "message": str(exc)}, ensure_ascii=False))
         return 1
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    return 1 if report.get("issues") or report.get("configured") is False else 0
+    return 1 if (report.get("issues") or report.get("configured") is False
+                 or report.get("status") in ("STOPPED", "OUTCOME_UNKNOWN")) else 0
 
 
 if __name__ == "__main__":

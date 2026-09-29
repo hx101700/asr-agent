@@ -10,6 +10,7 @@
 | [CODE_REVIEW.md](CODE_REVIEW.md) | 995703e审查、整改设计及完成记录 | 追溯整改原因 |
 | [S1_VERIFICATION.md](S1_VERIFICATION.md) | S1历史验证与环境能力依据 | 需要追溯基础实现时 |
 | [S2_VERIFICATION.md](S2_VERIFICATION.md) | 网页、直接选文件、组合增强、确认及浏览器验证 | 接续S2/S3 |
+| [S3_VERIFICATION.md](S3_VERIFICATION.md) | 明确授权的执行入口、一次执行记录、BL合约及限制 | 执行与接续S3/S4 |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | 需求、原子能力、架构、界面、数据与阶段计划 | 开发前 |
 | [REFERENCES.md](REFERENCES.md) | 官方来源、版本基线、能力限制与证据边界 | 实现接口前 |
 | [ERRORS.md](ERRORS.md) | 官方状态/错误与本地错误的区别及解释规则 | 实现和排障 |
@@ -24,4 +25,4 @@
 - **方案**：项目建议的实现，尚未具备运行证据。
 - **待验证**：需要锁定 CLI 版本、探针或真实流程验收，不能当成已完成能力。
 
-官方资料的核验日期为 **2026-09-28**。在线文档和 CLI 会变化；实施阶段重新核对受影响的项目即可，无须反复调研无关能力。
+S3受影响的官方CLI、Filetrans结果和错误资料已于 **2026-09-29** 复核；各来源日期见REFERENCES。实施阶段重新核对受影响的项目即可，无须反复调研无关能力。

@@ -1,0 +1,41 @@
+{
+  "verified_at": "2026-09-29",
+  "cli_version": "2.1.0",
+  "cli_source": "https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/errors/codes.ts",
+  "api_source": "https://www.alibabacloud.com/help/zh/model-studio/error-code",
+  "cli_exit_codes": {
+    "0": {"name": "SUCCESS", "meaning": "BL进程正常结束，仍需检查业务产物。"},
+    "1": {"name": "GENERAL", "meaning": "BL一般错误，请结合实际API错误码和信息判断。"},
+    "2": {"name": "USAGE", "meaning": "BL命令或参数使用错误。"},
+    "3": {"name": "AUTH", "meaning": "BL鉴权类别错误。"},
+    "4": {"name": "QUOTA", "meaning": "BL配额类别错误。"},
+    "5": {"name": "TIMEOUT", "meaning": "BL请求或等待超时，云端结果可能尚未确定。"},
+    "6": {"name": "NETWORK", "meaning": "BL网络类别错误，不能据此认定云端没有受理任务。"},
+    "7": {"name": "CONFIRMATION_REQUIRED", "meaning": "BL命令要求确认。"},
+    "10": {"name": "CONTENT_FILTER", "meaning": "BL内容过滤类别错误。"}
+  },
+  "api_codes": {
+    "InvalidParameter": {"meaning": "参数不符合要求，请按具体错误信息检查本模型参数。"},
+    "InvalidApiKey": {"meaning": "Key或鉴权配置有误，请检查Key、地域及端点。"},
+    "invalid_api_key": {"meaning": "Key或鉴权配置有误，请检查Key、地域及端点。"},
+    "NOT AUTHORIZED": {"meaning": "账号或业务空间未授权，请检查权限和空间归属。"},
+    "AccessDenied": {"meaning": "访问被拒，请结合具体错误信息确认原因。"},
+    "Model.AccessDenied": {"meaning": "没有模型访问权限，请检查模型开通与授权。"},
+    "WorkSpaceNotFound": {"meaning": "业务空间不可用或配置错误。"},
+    "Throttling": {"meaning": "请求频率受限，已停止自动推进。"},
+    "Throttling.RateQuota": {"meaning": "请求频率受限，已停止自动推进。"},
+    "Throttling.Concurrency": {"meaning": "并发受限，请检查同账号的其他任务。"},
+    "BudgetLimitExceeded": {"meaning": "预算触发停止调用，请检查预算设置。"},
+    "InternalError": {"meaning": "服务内部错误，保留请求ID以便排查。"},
+    "InternalError.FileUpload": {"meaning": "文件上传失败，请结合具体错误信息排查。"},
+    "ServiceUnavailable": {"meaning": "服务暂不可用或容量不足，已停止自动推进。"},
+    "FILE_DOWNLOAD_FAILED": {
+      "meaning": "云端获取输入音频失败，请检查资源有效期及访问条件。",
+      "source_url": "https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-http-api"
+    },
+    "InvalidFile.DownloadFailed": {
+      "meaning": "输入文件下载失败，保留此接口返回的原始错误码。",
+      "source_url": "https://help.aliyun.com/zh/model-studio/funauidio-asr-recorded-speech-recognition-python-sdk"
+    }
+  }
+}

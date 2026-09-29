@@ -1,6 +1,6 @@
 # 官方资料与能力基线
 
-> 核验日期：2026-09-28。仅采用已读取的官方资料及本机证据。部分2.1.0发布包契约已在S1验证，范围见[S1_VERIFICATION.md](S1_VERIFICATION.md)；源码确认仍不等于真实云端验收。
+> 初次核验：2026-09-28；S3相关资料于2026-09-29复核。仅采用官方资料及本机证据。2.1.0发布包和执行入口的本机验证见[S3_VERIFICATION.md](S3_VERIFICATION.md)；源码/模拟服务通过不等于真实云端验收。
 
 ## 来源索引
 
@@ -18,6 +18,8 @@
 | A10 | [CLI 安装与鉴权](https://help.aliyun.com/zh/model-studio/cli/installation) | 安装要求和官方鉴权流程 |
 | A11 | [CLI 快速开始](https://help.aliyun.com/zh/model-studio/cli/quickstart) | Agent 调用范式 |
 | A12 | [CLI 配置与工具](https://help.aliyun.com/zh/model-studio/cli/config) | 文件上传和配置命令 |
+| A13 | [CLI 语音合成与识别](https://help.aliyun.com/zh/model-studio/cli/speech) | --url本地文件、识别选项与--out |
+| W01 | [Windows CreateProcessW](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw) | 完整Unicode命令行32767字符（含终止NUL） |
 | O01 | [Codex AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md) | 项目指令发现与优先级 |
 | O02 | [Codex Skills](https://learn.chatgpt.com/docs/build-skills) | SKILL.md、发现路径和渐进加载 |
 | M01 | [PyAV18.1.0安装文档](https://github.com/PyAV-Org/PyAV/blob/v18.1.0/docs/overview/installation.rst) | Windows wheel包含FFmpeg库 |
@@ -115,10 +117,10 @@
 S3正式流程采用的命令模板：
 
 ```text
-bl speech recognize --model qwen-audio-3.0-asr-flash-filetrans --url <上传文件绝对路径> --diarization --out <JSON绝对路径> --quiet
+bl speech recognize --config default --model qwen-audio-3.0-asr-flash-filetrans --url <上传文件绝对路径> --base-url https://dashscope.aliyuncs.com --diarization --out <JSON绝对路径> --timeout 3600 --poll-interval 5 --quiet --output json
 ```
 
-模板对应项目默认开启说话人；若需要合并，上传路径为已通过校验的单声道副本，用户关闭说话人时省略`--diarization`。Python读取`--out`文件而非把stdout当JSON。stdout可能含识别正文，应在本地受控捕获，不直接回传Codex。本机真实CLI合约已确认完整模式不暴露task_id、子任务失败可能退出0并写空数组，以及取消/未知状态超时；真实云端鉴权、音频和结果格式仍须S3验收。存在接口限制不代表CLI没有相应云端能力。
+模板对应项目默认开启说话人；若需要合并，上传路径为已通过校验的单声道副本，用户关闭说话人时省略`--diarization`。Python读取`--out`文件而非把stdout当JSON；S3丢弃可能含正文的stdout。本机真实CLI合约已确认完整模式通常不暴露task_id、子任务失败可能退出0并写空数组，以及取消/未知状态超时；真实云端鉴权、音频和结果格式仍须S3验收。存在接口限制不代表CLI没有相应云端能力。3600秒为项目等待策略，不是官方处理时限。
 
 以下`--async`只是待研究的另一模式，不是默认实现路线：
 
@@ -130,7 +132,7 @@ bl speech recognize --model qwen-audio-3.0-asr-flash-filetrans --url <上传文�
 
 参数：`--context <text>` 转为上下文；`--vocabulary <json>` 为即时词映射；`--vocabulary-id` 为预编译表；`--diarization`、`--speaker-count`、`--channel-id` 分别控制相关参数。没有查到 `--context-file`，不得编造。[recognize.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/speech/recognize.ts)
 
-**Windows 待验证**：2,000 个热词直接作为 `--vocabulary` 参数可能达到进程命令行长度限制。须测定实际入口可承载范围；超限应准确拒绝或回到用户讨论，不能悄悄截词，也不能擅自改用云端表。
+**Windows 已实施边界**：按subprocess.list2cmdline的完整参数计算UTF-16单元并计入终止NUL，超过32767即在启动前拒绝；引号、反斜线和代理对测试通过。2,000条是模型上限，不保证全部能放入Windows命令行；不截词或改用云表。[W01](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw)
 
 ### 需要规避的行为
 
@@ -143,6 +145,12 @@ bl speech recognize --model qwen-audio-3.0-asr-flash-filetrans --url <上传文�
 独立恢复入口限制：注册表未提供`speech task get`；`bl video task get`实际使用通用任务查询路径，但名称与正式能力文档不匹配，且`--quiet`会丢弃`results`。这不表示BL缺少正常转写中的轮询或下载。仅在需要恢复任务时核实入口，不据此另建Python云端客户端。[task-get.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/video/task-get.ts)、[commands.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/cli/src/commands.ts)
 
 ### 鉴权复用的边界
+
+2026-09-29复核：npm最新仍为2.1.0，integrity与锁文件一致，GitHub main仍为上述固定提交。S3控制台登录使用`auth login --console --console-site domestic --config default`，不能同时指定--base-url；识别命令才显式覆盖国内端点。BL会打开默认浏览器，15分钟空等也可能退出0，auth status的authenticated也可能仅代表控制台token或AK，因此结束后必须检查api_key对象。只检查模型凭据存在性，不额外在线验证。[login.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/login.ts)、[login-console.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/login-console.ts)、[status.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/status.ts)
+
+recognize的模型鉴权优先级为显式--api-key、DASHSCOPE_API_KEY、profile的api_key；项目不使用明文argv Key，API Key模式由.env环境注入覆盖已有控制台配置，控制台模式不读.env。固定default profile避免继承其他活动配置。
+
+最后下载JSON使用原生fetch而没有独立AbortSignal；S3外层3900秒终止并回收BL进程，不能称为取消云端。--out单份下载写对象、零份写[]、多份写列表；顶层results为空时甚至不写文件。S3只验收单文件对象的稳定句子字段，空/异常结果保留且不重提；该JSON不包含子任务元数据，不能声称Python验证了所有云端子状态。[recognize.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/speech/recognize.ts)
 
 普通Key登录已包含在线有效性校验，`auth status`只反映本地配置。本项目按用户最新决定使用.env本地检查，并通过BL支持的DASHSCOPE_API_KEY子进程环境变量正式调用；不执行带明文Key参数的登录命令、不另做在线预验证。[安装与鉴权](https://help.aliyun.com/zh/model-studio/cli/installation)、[resolver.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/auth/resolver.ts)
 
