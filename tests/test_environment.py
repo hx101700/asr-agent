@@ -1,13 +1,17 @@
 import json
 import os
 import subprocess
+import shutil
 from unittest.mock import patch
 
 from asr_agent import BAILIAN_VERSION
 from asr_agent.bootstrap import bootstrap
-from asr_agent.environment import SetupError, bl_command, child_environment, run_process, verify_bl_installation
+from asr_agent.environment import (
+    SetupError, bl_command, child_environment, doctor, installed_python_versions,
+    locked_python_versions, run_process, verify_bl_installation,
+)
 from asr_agent.probe import SYNTHETIC_AUDIO_URL, probe
-from tests.support import ProjectTestCase
+from tests.support import ProjectTestCase, ROOT
 
 
 class EnvironmentTests(ProjectTestCase):
@@ -87,6 +91,46 @@ class EnvironmentTests(ProjectTestCase):
                 verify_bl_installation(self.project)
         run.assert_called_once()
 
+    def test_doctor_reports_python_version_drift(self):
+        shutil.copyfile(ROOT / "requirements.txt", self.project.path("requirements.txt"))
+        python = self.project.path(".venv/Scripts/python.exe")
+        python.parent.mkdir(parents=True)
+        python.touch()
+        packages = {"av": "0.0.0", "python-dotenv": "1.2.3", "openpyxl": "3.1.5",
+                    "et-xmlfile": "2.0.0", "defusedxml": "0.7.1"}
+        with patch("asr_agent.environment.check_node", side_effect=SetupError("test Node unavailable")), \
+             patch("asr_agent.environment.installed_bl_version", return_value=None), \
+             patch("asr_agent.environment.run_process", return_value=subprocess.CompletedProcess([], 0, json.dumps(packages), "")):
+            report = doctor(self.project)
+        self.assertEqual(report["python_packages"], packages)
+        self.assertTrue(any("av" in issue and "18.1.0" in issue for issue in report["issues"]))
+
+    def test_doctor_reports_corrupt_bl_metadata_without_aborting(self):
+        manifest = self.project.path(".tools/bailian/node_modules/bailian-cli/package.json")
+        manifest.parent.mkdir(parents=True)
+        manifest.write_text("[]", encoding="utf-8")
+        with patch("asr_agent.environment.check_node", side_effect=SetupError("test Node unavailable")):
+            report = doctor(self.project)
+        self.assertTrue(any("包信息损坏" in issue for issue in report["issues"]))
+
+    def test_dependency_probe_rejects_malformed_report(self):
+        python = self.project.path(".venv/Scripts/python.exe")
+        python.parent.mkdir(parents=True)
+        python.touch()
+        for output in ("not JSON", "[]", '{"av": null}', '{}'):
+            with self.subTest(output=output), \
+                 patch("asr_agent.environment.run_process", return_value=subprocess.CompletedProcess([], 0, output, "")):
+                with self.assertRaisesRegex(SetupError, "依赖检查返回异常"):
+                    installed_python_versions(self.project, {"av": "18.1.0"})
+
+    def test_dependency_lock_requires_exact_versions_and_hashes(self):
+        path = self.project.path("requirements.txt")
+        for content in ("", "av>=18.0.0", "av==18.1.0"):
+            with self.subTest(content=content):
+                path.write_text(content, encoding="utf-8")
+                with self.assertRaises(SetupError):
+                    locked_python_versions(self.project)
+
     def test_probe_refuses_existing_configuration_without_reading(self):
         config = self.project.path(".state/bailian-probe/config.json")
         config.parent.mkdir(parents=True)
@@ -99,7 +143,8 @@ class EnvironmentTests(ProjectTestCase):
         payload = {"request": {
             "model": MODEL,
             "input": {"file_urls": [SYNTHETIC_AUDIO_URL], "context": [{"content": [{"text": "本地合约探针"}]}]},
-            "parameters": {"diarization_enabled": True, "vocabulary": {"测试术语": 4}},
+            "parameters": {"diarization_enabled": True, "speaker_count": 3,
+                           "language_hints": ["zh"], "vocabulary": {"测试术语": 4}},
         }}
         outputs = [
             subprocess.CompletedProcess([], 0, "bl 2.1.0\n", ""),
@@ -113,3 +158,5 @@ class EnvironmentTests(ProjectTestCase):
             self.assertTrue(call.kwargs["probe_mode"])
         request_args = run.call_args_list[-1].args[1]
         self.assertEqual(request_args[request_args.index("--url") + 1], SYNTHETIC_AUDIO_URL)
+        self.assertEqual(request_args[request_args.index("--language") + 1], "zh")
+        self.assertEqual(request_args[request_args.index("--speaker-count") + 1], "3")

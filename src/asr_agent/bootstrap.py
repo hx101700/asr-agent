@@ -12,6 +12,8 @@ from .environment import (
     SetupError,
     check_node,
     installed_bl_version,
+    installed_python_versions,
+    locked_python_versions,
     npm_entry,
     run_process,
     verify_bl_installation,
@@ -31,10 +33,25 @@ def bootstrap(project: Project) -> dict:
     lock_path = source / "package-lock.json"
     if not lock_path.is_file():
         raise SetupError("缺少已验证的BL依赖锁文件，停止安装。")
-    lock = json.loads(lock_path.read_text(encoding="utf-8"))
-    locked = lock["packages"]["node_modules/bailian-cli"]
-    if locked["version"] != BAILIAN_VERSION or locked["integrity"] != EXPECTED_BAILIAN_INTEGRITY:
+    try:
+        lock = json.loads(lock_path.read_text(encoding="utf-8"))
+        locked = lock["packages"]["node_modules/bailian-cli"]
+        valid_lock = locked["version"] == BAILIAN_VERSION and locked["integrity"] == EXPECTED_BAILIAN_INTEGRITY
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise SetupError("BL依赖锁文件损坏，停止安装。") from exc
+    if not valid_lock:
         raise SetupError("BL锁文件版本/完整性摘要与已核实的发布包不一致。")
+    expected = locked_python_versions(project)
+
+    # 先拒绝已有安装冲突，避免明知BL无法使用仍修改Python环境。
+    installed = installed_bl_version(project)
+    destination = project.bl_directory
+    if installed is not None:
+        if installed != BAILIAN_VERSION or not project.bl_entry.is_file():
+            raise SetupError("已有BL安装不匹配或不完整，未覆盖，请先检查。")
+        verify_bl_installation(project)
+    elif destination.exists() and any(destination.iterdir()):
+        raise SetupError("BL目标目录非空，未覆盖或自动重试，请先检查上次安装状态。")
 
     project.prepare()
     environment = project.path(".venv")
@@ -49,29 +66,25 @@ def bootstrap(project: Project) -> dict:
     checked = run_process(project, [str(python), "-c", "import sys; raise SystemExit(sys.version_info < (3, 12))"])
     if checked.returncode:
         raise SetupError("项目虚拟环境无法启动或Python版本低于3.12，未覆盖。")
-    if not (environment / "Lib/site-packages/pip").is_dir():
-        result = run_process(project, [str(python), "-m", "ensurepip", "--default-pip"])
+    if installed_python_versions(project, expected) != expected:
+        if not (environment / "Lib/site-packages/pip").is_dir():
+            result = run_process(project, [str(python), "-m", "ensurepip", "--default-pip"])
+            if result.returncode:
+                raise SetupError("无法在项目虚拟环境中准备pip，未自动重试。")
+        result = run_process(project, [
+            str(python), "-m", "pip", "install", "--require-hashes", "--only-binary=:all:",
+            "--no-cache-dir", "--retries", "0", "--index-url", "https://pypi.org/simple",
+            "-r", str(project.path("requirements.txt")),
+        ], timeout=300)
         if result.returncode:
-            raise SetupError("无法在项目虚拟环境中准备pip，未自动重试。")
-    result = run_process(project, [
-        str(python), "-m", "pip", "install", "--require-hashes", "--only-binary=:all:",
-        "--no-cache-dir", "--retries", "0", "--index-url", "https://pypi.org/simple",
-        "-r", str(project.path("requirements.txt")),
-    ], timeout=300)
-    if result.returncode:
-        project.path(".runtime/python-install.log").write_text(result.stdout + result.stderr, encoding="utf-8")
-        raise SetupError("Python依赖安装失败，未重试；详见.runtime/python-install.log。")
+            project.path(".runtime/python-install.log").write_text(result.stdout + result.stderr, encoding="utf-8")
+            raise SetupError("Python依赖安装失败，未重试；详见.runtime/python-install.log。")
+        if installed_python_versions(project, expected) != expected:
+            raise SetupError("pip结束但Python依赖校验失败，未自动重试。")
 
-    installed = installed_bl_version(project)
     if installed is not None:
-        if installed != BAILIAN_VERSION or not project.bl_entry.is_file():
-            raise SetupError("已有BL安装不匹配或不完整，未覆盖，请先检查。")
-        verify_bl_installation(project)
         return {"status": "already_installed", "version": installed, "directory": str(project.bl_directory)}
 
-    destination = project.bl_directory
-    if destination.exists() and any(destination.iterdir()):
-        raise SetupError("BL目标目录非空，未覆盖或自动重试，请先检查上次安装状态。")
     destination.mkdir(parents=True, exist_ok=True)
     for name in ("package.json", "package-lock.json"):
         shutil.copyfile(source / name, destination / name)

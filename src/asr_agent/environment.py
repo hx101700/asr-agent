@@ -130,8 +130,11 @@ def installed_bl_version(project: Project) -> str | None:
     if not path.is_file():
         return None
     try:
-        return json.loads(path.read_text(encoding="utf-8"))["version"]
-    except (ValueError, KeyError) as exc:
+        version = json.loads(path.read_text(encoding="utf-8"))["version"]
+        if not isinstance(version, str) or not version:
+            raise ValueError("invalid version")
+        return version
+    except (OSError, ValueError, KeyError, TypeError) as exc:
         raise SetupError("项目内BL包信息损坏，请检查安装目录。") from exc
 
 
@@ -147,6 +150,47 @@ def verify_bl_installation(project: Project) -> None:
     result = run_process(project, bl_command(project, ["--version"]), probe_mode=True)
     if result.returncode or result.stdout.strip() != f"bl {BAILIAN_VERSION}":
         raise SetupError("BL入口无法按锁定版本启动，安装可能不完整；未自动重装。")
+
+
+def locked_python_versions(project: Project) -> dict[str, str]:
+    """只读取本项目的单行精确版本+SHA256格式，版本不在代码中再维护一份。"""
+    try:
+        lines = project.path("requirements.txt").read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        raise SetupError("无法读取Python依赖锁文件requirements.txt。") from exc
+    versions = {}
+    for number, line in enumerate(lines, 1):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        match = re.fullmatch(r"([A-Za-z0-9_.-]+)==([^\s]+)(?:\s+--hash=sha256:[0-9a-f]{64})+", line)
+        if not match or match[1] in versions:
+            raise SetupError(f"requirements.txt第{number}行不是唯一的锁定依赖，请检查。")
+        versions[match[1]] = match[2]
+    if not versions:
+        raise SetupError("requirements.txt没有锁定依赖，停止检查/安装。")
+    return versions
+
+
+def installed_python_versions(project: Project, packages: dict[str, str]) -> dict[str, str] | None:
+    """在项目venv实际加载运行依赖；缺失或无法加载时返回None，不联网修复。"""
+    python = project.path(".venv/Scripts/python.exe")
+    if not python.is_file():
+        return None
+    result = run_process(project, [str(python), "-c",
+        "import av, dotenv, openpyxl, et_xmlfile, defusedxml, importlib.metadata as m, json, sys; "
+        "print(json.dumps({name:m.version(name) for name in sys.argv[1:]}))", *packages])
+    if result.returncode:
+        return None
+    try:
+        versions = json.loads(result.stdout)
+        if not isinstance(versions, dict) or set(versions) != set(packages):
+            raise ValueError("invalid package report")
+        if not all(isinstance(version, str) for version in versions.values()):
+            raise ValueError("invalid package version")
+    except ValueError as exc:
+        raise SetupError("Python依赖检查返回异常，未自动安装或重试。") from exc
+    return versions
 
 
 def doctor(project: Project) -> dict:
@@ -167,28 +211,31 @@ def doctor(project: Project) -> dict:
         report["node"] = {"path": str(node), "version": version, "npm_entry": str(npm_entry(node))}
     except SetupError as exc:
         report["issues"].append(str(exc))
-    version = installed_bl_version(project)
-    report["bailian"] = {"version": version, "expected": BAILIAN_VERSION, "entry": str(project.bl_entry)}
-    if version != BAILIAN_VERSION or not project.bl_entry.is_file():
-        report["issues"].append("项目内BL尚未安装或版本不匹配。")
-    else:
-        try:
+    try:
+        version = installed_bl_version(project)
+        report["bailian"] = {"version": version, "expected": BAILIAN_VERSION, "entry": str(project.bl_entry)}
+        if version != BAILIAN_VERSION or not project.bl_entry.is_file():
+            report["issues"].append("项目内BL尚未安装或版本不匹配。")
+        else:
             verify_bl_installation(project)
-        except SetupError as exc:
-            report["issues"].append(str(exc))
+    except SetupError as exc:
+        report["issues"].append(str(exc))
     venv_python = project.path(".venv/Scripts/python.exe")
     report["venv_python"] = str(venv_python) if venv_python.is_file() else None
     if not venv_python.is_file():
         report["issues"].append("项目虚拟环境尚未创建或不完整。")
     else:
-        # 检查真正使用的虚拟环境，不依赖启动脚本的全局Python是否装过这些库。
-        result = run_process(project, [str(venv_python), "-c",
-            "import av, dotenv, openpyxl, defusedxml, importlib.metadata as m, json; "
-            "print(json.dumps({name:m.version(name) for name in "
-            "['av','python-dotenv','openpyxl','et-xmlfile','defusedxml']}))"])
-        if result.returncode:
-            report["issues"].append("Python运行依赖缺失或无法加载，请运行bootstrap。")
-        else:
-            report["python_packages"] = json.loads(result.stdout)
+        try:
+            expected = locked_python_versions(project)
+            installed = installed_python_versions(project, expected)
+            if installed is None:
+                report["issues"].append("Python运行依赖缺失或无法加载，请运行bootstrap。")
+            else:
+                report["python_packages"] = installed
+                for name, version in expected.items():
+                    if installed[name] != version:
+                        report["issues"].append(f"Python依赖{name}版本不匹配：需要{version}，实际{installed[name]}。")
+        except SetupError as exc:
+            report["issues"].append(str(exc))
     report["note"] = "仅检查本地环境；不读取凭据，不验证账号权限，不执行转写。"
     return report

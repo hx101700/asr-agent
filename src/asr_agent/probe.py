@@ -35,7 +35,8 @@ def probe(project: Project) -> dict:
     # BL的本地文件dry-run可能先上传；这里始终使用保留域名且不给文件路径入口。
     arguments = [
         "speech", "recognize", "--model", MODEL, "--url", SYNTHETIC_AUDIO_URL,
-        "--diarization", "--context", "本地合约探针", "--vocabulary", '{"测试术语":4}',
+        "--diarization", "--speaker-count", "3", "--language", "zh",
+        "--context", "本地合约探针", "--vocabulary", '{"测试术语":4}',
         "--dry-run", "--output", "json",
     ]
     result = run_process(project, bl_command(project, arguments), probe_mode=True)
@@ -48,13 +49,15 @@ def probe(project: Project) -> dict:
             request["model"] == MODEL
             and request["input"]["file_urls"] == [SYNTHETIC_AUDIO_URL]
             and request["parameters"]["diarization_enabled"] is True
+            and request["parameters"]["speaker_count"] == 3
+            and request["parameters"]["language_hints"] == ["zh"]
             and request["parameters"]["vocabulary"] == {"测试术语": 4}
             and request["input"]["context"][0]["content"][0]["text"] == "本地合约探针"
         )
     except (ValueError, KeyError, IndexError, TypeError) as exc:
         raise SetupError("BL dry-run输出结构与核实契约不一致。") from exc
     if not valid:
-        raise SetupError("BL未按预期构造固定模型、说话人或增强参数。")
+        raise SetupError("BL未按预期构造固定模型、语言、说话人或增强参数。")
     report = {
         "version": BAILIAN_VERSION,
         "model": MODEL,
