@@ -96,8 +96,7 @@ class EnvironmentTests(ProjectTestCase):
         python = self.project.path(".venv/Scripts/python.exe")
         python.parent.mkdir(parents=True)
         python.touch()
-        packages = {"av": "0.0.0", "python-dotenv": "1.2.3", "openpyxl": "3.1.5",
-                    "et-xmlfile": "2.0.0", "defusedxml": "0.7.1"}
+        packages = {**locked_python_versions(self.project), "av": "0.0.0"}
         with patch("asr_agent.environment.check_node", side_effect=SetupError("test Node unavailable")), \
              patch("asr_agent.environment.installed_bl_version", return_value=None), \
              patch("asr_agent.environment.run_process", return_value=subprocess.CompletedProcess([], 0, json.dumps(packages), "")):

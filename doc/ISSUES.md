@@ -48,6 +48,7 @@
 | T32 | 已实施，本机验证 | BL下载无独立超时；完整模式不稳定提供task_id及子任务元数据 | 进程3900秒上限、持久一次执行占用、JSON检查；不承诺恢复云端查询或精准子状态 |
 | T33 | 已整改并验证 | S3曾重复读Key、构造argv/长度校验、重新解析S2输入及重复探测产物 | 一次PreparedCommand；配置SHA-256+输入指纹复用快照；新FLAC复用AudioInfo。180项Python/20项前端及一次真实API Key转写通过 |
 | T34 | 已修复并真实验证 | BL2.1.0的Windows cmd/start把&needapikey=true当作第二条命令；本项目又丢弃了BL输出的完整备用链接 | 合成cmd echo实测截断；现在同一BL会话内转交完整官方URL给os.startfile。实际登录返回configured=true、console_configured=true；未复制.env、未改CLI源码、未重复ASR |
+| T35 | 待视觉验收 | S4 Word内容回读通过，但当前文档工具包缺Windows LibreOffice，render_docx.py无法生成页面PNG | 根错误为soffice.exe not found；后续临时目录清理另有权限错误。未安装全局软件或改系统PATH；先补逐页视觉再宣称S4全部验收通过，证据在S4_VERIFICATION |
 
 ## 已解决/已明确
 

@@ -200,13 +200,13 @@ API Key 不进 URL、localStorage、浏览器日志或任务 JSON；传给子进
 
 ### 任务配置（项目自定义，非百炼参数）
 
-当前配置包含schema_version、job_id、model、region、auth_mode、暂存音频元信息、enhancement、diarization_enabled、recognition_options（language_hints与speaker_count）、两类输出目录、confirmed_at、status=CONFIGURED及execution_authorized=false。不保存API Key、凭据摘要或会话令牌；配置仅写入被Git忽略的.state/jobs/<job_id>/config.json。S3读取旧配置缺失的新参数时应使用明确默认值，并验证所选外部输出目录仍可用。
+当前配置包含schema_version、job_id、model、region、auth_mode、暂存音频元信息、enhancement、diarization_enabled、recognition_options（language_hints与speaker_count）、两类输出目录、confirmed_at、status=CONFIGURED及execution_authorized=false。不保存API Key、凭据摘要或会话令牌；配置仅写入被Git忽略的.state/jobs/<job_id>/config.json。S3只接受有精确摘要的已确认配置；旧配置缺摘要须重新确认，不补签或猜默认值。输出时核对已确认路径没有被重定向。
 
 模型和地域由程序固定/受控，不接收任意 endpoint。配置在上传前再次校验，防止确认后文件被替换。首版不建立复杂数据库；单任务目录、原子 JSON 写入和一把运行锁足够。
 
 ### 转写标准结果
 
-内部结果包含来源文件、模型、task_id、request_id、实际音频元数据、全文以及句子列表。每句保留原始序号、开始/结束毫秒、文本、channel_id、可空 speaker_id。具体字段映射依据固定模型 JSON，不能把其他模型的 JSON 样例当作契约。
+S4内部结果只包含本次读取的JSON摘要、字节数、音轨数及不可变句子列表。每句包含展示序号、原音轨组序号、开始/结束毫秒、原文、可空channel_id和speaker_id，按响应顺序保留空句，不重排或猜测别名。原始sentence_id、words、properties等继续保留在原JSON，不复制到展示对象。来源名称/任务编号从已确认配置提供，模型固定；未提供的task_id/request_id不补造。
 
 保留BL通过`--out`保存的转写JSON原有完整结构，作为本地敏感文件；如含可访问结果链接，同样视为敏感信息。另存最小任务摘要；标准化对象优先仅用于内存中的导出，不无故复制一份结果。文件正文不裁剪成只有text，也不把CLI进度文本混入JSON。首版不额外要求保存BL未公开的HTTP响应信封，更不能为此另发请求。
 
@@ -214,7 +214,7 @@ API Key 不进 URL、localStorage、浏览器日志或任务 JSON；传给子进
 
 | 格式 | 内容 | 验证重点 |
 | --- | --- | --- |
-| Excel | 信息页 + 逐句明细；序号、开始、结束、音轨索引、说话人、文本 | 中文与长文本、时间单位、公式注入、表格筛选和列宽 |
+| Excel | 单页元信息与逐句明细；序号、开始、结束、音轨索引、说话人、文本 | 中文与长文本、时间单位、公式注入、表格筛选和列宽 |
 | Word | 标题、来源/模型/任务信息、按句或连续说话人段落排版、时间戳 | 段落清晰、长文分页、中文字体回退、无文本遗漏 |
 | Markdown | 标题与元信息、带时间戳的逐段正文 | UTF-8、转义 Markdown 特殊字符、文本顺序 |
 
@@ -298,3 +298,9 @@ S5 才生成可执行技能；本阶段不安装声称可转写的空壳技能�
 6. 完整成功以所有成品可用为准；任何错误不可被泛化异常捕获吞掉。
 
 更多未决事项见 [ISSUES.md](ISSUES.md)，逐项验收见 [ACCEPTANCE.md](ACCEPTANCE.md)。
+
+### S4实现边界
+
+results.py解析一次JSON，返回不可变Transcript/Sentence；documents.py三个普通函数各自生成并回读一个格式；delivery.py创建独立导出目录、原子发布每个成品并记录部分失败；transcription.py编排自动首次导出或显式export。没有通用writer基类、工厂、数据库或新的云客户端。
+
+云端执行记录与导出轮次分开。转写JSON一经通过立即记录JSON_READY，再进行本地交付；记录失败仍向调用者返回JSON路径和交付结果未知。每个执行命令返回自己的轮次，job-status单独读取最新发起轮。重导全部格式，不覆盖历史、不自动重试；当前不提供只重导某一格式的选项。

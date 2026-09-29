@@ -137,12 +137,12 @@ class TranscriptionTests(ProjectTestCase):
         self.assertFalse(path.parent.joinpath("execution").exists())
         self.cli.assert_not_called()
 
-    def test_success_records_json_only_and_never_reexecutes_the_saved_job(self):
+    def test_success_delivers_documents_and_never_reexecutes_the_saved_job(self):
         job_id, _ = self.make_job()
         report = transcribe(self.project, job_id, authorize_upload=True)
         self.assertEqual(report["status"], "JSON_READY")
         self.assertEqual(report["cloud_outcome"], "result_received")
-        self.assertFalse(report["documents_ready"])
+        self.assertTrue(report["documents_ready"])
         self.assertIsNone(report["task_id"])
         self.assertTrue(Path(report["json_path"]).is_file())
         self.assertEqual(job_status(self.project, job_id), report)

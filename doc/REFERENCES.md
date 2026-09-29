@@ -230,3 +230,11 @@ S1已安装真实CLI发布包并执行公开帮助、虚构URL dry-run及本机�
 目录窗口使用Python3.12标准库[tkinter.filedialog.askdirectory](https://docs.python.org/3.12/library/dialog.html#tkinter.filedialog.askdirectory)，支持initialdir/parent和mustexist。用户已授权选择项目外保存位置；当前只选现有目录，不用浏览器文件上传控件冒充保存位置选择。
 
 目录故障补充：Python[线程模型说明](https://docs.python.org/3.12/library/tkinter.html#threading-model)允许Tk解释器属于单独线程，不能仅凭HTTP工作线程创建Tk认定违规。本机对照确认默认受限执行与正常交互桌面的原生窗口显示结果不同；这是运行证据，不是官方文档对Codex实现的结论。独立GUI进程用于取消/超时回收，正常桌面启动解决已观察的可见性问题。
+
+## S4本地格式导出依据（2026-09-29）
+
+- BL2.1.0本机`speech recognize --help`的--out保存完整JSON，输出选择只有text/json；结合A13及已核对的recognize实现，未提供本项目需要的xlsx/docx/md成品入口。Python只补本地导出，不另行下载或轮询。
+- [python-docx1.2.0官方文档](https://python-docx.readthedocs.io/en/latest/)及[文本/分页属性](https://python-docx.readthedocs.io/en/latest/user/text.html)：段落、样式、keep_with_next和widow_control。实际字体与分页仍需要渲染/目标应用核验。
+- [openpyxl样式文档](https://openpyxl.readthedocs.io/en/stable/styles.html)：单元格格式、对齐、行列设置；本项目运行版本为3.1.5，实际roundtrip由测试验证。
+- [Microsoft Excel规格](https://support.microsoft.com/en-us/excel/excel-specifications-and-limits)：单元格32767字符、工作表1048576行、行高409磅。显示行高由本地字体/列宽估算，超限明确拒绝该格式；这是项目导出策略，不是模型限制。
+- 新依赖官方wheel摘要：[python-docx1.2.0](https://pypi.org/pypi/python-docx/1.2.0/json)、[lxml6.1.3](https://pypi.org/pypi/lxml/6.1.3/json)、[typing-extensions4.16.0](https://pypi.org/pypi/typing-extensions/4.16.0/json)。仅选择CPython3.12 Windows x64或py3-none-any wheel，写入requirements.txt并通过实际安装。

@@ -1,50 +1,44 @@
 # 当前状态
 
-更新时间：2026-09-29。API Key无增强及联合增强真实验收通过；控制台登录的Windows链接问题已修复，实际登录取得模型Key。尚未开始S4导出。
+更新时间：2026-09-29。S4三格式导出已接入并完成真实结果内容验收；Word逐页视觉检查仍待完成。分支dev，未进入S5打包或合并master。
 
-## 当前目标与完成情况
+## 当前目标
 
-在已完成S1/S2基础上接入一次完整BL执行，保持明确上传授权和失败不重试。
+补齐从已保存JSON到Excel、Word、Markdown的本地交付，保持BL负责全部云端流程、失败不自动重试。下一次接续先处理Word视觉验收限制，详情见[S4_VERIFICATION.md](S4_VERIFICATION.md)。
 
-- 前端：app.mjs为Presenter，model.mjs管理状态/派生权限，view.mjs处理DOM；无新增框架。
-- 后端：web.py只处理HTTP，session.py承载用例，DirectoryPicker独立管理原生窗口与取消。
-- 上传：短锁登记、锁外接收、短锁发布；目录取消不等上传/校验；关闭后迟到上传不能发布。
-- 清理：删除旧app.js、旧DOM桩测试、废弃CSS、recognition_options模块及allow_super分支；模型规则统一在validation.py。
-- S1：doctor核对锁定依赖版本；完整环境跳过pip；BL冲突在修改Python前拒绝；probe覆盖语言、人数和双增强。
-- 已统一Key显示、依赖说明、BL本机/云端验证状态与即时热词验收规则。
-- 长表单交互：桌面摘要吸顶并避开底部操作栏，长内容内部滚动；填写时显示未校验摘要，提供栏目定位，窄/矮窗口保持文档流。
-- S3：transcription.py承担复核、声道准备、一次执行占用和JSON验收；bailian.py只管公开CLI进程，error_catalog.json提供有来源的解释。
-- 新命令：login、console-status、transcribe --job ID --authorize-upload、job-status --job ID。启动记录独占且保留，重复执行不会重新提交。
-- T33已整改：配置摘要+文件指纹后复用S2快照；argv/环境/Key只准备一次；不再执行前auth status；新FLAC复用转换器返回的实测信息。API Key模式不需要login，已有项目BL凭据直接复用。
-- T34已定位并修复：BL2.1.0通过cmd/start传URL会丢掉&needapikey参数，Python原封装又丢弃完整备用链接。现在运行中读取该官方链接，校验格式后用os.startfile打开一次，继续使用原BL回调服务。
-- 实际修复后登录返回configured=true、console_configured=true，模型Key由BL官方流程配置，未复制.env或自建取Key逻辑。正常账号登录无需手填第二次Key。
+## 已完成
 
-## 已确认边界
+- S1局部环境与BL2.1.0能力探针；依赖锁定，完整安装不重复运行pip，安装入口可在未加载第三方库时启动。
+- S2前端轻量MVP：model管理交互状态，view处理DOM，app编排；web处理HTTP，session承载本地配置。上传短锁登记/发布，锁外接收；原生目录窗口可取消、不阻塞表单。
+- 直接选单个文件，热词与上下文独立且可并用；说话人默认开启，多声道最终确认前提示合并；默认outputs，也可由原生弹窗登记外部输出目录。
+- S3核对配置字节摘要、输入指纹后复用S2快照；PreparedCommand只构造一次参数和环境，Key读取一次，不额外调用auth status。
+- 用户指定样本已完成API Key无增强和热词+上下文联合增强真实识别，原JSON只留本地；不据此声称准确率改善。
+- Windows控制台登录链接丢失needapikey参数的问题已修复。BL同一回调会话给出的完整官方链接由os.startfile转交一次，实际登录已有模型Key和控制台凭据；没有为登录再次识别。
+- S4新建results.py共享解析、documents.py三种writer、delivery.py逐格式交付。转写成功后自动导出一次；export --job ID只读已有JSON，在新目录生成全部三格式，不覆盖历史、不重跑BL。
+- 导出状态独立于云端记录。逐项回读文字/时间/标签后发布正式文件；单格式失败不阻止其他格式；状态记录失败仍报告已有JSON。
+- 并行导出每次返回自己的回执；job-status展示最新发起轮，未知/损坏记录不冒充成功。网页阶段说明和HELP已同步。
 
-- Windows 10/11 + Codex；固定qwen-audio-3.0-asr-flash-filetrans、北京、单文件、临时OSS。
-- 热词与上下文可并用；发言人区分默认开启，多声道仅在正式执行时生成单声道副本。
-- 浏览器只向本机服务传入文件；S2确认保存CONFIGURED且execution_authorized=false。
-- 实际转写需用户明确授权具体配置的上传；S3授权另记execution/status.json。正常完成为JSON_READY、documents_ready=false，不冒充三格式交付成功。
-- Key由项目.env提供，仅用户选择后在只读控件显示/遮蔽；不进Model、日志或任务配置。
-- 输出默认在outputs，也可经原生弹窗登记项目外可写目录；不能由客户端任意路径新增授权。
-- BL已有的鉴权、云上传、提交、轮询与下载不由Python重写。
-- 原生窗口要求正常Windows交互桌面，遵守AGENTS执行权限规则；可取消，最多等待5分钟，不重开重试。
+## 验证情况
 
-## 最新验证
+- Python全量218项、前端20项通过，无跳过。Python在正常桌面环境执行；前端受限环境spawn EPERM，正常环境通过。未修改测试规避环境错误。
+- 新Word依赖从官方PyPI安装并锁定哈希；首次下载超时停止，经诊断后单次延长下载等待安装成功，bootstrap复核already_installed；python -S入口检查通过。
+- 复用既有联合增强JSON完成真实本地导出：329段、11,305字符，Excel/Word/Markdown全文独立比对一致，JSON未改，未带出临时file_url，无新增ASR请求。
+- Excel首部、最长句与末尾渲染已检查。Word成功写入并回读全文，但渲染器缺LibreOffice，没有页面PNG；不得报告逐页视觉通过。问题T35。
+- S3本机模拟ASR、媒体转换及失败语义仍在全量回归内；多声道云端、账号凭据下单独ASR和人工识别质量尚未由本轮覆盖。
 
-- 本轮192项Python全量回归通过，无跳过；前端未改动，最近20项前端回归仍为前轮结果。新测试覆盖完整链接、运行中打开、stderr排空、错误/超时回收和不泄露state。受限环境既有连接差异见T30。
-- bootstrap返回already_installed，未重复安装；python -S scripts/asr.py --help通过，安装入口保持标准库可加载。
-- 真实BL连接127.0.0.1模拟ASR，完整执行入口的JSON成功、空结果与401路径通过；重复调用不增加云端模拟请求。
-- 已实际验证修复后的控制台登录：BL保存了控制台凭据及模型Key。按官方文档只查询公开状态，没有为验证登录重复识别；账号凭据下的独立ASR调用未另行进行。
-- 用户明确授权后，使用项目.env Key、固定模型/北京、单声道样本、说话人开启、无增强，真实执行一次并返回JSON_READY。原音频内容未改、配置摘要一致，实际JSON符合当前句子结构检查；不把这次成功当作所有场景或识别质量通过。
-- 用户授权合理实际测试后，再完成一次API Key热词+上下文联合调用；输入合法，BL请求构造同时保留vocabulary/context，真实返回JSON_READY。测试词汇来自先前转写，不是人工真值，不据此声称精度改善。
-- 真实Session/PyAV覆盖双增强、单双声道、转换后超限、输入变更及关闭网页会话后执行；详见S3_VERIFICATION。
-- 既有浏览器布局/交互证据见S2_VERIFICATION，本轮仅更新阶段提示，没有重新进行整页视觉验收。
+## 状态与边界
 
-## 接续与下一步
+- 模型固定qwen-audio-3.0-asr-flash-filetrans、北京、Windows首版、临时OSS、一次单文件。
+- 网页确认只保存CONFIGURED、execution_authorized=false；上传授权单独给transcribe。一次execution占用永久保留，重复命令不重新上传或导出。
+- JSON_READY仅表示JSON已通过结构检查；delivery.status=COMPLETE、documents_ready=true表示三成品通过写入和内容核验，不等于准确率或人工视觉验收。
+- export是纯本地操作，每轮在<已选根目录>/<job_id>/documents/<导出编号>/保存三文件；源码不处理新云端协议。
+- 用户已授权本项目指定样本范围内的合理真实测试，不逐次询问；仍限制次数、失败不重试，不扩展到无关数据。
+- 凭据、音频、真实热词/上下文、原始结果、成品和截图仅在被忽略的data/.state/.runtime/outputs等目录，不进Git。
 
-先读AGENTS、本文件和S3_VERIFICATION，再检查Git与运行服务。旧页面可能仍加载前一阶段文案，不要擅自刷新用户未保存的表单。
+## 接续
 
-本轮联合增强统计在被忽略的.state/enhancement-acceptance-*/；其中旧console-diagnostic是修复前历史，不能当作当前登录状态。当前凭据状态以console-status为准。可复用已有JSON推进S4，不重复识别。多声道云端及人工质量尚未覆盖。S5 ZIP/Skill、S6完整验收尚未实施。
+先读AGENTS、本文件、S4_VERIFICATION，再看Git和当前进程。不要刷新用户未保存的旧网页；旧console-diagnostic只是登录修复前历史。
 
-整改在dev形成检查点，不推送或合并master；准确提交号以git log为准。数据、凭据、截图和合成结果均不入Git。
+可从.state/jobs各任务的execution/status.json和exports/<导出编号>/status.json定位真实结果；本轮统计/Excel预览/Word渲染日志在.state/s4-qa，测试日志在.runtime。不要打印完整原始响应或读取凭据值。
+
+先补Word逐页视觉，再由用户推进S5 Skill/ZIP与S6从ZIP到交付的整体验收。当前保留dev检查点，不推送或合并master；提交号以git log为准。

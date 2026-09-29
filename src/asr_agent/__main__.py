@@ -24,7 +24,7 @@ def main(argv: list[str] | None = None) -> int:
     serve_parser = commands.add_parser("serve", help="打开本地配置网页")
     serve_parser.add_argument("--port", type=int, default=0, help="本地网页端口，默认自动选择")
     serve_parser.add_argument("--no-browser", action="store_true", help="不自动打开系统浏览器")
-    for name in ("transcribe", "job-status"):
+    for name in ("transcribe", "export", "job-status"):
         command = commands.add_parser(name)
         command.add_argument("--job", required=True, help="网页保存回执中的设置编号")
         if name == "transcribe":
@@ -39,6 +39,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "transcribe":
             from .transcription import transcribe
             report = transcribe(project, args.job, authorize_upload=args.authorize_upload)
+        elif args.command == "export":
+            from .transcription import export_job
+            report = export_job(project, args.job)
         elif args.command == "job-status":
             from .transcription import job_status
             report = job_status(project, args.job)
@@ -58,7 +61,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 1 if (report.get("issues") or report.get("configured") is False
-                 or report.get("status") in ("STOPPED", "OUTCOME_UNKNOWN")) else 0
+                 or report.get("status") in ("STOPPED", "OUTCOME_UNKNOWN")
+                 or (report.get("status") == "JSON_READY" and not report.get("documents_ready"))) else 0
 
 
 if __name__ == "__main__":

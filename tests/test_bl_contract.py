@@ -201,7 +201,7 @@ class BailianContractTests(ProjectTestCase):
     def test_saved_config_runs_once_through_real_cli_and_checks_json(self):
         report = self.invoke_saved_job("success")
         self.assertEqual(report["status"], "JSON_READY")
-        self.assertFalse(report["documents_ready"])
+        self.assertTrue(report["documents_ready"])
         self.assertIsNone(report["task_id"])
         self.assertTrue(Path(report["json_path"]).is_file())
         self.assertNotIn("本地模拟转写", json.dumps(report, ensure_ascii=False))

@@ -11,6 +11,7 @@
 | [S1_VERIFICATION.md](S1_VERIFICATION.md) | S1历史验证与环境能力依据 | 需要追溯基础实现时 |
 | [S2_VERIFICATION.md](S2_VERIFICATION.md) | 网页、直接选文件、组合增强、确认及浏览器验证 | 接续S2/S3 |
 | [S3_VERIFICATION.md](S3_VERIFICATION.md) | 明确授权的执行入口、一次执行记录、BL合约及限制 | 执行与接续S3/S4 |
+| [S4_VERIFICATION.md](S4_VERIFICATION.md) | 三格式导出、局部失败、已有结果验收与视觉限制 | 接续S4/S5 |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | 需求、原子能力、架构、界面、数据与阶段计划 | 开发前 |
 | [REFERENCES.md](REFERENCES.md) | 官方来源、版本基线、能力限制与证据边界 | 实现接口前 |
 | [ERRORS.md](ERRORS.md) | 官方状态/错误与本地错误的区别及解释规则 | 实现和排障 |

@@ -75,7 +75,7 @@
 | CONFIGURED | 已保存设置，未授权执行 |
 | PREPARING | 已占用本次执行，正在本地准备；记录不保证进程仍存活 |
 | RUNNING | 最近进入BL执行阶段，不能据此细分上传/排队/识别/下载 |
-| JSON_READY | BL结束且JSON通过本地结构检查，三种文档尚未生成 |
+| JSON_READY | BL结束且JSON通过本地结构检查；文档状态另见delivery，不用此字段推断三种文档成功 |
 | STOPPED | 本地准备、BL执行或JSON检查停止；失败不重试 |
 | OUTCOME_UNKNOWN | 执行已被占用但记录不可读，不得重新启动 |
 
@@ -96,3 +96,17 @@ cloud_outcome分别记录not_started、unknown、result_received，不将本地�
 已实现的CLI错误字段：source、cli_exit_code、http_status、code（服务端api_code）、脱敏message、explanation、request_id、source_url。只保留BL实际暴露的值，不补造cause/hint/stack或失败所在云端阶段。非JSON stderr不原样透传，保留实际退出码和通用说明。
 
 本机status.json包含任务编号、最近状态/时间、执行器PID、授权来源、cloud_outcome、task_id（当前通常为空）、JSON位置及可用性计数；不包含转写正文、Key、上下文或热词。状态位于.state/jobs/ID/execution，BL原始JSON位于用户选择的JSON目录，均排除Git。未识别的官方code保留脱敏拼写，并明确字典未收录，不借用Paraformer含义。
+
+## S4本地交付状态
+
+以下状态来自本项目delivery.py，不是阿里云状态码，不借用云端错误解释。
+
+| delivery.status | 含义与处理 |
+| --- | --- |
+| EXPORTING | 最近记录在导出中，不保证进程仍存活；检查原进程和本地文件 |
+| COMPLETE | 同一轮三种成品写入并回读核验通过，documents_ready=true |
+| PARTIAL | 至少一种成功，其余失败；逐项查看files，保留所有成功文件 |
+| FAILED | 三种均失败或无法创建已确认的输出目录；JSON保留 |
+| OUTCOME_UNKNOWN | 记录不可读/不可写或导出被中断，不声称成品齐全；检查目录及已有文件 |
+
+files中的READY/FAILED为单格式状态。失败仅返回自有中文说明和异常类型；不打印第三方异常中的正文，不自动重试。显式export可本地重导全部格式至新目录，不运行BL。云端执行记录保持JSON_READY/result_received，不把交付失败改写为识别失败。

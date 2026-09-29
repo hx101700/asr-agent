@@ -10,6 +10,8 @@ from pathlib import Path
 from . import MODEL
 from .bailian import BEIJING_BASE_URL, WAIT_SECONDS, BailianFailure, PreparedCommand, prepare_command, run_recognition
 from .environment import Project, SetupError
+from .results import Transcript, load_transcript
+from .delivery import export_documents, latest_delivery
 from .media import MediaError, convert_to_mono
 from .validation import ValidationError, check_audio_limits, file_fingerprint
 
@@ -77,7 +79,44 @@ def job_status(project: Project, job_id: str) -> dict:
                 "message": "任务已被占用但执行记录不可读，不能重新提交。请检查本地进程和记录。"}
     if report["status"] in ("PREPARING", "RUNNING"):
         report["message"] = "这是最近保存的执行状态，不代表进程仍存活。请检查原执行进程，勿重新提交。"
+    return _with_delivery(root, report)
+
+
+def _with_delivery(root: Path, report: dict) -> dict:
+    delivery = latest_delivery(root)
+    if delivery is not None:
+        _attach_delivery(report, delivery)
     return report
+
+
+def _attach_delivery(report: dict, delivery: dict) -> dict:
+    report.update(delivery=delivery, documents_ready=delivery["status"] == "COMPLETE",
+                  message=delivery["message"])
+    return report
+
+
+def _deliver(project: Project, config: dict, transcript: Transcript, report: dict) -> dict:
+    try:
+        delivery = export_documents(job_directory(project, config["job_id"]), config, transcript)
+    except (OSError, SetupError, KeyboardInterrupt) as exc:
+        # 即使状态文件也无法写入，仍把已保存的JSON交给调用者，不能误报识别失败。
+        delivery = {"status": "OUTCOME_UNKNOWN", "error_type": type(exc).__name__,
+                    "message": "本地导出中断或记录无法保存。JSON及已生成文件已保留，请检查目录权限、空间和文件；未重新识别。"}
+    # 返回本次调用的轮次；并行发起的另一轮不能替换本调用的回执。
+    return _attach_delivery(report, delivery)
+
+
+def export_job(project: Project, job_id: str) -> dict:
+    """已有结果的显式本地导出入口；不读取Key、原音频或热词，也不调用BL。"""
+    config = read_config(project, job_id)
+    report = job_status(project, job_id)
+    if report["status"] != "JSON_READY":
+        raise SetupError("任务尚无通过检查的JSON，不能导出；不会自动重新识别。")
+    transcript = load_transcript(_output_path(config))
+    expected = report.get("result", {}).get("sha256")
+    if expected is not None and transcript.sha256 != expected:
+        raise SetupError("转写JSON在验收后发生变化，未导出；请先检查原结果。")
+    return _deliver(project, config, transcript, report)
 
 
 def _check_input(project: Project, record: dict) -> Path:
@@ -150,35 +189,6 @@ def prepare_input(project: Project, config: dict, execution: Path) -> tuple[Prep
     return command, private, destination
 
 
-def inspect_result(path: Path) -> dict:
-    """只检查官方句子结构；保留全部音轨，不提前实施导出或猜测字段别名。"""
-    try:
-        result = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(result, dict) or not isinstance(result["transcripts"], list):
-            raise ValueError("unexpected document")
-        sentences = 0
-        nonempty = 0
-        for track in result["transcripts"]:
-            if not isinstance(track, dict) or not isinstance(track["sentences"], list):
-                raise ValueError("unexpected track")
-            for sentence in track["sentences"]:
-                begin, end = sentence["begin_time"], sentence["end_time"]
-                if (type(begin) is not int or type(end) is not int or not 0 <= begin <= end
-                        or not isinstance(sentence["text"], str)):
-                    raise ValueError("unexpected sentence")
-                speaker = sentence.get("speaker_id")
-                if speaker is not None and (type(speaker) is not int or speaker < 0):
-                    raise ValueError("unexpected speaker")
-                sentences += 1
-                nonempty += bool(sentence["text"].strip())
-        if not nonempty:
-            raise ValueError("no usable transcript")
-    except (OSError, ValueError, KeyError, TypeError) as exc:
-        raise SetupError("BL未生成可用的转写JSON，或结果结构不符合已核实契约。已保留现有文件；未推断失败原因，未重新识别。") from exc
-    return {"audio_tracks": len(result["transcripts"]), "sentences": sentences,
-            "json_bytes": path.stat().st_size}
-
-
 def transcribe(project: Project, job_id: str, *, authorize_upload: bool = False) -> dict:
     if not authorize_upload:
         raise SetupError("保存设置不等于授权上传。需用户明确同意后，使用--authorize-upload执行本次任务。")
@@ -201,9 +211,10 @@ def transcribe(project: Project, job_id: str, *, authorize_upload: bool = False)
         report.update(status="RUNNING", cloud_outcome="unknown", message="BL正在执行上传、识别、等待及结果保存。")
         _save_status(execution, report)
         run_recognition(project, command, private)
-        result = inspect_result(destination)
+        transcript = load_transcript(destination)
+        result = transcript.summary()
         report.update(status="JSON_READY", cloud_outcome="result_received", json_path=str(destination), result=result,
-                      message="BL已结束，转写JSON已保存并通过结构检查；Excel、Word和Markdown导出尚未接入。")
+                      message="BL已结束，转写JSON已保存并通过结构检查；等待本地导出。")
     except BailianFailure as exc:
         outcome = "unknown" if report["status"] == "RUNNING" and exc.started else "not_started"
         message = ("BL执行已停止，云端结果未知；未自动重试，也未取消云端任务。" if outcome == "unknown"
@@ -217,4 +228,7 @@ def transcribe(project: Project, job_id: str, *, authorize_upload: bool = False)
     if destination is not None and destination.is_file():
         report["json_path"] = str(destination)
     _save_status(execution, report)
+    if report["status"] == "JSON_READY":
+        # 云端成功先独立落盘。导出失败不得改写为识别失败或触发第二次BL执行。
+        return _deliver(project, config, transcript, report)
     return report

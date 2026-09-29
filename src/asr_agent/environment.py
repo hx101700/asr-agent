@@ -178,7 +178,8 @@ def installed_python_versions(project: Project, packages: dict[str, str]) -> dic
     if not python.is_file():
         return None
     result = run_process(project, [str(python), "-c",
-        "import av, dotenv, openpyxl, et_xmlfile, defusedxml, importlib.metadata as m, json, sys; "
+        "import av, dotenv, openpyxl, et_xmlfile, defusedxml, docx, lxml.etree, typing_extensions; "
+        "import importlib.metadata as m, json, sys; "
         "print(json.dumps({name:m.version(name) for name in sys.argv[1:]}))", *packages])
     if result.returncode:
         return None
