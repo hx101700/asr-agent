@@ -28,6 +28,7 @@
 - 实际Edge页面验证通过：合成文件添加、联合增强、Key密码显示与清空、多声道提示、预览保存、刷新恢复、转写信息停靠及三种视口无横向溢出。
 - UML已按源码核对并检查渲染图；发行清单、CRC、源码逐字节一致性及包内/开发文档链接通过。
 - 当前唯一发行包为dist/asr-agent.zip，44个文件、113771字节。SHA-256：`18c11ed97b6ece79fe4a8449bd8df99fb74951ef38a8c889fd962e8ef1633740`。旧ZIP已删除，候选包已成为正式文件名。
+- 发行源码提交为`0f76157f39099413a146532fa3ff7f2c2ff17909`，已推送[origin/dev](https://github.com/hx101700/asr-agent/tree/dev)，并以远端refs/heads/dev核对一致；其后的本页交付记录更新不改变ZIP内容。
 - 根README、AGENTS和.gitignore来自release模板。包内doc仅HELP、ERRORS、REFERENCES；开发文档、测试、UML图、运行时、依赖包、凭据、数据和成品均不发布。
 
 ## 本机数据与接续
