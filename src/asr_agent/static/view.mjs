@@ -1,7 +1,9 @@
+// 将字节数转换为与页面限制一致的十进制 KB 或 MB。
 function fileSize(bytes) {
   return bytes < 1_000_000 ? `${(bytes / 1000).toFixed(1)} KB` : `${(bytes / 1_000_000).toFixed(2)} MB`;
 }
 
+// 将音频时长转换为按秒取整的中文时分秒。
 function durationText(seconds) {
   const total = Math.round(seconds);
   const hours = Math.floor(total / 3600);
@@ -9,7 +11,9 @@ function durationText(seconds) {
   return [hours ? `${hours} 小时` : "", minutes ? `${minutes} 分` : "", `${total % 60} 秒`].filter(Boolean).join(" ");
 }
 
+// 集中表单读取、DOM 渲染与事件绑定，业务操作交给 Presenter。
 export function createView(document) {
+  // 按页面约定的固定 ID 获取控件。
   const element = (id) => document.getElementById(id);
   const form = element("config-form");
   let errorField = null;
@@ -20,6 +24,7 @@ export function createView(document) {
   let controls = { editable: false, upload: { audio: false, hotwords: false } };
   let session = null;
 
+  // 以文本节点添加摘要标签和值。
   function detailRow(parent, label, value) {
     const row = document.createElement("div");
     const title = document.createElement("dt");
@@ -31,15 +36,18 @@ export function createView(document) {
     return row;
   }
 
+  // 将键盘焦点和滚动位置一起移到目标区域。
   function focusRegion(id, block = "start") {
     element(id).focus({ preventScroll: true });
     element(id).scrollIntoView({ block });
   }
 
+  // 根据当前表单和上传状态展示转写摘要。
   function renderDraft(model, values) {
     // 摘要直接派生自表单与上传状态，不保存第二份配置，也不把选择当作校验成功。
     const details = element("draft-details");
     details.replaceChildren();
+    // 将上传状态映射为摘要文字，成功时显示文件名。
     const uploadLabel = (upload) => ({
       empty: "尚未添加", uploading: "正在添加…", failed: "添加失败", ready: upload.name,
     })[upload.status];
@@ -55,6 +63,7 @@ export function createView(document) {
     detailRow(details, "账号连接", values.useApiKey ? "API Key" : "百炼账号登录");
   }
 
+  // 展示服务端校验摘要和警告，并复用当前预览。
   function renderPreview(preview, uploads) {
     if (preview === renderedPreview) return;
     renderedPreview = preview;
@@ -72,7 +81,7 @@ export function createView(document) {
     detailRow(details, "音频文件", uploads.audio.name || audio.name);
     detailRow(details, "音频时长", durationText(audio.duration_seconds));
     detailRow(details, "文件大小", fileSize(audio.size_bytes));
-    detailRow(details, "格式 / 声道", `${audio.format || audio.name.split(".").pop().toUpperCase()} / ${audio.channels} 声道`);
+    detailRow(details, "格式 / 声道", `${audio.format_name} / ${audio.channels} 声道`);
     detailRow(details, "采样率", `${audio.sample_rate.toLocaleString("zh-CN")} Hz`);
     detailRow(details, "账号连接", summary.auth_mode === "api_key" ? "API Key" : "百炼账号登录");
     detailRow(details, "区分发言人", config.diarization_enabled ? "开启" : "关闭");
@@ -92,6 +101,7 @@ export function createView(document) {
     warnings.hidden = warnings.childElementCount === 0;
   }
 
+  // 展示已保存的任务编号和文件位置，供用户返回 Codex 后继续。
   function renderReceipt(receipt) {
     if (!receipt || receipt === renderedReceipt) return;
     renderedReceipt = receipt;
@@ -106,10 +116,14 @@ export function createView(document) {
   }
 
   const view = {
+    // 用服务端公布的选项、限制和默认目录初始化表单。
     initialize(description) {
       session = description;
       element("model-name").textContent = session.model;
-      element("region-name").textContent = ["cn-beijing", "beijing"].includes(session.region) ? "中国内地 · 北京" : session.region;
+      element("region-name").textContent = session.region;
+      element("audio-file").accept = session.audio_suffixes.join(",");
+      const formats = session.audio_suffixes.map((suffix) => suffix.slice(1).toUpperCase()).join("、");
+      element("audio-limits").textContent = `可添加不超过 ${session.limits.audio_bytes / 1_000_000_000} GB、${session.limits.audio_seconds / 3600} 小时的文件。发送至阿里云的音频须不超过 ${session.limits.upload_bytes / 1_000_000_000} GB；如需合并声道，将以转换后的文件大小为准。支持 ${formats}。`;
       for (const kind of ["json", "document"]) element(`${kind}-directory`).placeholder = session.output_defaults[kind];
       for (const [code, name] of session.languages) {
         const option = document.createElement("option");
@@ -121,9 +135,11 @@ export function createView(document) {
       element("speaker-count").max = session.limits.speaker_max;
       element("speaker-help").textContent = `可指定 ${session.limits.speaker_min}–${session.limits.speaker_max} 人，供识别参考。`;
       element("hotwords-file-limit").textContent = `或拖拽至此处 · .xlsx · 最大 ${session.limits.hotwords_bytes / 1_000_000} MB`;
+      element("hotwords-help").textContent = `按模板填写词语和权重，最多 ${session.limits.hotwords_count.toLocaleString("zh-CN")} 个热词。`;
       element("context-help").textContent = `包含录音中可能出现的具体词语，最多 ${session.limits.context_chars} 字符。`;
     },
 
+    // 读取普通表单值和人数输入状态。
     readForm() {
       return {
         useApiKey: element("use-api-key").checked,
@@ -136,6 +152,7 @@ export function createView(document) {
       };
     },
 
+    // 按模型状态统一更新控件、摘要、进度提示和可访问性属性。
     render(model, available) {
       controls = available;
       const saved = model.phase === "saved";
@@ -226,6 +243,7 @@ export function createView(document) {
       renderReceipt(model.receipt);
     },
 
+    // 清除错误内容、字段关联和高亮状态。
     clearError() {
       element("error-panel").hidden = true;
       element("error-details").replaceChildren();
@@ -239,6 +257,7 @@ export function createView(document) {
       form.querySelectorAll('[aria-invalid="true"]').forEach((input) => input.removeAttribute("aria-invalid"));
     },
 
+    // 展示字段或公共错误，并聚焦对应提示。
     showError(error) {
       view.clearError();
       const fields = {
@@ -282,17 +301,23 @@ export function createView(document) {
       }
     },
 
-    fileExtensions: (kind) => element(`${kind}-file`).accept.split(","),
+    // 上传失败后清空文件控件，允许重新选择同一个文件。
     clearFile: (kind) => { element(`${kind}-file`).value = ""; },
+    // 清除控件中的凭据并恢复隐藏状态。
     clearApiKey() {
       element("api-key-value").value = "";
       element("api-key-value").type = "password";
       element("api-key-toggle").textContent = "显示";
     },
+    // 将凭据填入页面的只读控件。
     setApiKey: (value) => { element("api-key-value").value = value; },
+    // 返回可编辑的配置区域。
     focusForm: () => focusRegion("config-fields"),
+    // 将焦点移到核对区域，便于查看预览结果。
     focusPreview: () => focusRegion("review-card"),
+    // 保存完成后将焦点移到回执区域。
     focusReceipt: () => focusRegion("receipt-panel"),
+    // 通过临时对象 URL 下载模板，触发后释放该 URL。
     download(blob) {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -304,6 +329,7 @@ export function createView(document) {
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     },
 
+    // 绑定表单、目录、拖拽和导航事件，将业务动作交给 Presenter。
     bind(actions) {
       form.addEventListener("input", (event) => {
         if (!["checkbox", "file", "select-one"].includes(event.target.type)) actions.changed(event.target.id);

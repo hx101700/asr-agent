@@ -1,0 +1,46 @@
+classDiagram
+direction LR
+class Project {
+  <<frozen dataclass>>
+  +Path root
+  +path(relative) Path
+  +bl_directory Path
+  +bl_entry Path
+  +prepare()
+}
+class Session {
+  +Project project
+  +dict uploads
+  +dict output_directories
+  +dict_or_None draft
+  +dict_or_None receipt
+  -Lock _state_lock
+  -DirectoryPicker _picker
+  -Event _closed
+  -set _pending_uploads
+  +upload(kind, name, source, size) dict
+  +uploaded(identifier, kind) dict
+  +validate(payload) dict
+  +confirm(validation_id) dict
+  +select_directory(kind, picker_id) dict
+  +cancel_directory(picker_id) dict
+  +description() dict
+  +api_key_display() dict
+  +cleanup()
+}
+class DirectoryPicker {
+  -Lock _lock
+  -request_id_or_None _active_id
+  -Event_or_None _cancel_event
+  -request_id_or_None _cancelled_id
+  -bool _closed
+  -Event _finished
+  +select(initial, request_id) Path_or_None
+  +cancel(request_id)
+  +close()
+}
+Session --> Project : 持有外部传入的项目上下文
+Session "1" *-- "1" DirectoryPicker : 会话创建并关闭
+note for Session "src/asr_agent/application/session.py<br/>短锁登记与发布上传；字节接收在锁外<br/>validate与confirm持锁处理当前快照<br/>draft / receipt初始为None；配置与回执采用dict"
+note for Project "src/asr_agent/tools/environment.py<br/>项目目录界定安装与运行资源的存放范围<br/>与Session是普通关联，Project可独立存在"
+note for DirectoryPicker "src/asr_agent/tools/directory_picker.py<br/>独立取消信号；choose_directory函数启动窗口子进程<br/>进程是函数局部对象；Session登记返回的精确路径"

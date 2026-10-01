@@ -40,7 +40,7 @@
               <section class="card" aria-labelledby="audio-heading">
                 <div class="section-heading"><span class="step-number">01</span><h2 id="audio-heading" tabindex="-1">添加音频</h2><span class="section-aside">每次 1 个文件</span></div>
                 <div id="audio-dropzone" class="file-dropzone">
-                  <input id="audio-file" class="file-input" type="file" accept=".aac,.amr,.avi,.flac,.flv,.m4a,.mkv,.mov,.mp3,.mp4,.mpeg,.ogg,.opus,.wav,.webm,.wma,.wmv" aria-labelledby="audio-picker-title" aria-describedby="audio-file-status audio-limits">
+                  <input id="audio-file" class="file-input" type="file" aria-labelledby="audio-picker-title" aria-describedby="audio-file-status audio-limits">
                   <label for="audio-file" class="upload-target">
                     <svg class="upload-icon" viewBox="0 0 40 40" fill="none" aria-hidden="true"><path d="M8 24v8h24v-8M20 27V7m-8 8 8-8 8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     <strong id="audio-picker-title"><span id="audio-action">选择音频文件</span><span class="upload-or">，或拖拽至此处</span></strong>
@@ -50,7 +50,7 @@
                   <p id="audio-file-status" class="file-status" role="status">尚未选择文件</p>
                 </div>
                 <div id="audio-error" class="field-error" role="alert" hidden></div>
-                <details class="format-help"><summary>支持格式与文件限制</summary><p id="audio-limits" class="helper">可添加不超过 2 GB、12 小时的文件。发送至阿里云的音频须不超过 1 GB；如需合并声道，将以转换后的文件大小为准。支持 AAC、AMR、AVI、FLAC、FLV、M4A、MKV、MOV、MP3、MP4、MPEG、OGG、OPUS、WAV、WEBM、WMA、WMV。</p></details>
+                <details class="format-help"><summary>支持格式与文件限制</summary><p id="audio-limits" class="helper"></p></details>
               </section>
 
               <section class="card" aria-labelledby="settings-heading">
@@ -76,7 +76,7 @@
                       <p id="hotwords-file-status" class="file-status" role="status">尚未选择文件</p>
                     </div>
                     <div id="hotwords-error" class="field-error" role="alert" hidden></div>
-                    <p id="hotwords-help" class="helper">按模板填写词语和权重，最多 2,000 个热词。</p>
+                    <p id="hotwords-help" class="helper">按模板填写词语和权重。</p>
                   </div>
                 </div>
                 <div class="enhancement-option">

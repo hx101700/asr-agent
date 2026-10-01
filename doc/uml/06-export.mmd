@@ -1,0 +1,67 @@
+sequenceDiagram
+actor U as 用户
+participant C as Codex＋Skill
+participant T as transcription（函数模块）
+participant J as job_files（函数模块）
+participant R as results（函数模块）
+participant D as delivery（函数模块）
+participant W as documents（函数模块）
+participant F as 本机成品
+alt 用户明确要求重新导出
+    U->>C: 提供确切job_id并要求重新导出
+    C->>T: export --job ID
+    T->>J: read_config()核对配置协议与摘要
+    J-->>T: 确认配置或配置错误
+    alt 配置有效
+        T->>J: read_execution()读取已保存执行记录
+        J-->>T: 执行记录或缺失／未知结果
+        alt 磁盘JSON_READY且存在result.sha256
+            T->>J: result_path(config)取得原JSON路径
+            T->>R: load_transcript(path)
+            R-->>T: Transcript＋实际SHA，或解析错误
+            alt JSON有效且摘要一致
+                T->>T: _deliver(project, config, transcript, report)
+                T->>D: export_documents(job_root, config, transcript)
+                D->>D: 生成本轮export_id
+                D->>J: reserve_export()创建记录目录并保存EXPORTING
+                D->>J: prepare_documents()创建本轮成品目录
+                loop 三格式各执行一次
+                    D->>W: publish_document(writer, transcript, final_path)
+                    W->>F: 写入并发布本格式成品<br/>Excel和Word回读；Markdown编码写入
+                    W-->>D: 字节数或格式异常
+                    D->>J: 保存该格式交付结果
+                end
+                D->>J: 保存COMPLETE / PARTIAL / FAILED
+                D-->>T: 本轮delivery；记录中断可抛出异常
+                T->>T: _attach_delivery()；中断时附加OUTCOME_UNKNOWN
+                T-->>C: 保留JSON状态并附加本轮delivery
+                C-->>U: 报告已知结果与保存位置
+            else 结果无法核对
+                T-->>C: SetupError；CLI输出失败说明
+            end
+        else 执行状态或结果摘要条件不满足
+            T-->>C: SetupError；尚未读取结果JSON
+        end
+    else 配置检查失败
+        T-->>C: CLI失败说明；尚未读取执行记录或结果JSON
+    end
+else 用户查看本地任务状态
+    U->>C: 查询确切job_id
+    C->>T: job-status --job ID
+    T->>J: read_execution()
+    alt execution尚未建立
+        T->>J: read_config()核对确认配置
+        T-->>C: 配置有效则返回CONFIGURED；否则返回CLI失败说明
+    else execution存在但记录不可读
+        T-->>C: OUTCOME_UNKNOWN / unknown
+    else 执行记录可读
+        T->>J: latest_delivery()
+        J-->>T: None或最近一轮交付记录
+        T->>T: 有交付记录时附加delivery及documents_ready
+        T-->>C: 本地执行状态及已有交付信息
+    end
+end
+Note over T,F: 自动交付与显式export复用同一export_documents()<br/>重导保存新轮次并保留历史；本次调用返回自己的轮次<br/>读取范围为确认配置、执行记录和原JSON
+Note over C,J: 状态来自本机磁盘，既不查询云端，也不证明进程仍存活<br/>job-status读取最近发起的轮次，不重新核验成品文件
+Note over T,J: 当次JSON成功回执不能替代磁盘JSON_READY记录和摘要<br/>授权与配置检查通过后，已有execution的同job返回本地记录<br/>记录恢复入口尚未提供
+Note over C,F: src/asr_agent/application/transcription.py::export_job、job_status、_deliver<br/>tools/job_files.py::read_execution、latest_delivery<br/>application/delivery.py::export_documents；tools/documents.py::publish_document

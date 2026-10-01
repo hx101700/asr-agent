@@ -1,0 +1,53 @@
+classDiagram
+direction LR
+class AudioInfo {
+  <<frozen dataclass>>
+  +int channels
+  +int sample_rate
+  +float_or_None duration_seconds
+  +int size_bytes
+  +str format_name
+  +int audio_tracks
+}
+class HotwordRow {
+  <<frozen dataclass>>
+  +int number
+  +object text
+  +object weight
+  +bool has_formula
+}
+class Transcript {
+  <<frozen dataclass>>
+  +tuple sentences
+  +int audio_tracks
+  +int json_bytes
+  +str sha256
+  +summary() dict
+}
+class Sentence {
+  <<frozen dataclass>>
+  +int index
+  +int track_index
+  +int_or_None channel_id
+  +int begin_ms
+  +int end_ms
+  +int_or_None speaker_id
+  +str text
+}
+class PreparedCommand {
+  <<frozen dataclass>>
+  +tuple argv
+  +dict env
+}
+class BailianFailure {
+  +dict report
+  +bool started
+}
+class Exception
+Transcript --> "0..*" Sentence : 保存原顺序及毫秒时间戳
+Exception <|-- BailianFailure
+note for AudioInfo "src/asr_agent/models.py<br/>tools/media.py::probe_audio创建媒体事实<br/>供规则判断与声道转换使用"
+note for HotwordRow "src/asr_agent/models.py<br/>tools/hotwords.py::read_hotwords创建Excel原始行<br/>application/rules.py::build_vocabulary生成即时词典"
+note for Transcript "src/asr_agent/models.py<br/>tools/results.py::load_transcript创建<br/>三个writer共享内容；Sentence可独立存在或共享"
+note for PreparedCommand "src/asr_agent/tools/bailian.py<br/>prepare_command创建；run_recognition使用<br/>argv和env隐藏repr；env是可变字典，frozen限制属性重赋值"
+note for BailianFailure "src/asr_agent/tools/bailian.py<br/>started表示本机BL进程已启动<br/>云端结果由application/transcription.py解释"

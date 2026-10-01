@@ -1,29 +1,37 @@
 # asr-agent
 
-面向 Codex 的本地非实时语音转写工具，计划通过阿里云百炼 CLI 固定调用 `qwen-audio-3.0-asr-flash-filetrans`。
+在Codex中通过本机网页配置单个音频，再调用阿里云百炼CLI完成非实时转写，保存原始JSON及Excel、Word、Markdown。
 
-> 当前已提供本地配置网页和BL转写入口，可保存并检查JSON。API Key无增强及热词＋上下文联合增强已真实跑通，控制台登录的Windows链接问题也已修复并验证模型凭据到位。三种成品导出已接入，真实JSON的329段内容已回读核验；Word逐页视觉验收及发行ZIP仍待完成。
+模型固定为`qwen-audio-3.0-asr-flash-filetrans`，地域固定北京。支持即时热词与上下文同时使用；默认区分发言人，必要时生成单声道FLAC副本。
 
-首版范围：Windows 10/11、Codex 桌面端、单文件输入、临时 OSS、带时间戳的 Excel / Word / Markdown 三种成品，以及本地 JSON 结果。说话人区分默认开启、可关闭；开启时多声道将合并为单声道，网页会在确认前提示，原文件保留。
+## 使用
 
-- 开发者从 [文档索引](doc/README.md) 和 [当前状态](doc/STATUS.md) 开始。
-- 用户流程见 [使用说明](doc/HELP.md)，阶段验收见 [验收计划](doc/ACCEPTANCE.md)。
-- Codex 项目协作规则见 [AGENTS.md](AGENTS.md)。
-- 已实现命令与验证结果见 [S1验证记录](doc/S1_VERIFICATION.md)。媒体处理使用PyAV预编译wheel，不需要安装独立FFmpeg程序。
-- 网页与文件流程见 [S2验证记录](doc/S2_VERIFICATION.md)。地域固定北京，热词使用即时模式。
-- 执行、错误与一次性任务记录见 [S3验证记录](doc/S3_VERIFICATION.md)。正式执行前需明确本次文件与上传授权。
+适用于Windows 10/11 x64。用户发行ZIP不带运行时或依赖包。本机需有Windows x64 CPython 3.12（含venv、ensurepip、tkinter）、Node.js 18.17.0或更高版本及配套npm；安装时通过阿里云PyPI镜像获取全部Python依赖，通过npm获取BL依赖。安装器在项目内创建环境，不修改系统PATH或全局包。
 
-已有Windows Python 3.12+和Node.js 18.17+时，可在项目根目录运行：
+下载发行ZIP后解压，使用Codex打开其中的`asr-agent`目录。项目Skill位于`.agents/skills/asr-agent/SKILL.md`；在该目录提出“帮我转写录音”即可按Skill调用以下现有入口。开发仓库运行`python -S -X utf8 scripts/build_zip.py`生成`dist/asr-agent.zip`，发行清单及模板维护见[开发说明](doc/DEVELOPMENT.md)。
 
 ```powershell
-python scripts/asr.py bootstrap
-.venv\Scripts\python.exe scripts/asr.py doctor
-.venv\Scripts\python.exe scripts/asr.py probe-bl
+python -S -X utf8 scripts/asr.py bootstrap
 .venv\Scripts\python.exe scripts/asr.py serve
 ```
 
-`serve`打开本机网页；如由Codex内置浏览器打开，可加`--no-browser`并使用启动时的会话链接。原生目录窗口需要正常Windows交互桌面。网页确认只保存本地配置，不发送阿里云。`doctor`发现依赖缺失或版本不匹配会返回非零；完整环境再次执行bootstrap会跳过安装。API Key预填项目`.env`，`api-key-status`只返回脱敏状态；网页在勾选指定Key后可只读查看。完整说明见[HELP.md](doc/HELP.md)。
+网页只添加本机文件、检查并保存配置。确认上传范围后，由Codex运行：
 
-代码采用前端MVP、后端应用服务与本地能力边界。实际模块职责见[开发文档](doc/DEVELOPMENT.md)，审查整改记录见[代码审查](doc/CODE_REVIEW.md)。
+```powershell
+.venv\Scripts\python.exe scripts/asr.py transcribe --job <设置编号> --authorize-upload
+.venv\Scripts\python.exe scripts/asr.py job-status --job <设置编号>
+```
 
-测试数据、凭据和转写结果仅在本地保存，不进入 Git 和发布包。
+保留确认配置、已保存的JSON_READY执行记录和结果JSON的已有任务，可用`export --job <设置编号>`本地重导。控制台首次登录使用`login`；指定API Key模式读取项目`.env`，无需login。
+
+## 文档与范围
+
+- [使用说明](doc/HELP.md)：安装、配置、保存位置、失败处理。
+- [当前状态](doc/STATUS.md)：已完成、验证范围与下一步。
+- [开发说明](doc/DEVELOPMENT.md)：实际模块职责、数据与执行边界。
+- [UML设计视图](doc/UML.md)：对象关系、调用时序和状态，附可编辑源稿。
+- [文档索引](doc/README.md)：官方依据、错误解释及验证方法。
+
+用户发行ZIP只包含运行代码、项目Skill、依赖锁和必要使用文档。测试、构建脚本、开发状态及验证方法保留在本仓库；根目录说明由`release/`中的用户模板提供。全部依赖在安装时下载并按锁校验；复测步骤和未覆盖范围见[验证方法](doc/ACCEPTANCE.md)。
+
+`.env`、`data/`、`.state/`、`.runtime/`、`.venv/`、`.tools/`、`outputs/`不进入Git。用户选择其他输出位置时自行管理其隐私和版本控制范围。

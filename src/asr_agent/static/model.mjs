@@ -1,4 +1,4 @@
-// Model 只描述交互状态，不依赖 DOM、网络或凭据。
+// 初始化页面阶段、上传、凭据读取及目录选择状态。
 export function createModel() {
   return {
     phase: "loading", revision: 0, preview: null, receipt: null, session: null,
@@ -12,6 +12,7 @@ export function createModel() {
   };
 }
 
+// 从当前状态推导可用操作，供事件处理和控件渲染共同使用。
 export function availability(model) {
   const editable = ["editing", "validating", "review"].includes(model.phase);
   const uploading = Object.values(model.uploads).some((upload) => upload.status === "uploading");
@@ -28,6 +29,7 @@ export function availability(model) {
   };
 }
 
+// 输入变化后作废旧预览，并递增版本以识别迟到的校验结果。
 export function invalidatePreview(model) {
   if (!availability(model).editable) return;
   model.revision += 1;
@@ -37,6 +39,7 @@ export function invalidatePreview(model) {
   if (model.phase !== "validating") model.phase = "editing";
 }
 
+// 按输入版本接收校验结果并保存预览快照。
 export function receiveValidation(model, revision, result, configuration) {
   if (revision !== model.revision) {
     model.phase = "editing";
@@ -48,6 +51,7 @@ export function receiveValidation(model, revision, result, configuration) {
   return true;
 }
 
+// 根据保存错误恢复编辑或切换为结果待确认状态。
 export function receiveSaveError(model, error) {
   model.preview = null;
   if (error.httpStatus >= 400 && error.httpStatus < 500) {
@@ -60,6 +64,7 @@ export function receiveSaveError(model, error) {
   }
 }
 
+// 保存服务端回执并结束编辑，同时使未完成的凭据读取失效。
 export function receiveReceipt(model, receipt) {
   model.phase = "saved";
   model.preview = null;
@@ -69,10 +74,12 @@ export function receiveReceipt(model, receipt) {
   model.auth.status = "idle";
 }
 
+// 将错误绑定到表单字段，供视图提示并聚焦对应位置。
 export function fieldError(message, field) {
   return Object.assign(new Error(message), { field });
 }
 
+// 根据表单与会话状态生成服务端校验参数。
 export function configuration(model, form) {
   const limits = model.session.limits;
   let speakerCount = null;
@@ -100,6 +107,7 @@ export function configuration(model, form) {
   };
 }
 
+// 检查音频、增强选项的必填内容和上下文长度。
 export function checkRequiredInputs(config, limits) {
   if (!config.audio_upload_id) throw fieldError("请选择音频文件", "audio_upload_id");
   if (["both", "hotwords"].includes(config.enhancement_mode) && !config.hotwords_upload_id) {

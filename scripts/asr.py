@@ -1,4 +1,4 @@
-"""源码目录入口；无需先向全局 Python 安装本项目。"""
+"""从项目源码目录启动asr-agent命令行。"""
 
 import sys
 from pathlib import Path

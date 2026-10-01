@@ -15,16 +15,15 @@
 html { scroll-padding-bottom: calc(var(--action-height, 100px) + 20px); }
 body { margin: 0; font-size: 14px; line-height: 1.6; }
 button, input, textarea, select { font: inherit; }
-button, input[type="radio"], input[type="checkbox"], summary { cursor: pointer; }
+button, input[type="checkbox"], summary { cursor: pointer; }
 button, input, textarea { outline-offset: 3px; }
 :focus-visible { outline: 2px solid #1677ff; outline-offset: 3px; }
 button { transition: background-color 120ms ease, border-color 120ms ease; }
 button:disabled { cursor: not-allowed; color: #81858d; background: #f0f1f3; border-color: var(--border); }
 [hidden] { display: none !important; }
-h1, h2, h3, p { margin: 0; }
+h1, h2, p { margin: 0; }
 h1 { font-size: 26px; line-height: 1.4; font-weight: 650; }
 h2 { font-size: 16px; font-weight: 650; line-height: 1.5; }
-h3 { font-size: 14px; font-weight: 600; }
 .header-inner, .page-shell, .action-inner { max-width: 1232px; margin: 0 auto; padding-inline: 32px; }
 .page-header { background: #fff; border-bottom: 1px solid var(--border); }
 .header-inner { height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -64,7 +63,7 @@ input[type="text"]:hover, textarea:hover { border-color: #858d99; }
 textarea { resize: vertical; min-height: 112px; }
 input::placeholder, textarea::placeholder { color: #777e89; }
 input[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: #c62828; }
-input[type="radio"], input[type="checkbox"] { width: 16px; height: 16px; margin: 3px 0 0; flex: 0 0 auto; accent-color: var(--accent); }
+input[type="checkbox"] { width: 16px; height: 16px; margin: 3px 0 0; flex: 0 0 auto; accent-color: var(--accent); }
 .helper { color: var(--muted); font-size: 13px; line-height: 1.7; margin-top: 8px; overflow-wrap: anywhere; }
 .file-dropzone { position: relative; border: 1px dashed #b6beca; border-radius: 6px; background: #fafbfc; overflow: hidden; }
 .file-dropzone:has(input:focus-visible) { outline: 2px solid #1677ff; outline-offset: 3px; }
@@ -88,7 +87,6 @@ summary { color: var(--muted); font-size: 13px; }
 .format-help .helper { padding: 4px 0; }
 .check-row { display: flex; gap: 10px; align-items: start; margin: 0; cursor: pointer; }
 .check-row strong { font-weight: 600; }
-.check-row strong + span { display: block; color: var(--muted); font-size: 13px; font-weight: 400; margin-top: 3px; }
 .enhancement-fields { margin-top: 20px; }
 .enhancement-option + .enhancement-option { border-top: 1px solid var(--border); padding-top: 20px; margin-top: 20px; }
 .option-toggle { display: flex; gap: 12px; align-items: start; cursor: pointer; margin: 0; }

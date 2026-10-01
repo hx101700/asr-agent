@@ -1,0 +1,43 @@
+sequenceDiagram
+actor C as Codex
+participant T as transcribe（函数）
+participant S as _save_status（函数）
+participant F as execution/status.json
+participant B as BL外部进程
+alt PREPARING记录保存失败
+    T->>S: 保存PREPARING
+    S->>F: save_record()调用原子写入
+    F-->>S: I/O错误或中断
+    S-->>T: false＋record_error(PREPARING)
+    T-->>C: STOPPED / not_started
+    Note over T,B: BL调用次数为0；执行占用保留<br/>磁盘可能缺少记录，后续job-status可返回OUTCOME_UNKNOWN
+else RUNNING记录保存失败
+    Note over T,F: PREPARING已保存，本地准备已完成
+    T->>S: 保存RUNNING
+    S->>F: save_record()调用原子写入
+    F-->>S: I/O错误或中断
+    S-->>T: false＋record_error(RUNNING)
+    T-->>C: STOPPED / not_started
+    Note over F,B: BL调用次数为0；磁盘可能仍为PREPARING<br/>json_path可能已存在于回执，含义为计划的目标位置
+else JSON_READY记录保存失败
+    T->>B: 通过bailian.run_recognition()执行一次识别
+    B-->>T: 已写出JSON且进程结束
+    T->>T: load_transcript()检查成功并取得Transcript和SHA
+    T->>S: 保存JSON_READY
+    S->>F: save_record()调用原子写入
+    F-->>S: I/O错误或中断
+    S-->>T: false＋record_error(JSON_READY)
+    T-->>C: JSON_READY / result_received<br/>json_path＋结果摘要；documents_ready=false
+    Note over T,F: 当次回执保留已知结果；磁盘可能仍为RUNNING<br/>本次在导出前返回；export仍要求磁盘成功记录及摘要
+else STOPPED记录保存失败
+    Note over T,F: 已有原始执行错误；本次回执状态已设置STOPPED
+    T->>S: 保存STOPPED及原始error
+    S->>F: save_record()调用原子写入
+    F-->>S: I/O错误或中断
+    S-->>T: false＋record_error(STOPPED)
+    T-->>C: 原始STOPPED、cloud_outcome和error<br/>另附record_error
+    Note over T,F: 原因来自最初执行失败；保存失败作为附加事实<br/>磁盘可能仍为PREPARING或RUNNING
+end
+Note over C,B: record_error在写入失败后附入当次回执；没有再次补写记录<br/>保持执行占用；失败停止；本图均不自动重试或取消云端任务
+Note over C,F: record_error.phase=save_status<br/>record_error.attempted_status指出失败的保存点<br/>业务异常使用error.phase；本地异常另含error.error_type
+Note over C,F: src/asr_agent/application/transcription.py::_save_status、transcribe<br/>tools/job_files.py::save_record；tools/files.py::write_json_atomic

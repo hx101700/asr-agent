@@ -3,56 +3,26 @@ import {
   receiveReceipt, configuration, checkRequiredInputs, fieldError,
 } from "./model.mjs";
 import { createView } from "./view.mjs";
+import { createApi } from "./api.mjs";
 
-// HTTP 契约集中在入口；失败不自动重试，未知保存结果由 Presenter 保留。
-export function createApi(fetchRequest, sessionToken) {
-  const headers = () => sessionToken ? { "X-ASR-Token": sessionToken } : {};
-  const options = () => ({ headers: headers(), cache: "no-store", credentials: "same-origin" });
-  return {
-    async request(path, payload, file) {
-      const init = options();
-      if (file) {
-        init.method = "POST";
-        init.headers["Content-Type"] = "application/octet-stream";
-        init.headers["X-File-Name"] = encodeURIComponent(file.name);
-        init.body = file;
-      } else if (payload !== undefined) {
-        init.method = "POST";
-        init.headers["Content-Type"] = "application/json";
-        init.body = JSON.stringify(payload);
-      }
-      let response;
-      try {
-        response = await fetchRequest(path, init);
-      } catch {
-        throw new Error("连接已断开，请返回 Codex 检查应用是否仍在运行。本次操作不会自动重试。");
-      }
-      let data;
-      try {
-        data = await response.json();
-      } catch {
-        throw new Error("暂时无法获取操作结果，请返回 Codex 查看详情。");
-      }
-      if (!response.ok || data.ok === false) {
-        throw Object.assign(new Error(data.error || "本次操作未完成，请检查输入后手动再试。"), {
-          httpStatus: response.status, field: data.field, details: data.details,
-        });
-      }
-      return data;
-    },
-    async template() {
-      const response = await fetchRequest("/api/hotwords-template", options());
-      if (!response.ok) throw new Error("模板下载失败，请确认应用仍在运行后重试。");
-      return response.blob();
-    },
-  };
-}
-
+// 编排网页操作、HTTP 请求与状态更新。
 export function createPresenter(view, api, makeRequestId = () => crypto.randomUUID()) {
   const model = createModel();
+  // 将同一份状态和操作权限交给视图渲染。
   const render = () => view.render(model, availability(model));
+  // 先恢复控件状态，再显示错误并定位输入位置。
   const fail = (error) => { render(); view.showError(error); };
 
+  // 检查预览所需的 API Key 读取状态。
+  function authReady() {
+    if (view.readForm().useApiKey && model.auth.status !== "ready") {
+      fail(fieldError("API Key 尚未读取成功，请检查 .env 后重新勾选“使用指定 API Key”。", "auth_mode"));
+      return false;
+    }
+    return true;
+  }
+
+  // 按当前连接方式读取或清空凭据，并更新读取状态。
   async function updateAuth() {
     const revision = ++model.auth.revision;
     view.clearApiKey();
@@ -81,6 +51,7 @@ export function createPresenter(view, api, makeRequestId = () => crypto.randomUU
   }
 
   const actions = {
+    // 加载当前会话，进入编辑或显示已经保存的回执。
     async start() {
       render();
       try {
@@ -101,6 +72,7 @@ export function createPresenter(view, api, makeRequestId = () => crypto.randomUU
       }
     },
 
+    // 分派表单变化，作废旧预览并按需上传文件或读取凭据。
     async changed(id, files) {
       if (!availability(model).editable) return;
       if (id === "audio-file") return actions.upload("audio", files);
@@ -111,6 +83,7 @@ export function createPresenter(view, api, makeRequestId = () => crypto.randomUU
       if (id === "use-api-key") await updateAuth();
     },
 
+    // 将单个所选文件传给本机服务，保存其会话引用与上传状态。
     async upload(kind, files) {
       if (!availability(model).upload[kind] || !files.length) return;
       view.clearError();
@@ -120,7 +93,8 @@ export function createPresenter(view, api, makeRequestId = () => crypto.randomUU
       try {
         if (files.length !== 1) throw fieldError("一次只能添加 1 个文件。", `${kind}_upload_id`);
         const file = files[0];
-        if (!view.fileExtensions(kind).some((extension) => file.name.toLowerCase().endsWith(extension))) {
+        const suffixes = kind === "audio" ? model.session.audio_suffixes : [".xlsx"];
+        if (!suffixes.some((extension) => file.name.toLowerCase().endsWith(extension))) {
           throw fieldError(kind === "hotwords" ? "请选择 .xlsx 格式的热词文件。" : "暂不支持此文件格式。", `${kind}_upload_id`);
         }
         const limit = model.session.limits[`${kind}_bytes`];
@@ -140,6 +114,7 @@ export function createPresenter(view, api, makeRequestId = () => crypto.randomUU
       }
     },
 
+    // 等待原生目录窗口返回，再更新对应保存位置与预览状态。
     async selectDirectory(kind) {
       if (!availability(model).chooseDirectory) return;
       const picker = { id: makeRequestId(), kind, cancelling: false };
@@ -165,6 +140,7 @@ export function createPresenter(view, api, makeRequestId = () => crypto.randomUU
       if (failure) view.showError(failure);
     },
 
+    // 请求取消当前目录窗口，等待原选择请求结束后恢复操作。
     async cancelDirectory() {
       if (!availability(model).cancelDirectory) return;
       const picker = model.picker;
@@ -181,6 +157,7 @@ export function createPresenter(view, api, makeRequestId = () => crypto.randomUU
       }
     },
 
+    // 恢复对应输出目录的默认值，并要求重新核对预览。
     resetDirectory(kind) {
       if (!availability(model).chooseDirectory) return;
       model.directories[kind] = "outputs";
@@ -189,6 +166,7 @@ export function createPresenter(view, api, makeRequestId = () => crypto.randomUU
       render();
     },
 
+    // 从核对界面返回表单，修改后需要重新校验。
     edit() {
       if (!availability(model).editable) return;
       invalidatePreview(model);
@@ -196,8 +174,10 @@ export function createPresenter(view, api, makeRequestId = () => crypto.randomUU
       view.focusForm();
     },
 
+    // 检查必填项并获取当前输入版本的服务端预览。
     async validate() {
       if (!availability(model).validate) return;
+      if (!authReady()) return;
       view.clearError();
       invalidatePreview(model);
       let config;
@@ -223,6 +203,7 @@ export function createPresenter(view, api, makeRequestId = () => crypto.randomUU
       }
     },
 
+    // 保存已核对的预览，依据响应更新回执或保存失败状态。
     async confirm() {
       if (!availability(model).confirm) return;
       model.phase = "saving";
@@ -241,6 +222,7 @@ export function createPresenter(view, api, makeRequestId = () => crypto.randomUU
       }
     },
 
+    // 下载热词模板，并更新下载期间的操作状态。
     async downloadTemplate() {
       if (!availability(model).template) return;
       model.downloadingTemplate = true;

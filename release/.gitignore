@@ -1,0 +1,17 @@
+# 用户数据、凭据和项目内安装环境。
+.env
+.env.*
+!.env.example
+/.venv/
+/.tools/
+/.runtime/
+/.state/
+/.secrets/
+/data/
+/outputs/
+/node_modules/
+__pycache__/
+*.py[cod]
+*.log
+*.pem
+*.key

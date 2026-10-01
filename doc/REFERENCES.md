@@ -1,240 +1,89 @@
-# 官方资料与能力基线
+# 官方依据与固定能力
 
-> 初次核验：2026-09-28；S3相关资料于2026-09-29复核。仅采用官方资料及本机证据。2.1.0发布包和执行入口的本机验证见[S3_VERIFICATION.md](S3_VERIFICATION.md)；源码/模拟服务通过不等于真实云端验收。
+API资料核验基线：2026-09-29。CLI固定2.1.0，对照源码提交`8bbbbc722d70fb200641ef22b6f6d033aeae9f74`及本机发布包；不把未核实的新版本能力加入当前接口。
 
-## 来源索引
+## 来源
 
-| 编号 | 官方来源 | 用途 |
+| 编号 | 来源 | 用途 |
 | --- | --- | --- |
-| A01 | [模型详情](https://help.aliyun.com/en/model-studio/qwen-audio-3-0-asr-flash-filetrans) | 固定模型确实存在 |
-| A02 | [语音识别与音频规格](https://help.aliyun.com/zh/model-studio/asr-model) | 格式、大小、时长和采样率 |
-| A03 | [Filetrans HTTP API](https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-http-api) | 请求参数、任务与转写 JSON |
-| A04 | [提升识别准确率](https://help.aliyun.com/zh/model-studio/improve-asr-accuracy) | 即时热词、预编译热词、上下文限制 |
-| A05 | [热词 HTTP API](https://help.aliyun.com/zh/model-studio/vocabulary-http-api) | 创建、查询、删除预编译词表 |
-| A06 | [临时文件 URL](https://help.aliyun.com/zh/model-studio/get-temporary-file-url/) | 上传限额、有效期及资源约束 |
-| A07 | [管理异步任务](https://help.aliyun.com/zh/model-studio/manage-asynchronous-tasks) | 通用任务状态与轮询 |
-| A08 | [百炼错误码](https://www.alibabacloud.com/help/zh/model-studio/error-code) | 通用错误；页面更新于 2026-09-25 |
-| A09 | [本模型系列 Python SDK 参考](https://help.aliyun.com/zh/model-studio/funauidio-asr-recorded-speech-recognition-python-sdk) | 状态/错误示例，仅作为资料，不采用 SDK 实现 |
-| A10 | [CLI 安装与鉴权](https://help.aliyun.com/zh/model-studio/cli/installation) | 安装要求和官方鉴权流程 |
-| A10b | [用户提供的新版安装与鉴权文档](https://docs.bailian.console.aliyun.com/zh/model-studio/cli/installation) | 控制台登录应自动配置模型鉴权，登录后只查状态，无需重复模型调用 |
-| A11 | [CLI 快速开始](https://help.aliyun.com/zh/model-studio/cli/quickstart) | Agent 调用范式 |
-| A12 | [CLI 配置与工具](https://help.aliyun.com/zh/model-studio/cli/config) | 文件上传和配置命令 |
-| A13 | [CLI 语音合成与识别](https://help.aliyun.com/zh/model-studio/cli/speech) | --url本地文件、识别选项与--out |
-| W01 | [Windows CreateProcessW](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw) | 完整Unicode命令行32767字符（含终止NUL） |
-| W02 | [Windows cmd](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/cmd) | &作为命令分隔符，参数中的特殊字符需要正确转义/引用 |
-| W03 | [Python os.startfile](https://docs.python.org/3.12/library/os.html#os.startfile) | 通过Windows ShellExecute打开URL，不经过cmd |
-| O01 | [Codex AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md) | 项目指令发现与优先级 |
-| O02 | [Codex Skills](https://learn.chatgpt.com/docs/build-skills) | SKILL.md、发现路径和渐进加载 |
-| M01 | [PyAV18.1.0安装文档](https://github.com/PyAV-Org/PyAV/blob/v18.1.0/docs/overview/installation.rst) | Windows wheel包含FFmpeg库 |
-| M02 | [PyAV18.1.0 AudioResampler](https://github.com/PyAV-Org/PyAV/blob/v18.1.0/av/audio/resampler.py) | 声道转换和逐帧flush契约 |
-| C01 | [python-dotenv文档](https://bbc2.github.io/python-dotenv/) | 解析指定.env而不修改全局环境 |
+| A01 | [模型详情](https://help.aliyun.com/en/model-studio/qwen-audio-3-0-asr-flash-filetrans) | 固定模型与地域 |
+| A02 | [音频规格](https://help.aliyun.com/zh/model-studio/asr-model) | 容器、时长、采样率、模型文件大小 |
+| A03 | [Filetrans HTTP API](https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-http-api) | 参数、句子JSON、子任务结果 |
+| A04 | [提高识别准确率](https://help.aliyun.com/zh/model-studio/improve-asr-accuracy) | 即时热词、超级词、上下文 |
+| A06 | [临时文件URL](https://help.aliyun.com/zh/model-studio/get-temporary-file-url/) | 临时OSS限制及有效期 |
+| A07 | [异步任务管理](https://help.aliyun.com/zh/model-studio/manage-asynchronous-tasks) | 通用任务状态 |
+| A08 | [百炼错误码](https://www.alibabacloud.com/help/zh/model-studio/error-code) | API错误解释 |
+| A09 | [模型系列SDK状态示例](https://help.aliyun.com/zh/model-studio/funauidio-asr-recorded-speech-recognition-python-sdk) | 状态/错误依据，不采用SDK实现 |
+| A10 | [CLI安装与鉴权](https://docs.bailian.console.aliyun.com/zh/model-studio/cli/installation) | 控制台授权与本地状态 |
+| A13 | [CLI语音识别](https://help.aliyun.com/zh/model-studio/cli/speech) | 公开recognize与out参数 |
+| W01 | [CreateProcessW](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw) | Windows命令行长度 |
+| W02 | [cmd](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/cmd)、[os.startfile](https://docs.python.org/3.12/library/os.html#os.startfile) | 登录链接转交 |
+| M01 | [PyAV18.1.0安装](https://github.com/PyAV-Org/PyAV/blob/v18.1.0/docs/overview/installation.rst) | wheel包含FFmpeg库 |
+| M02 | [AudioResampler](https://github.com/PyAV-Org/PyAV/blob/v18.1.0/av/audio/resampler.py) | 声道变换、flush |
+| C01 | [python-dotenv](https://bbc2.github.io/python-dotenv/) | 只解析指定.env且不展开变量 |
+| O01 | [Codex构建Skill](https://learn.chatgpt.com/docs/build-skills) | 仓库`.agents/skills`发现位置与SKILL.md元信息 |
 
-## 模型与文件
+## 模型和本地阈值
 
-固定 ID：`qwen-audio-3.0-asr-flash-filetrans`。不能用 `qwen3-asr-flash-filetrans`、实时版或 3.1 替代。官方列出的地域为北京、新加坡。[A01](https://help.aliyun.com/en/model-studio/qwen-audio-3-0-asr-flash-filetrans)
+| 项目 | 当前依据与处理 |
+| --- | --- |
+| 模型/地域 | qwen-audio-3.0-asr-flash-filetrans，首版北京[A01] |
+| 输入 | 单文件；模型<=2GB、<=12小时，任意采样率[A02] |
+| 容器 | aac/amr/avi/flac/flv/m4a/mkv/mov/mp3/mp4/mpeg/ogg/opus/wav/webm/wma/wmv；只处理音频，不提供视频编辑[A02] |
+| 临时上传 | 官方1GB，项目采用1,000,000,000字节阈值；限制实际上传副本，超限不压缩/切片重试[A06] |
+| 临时资源 | 有效48小时，与主账号/模型绑定；没有本流程可主动删除临时音频的公开入口，不能承诺立即清除[A06] |
+| 说话人 | 模型要求单声道，建议<=2小时；产品按用户要求默认开启，人数2–100为参考值，不保证真实人数[A03] |
+| 语言 | API可多语种，但当前BL --language只收单值；产品自动或一种语言[A03/A13] |
+| 热词 | 词→权重映射，<=2000条；权重1–5或50；超级词<=50；含非ASCII总长<=15字符，纯ASCII按空格<=7段[A04] |
+| 上下文 | 单段<=400个Unicode字符，应包含要识别的相关原词，不作为模型行为指令[A04] |
+| 组合增强 | input.context和parameters.vocabulary可同时存在；BL同一请求已核对[A03] |
+| 音轨 | channel_id指音轨，默认[0]；不同于PyAV音轨内的channels。当前不开放选择 |
+| 未开放参数 | special_word_filter没有已核实BL公开入口；keep_dialect只属3.1，固定3.0不使用 |
 
-| 约束 | 官方值/语义 | 首版处理 |
+Excel的5MB、20MiB解压、200个内部文件、10001行和两列是本地解析资源限制，集中在tools/hotwords.py，不冒称模型限额。模型输入规则集中在application/rules.py，界面从服务端取得显示限制。
+
+## BL复用边界
+
+官方仓库：[modelstudioai/cli](https://github.com/modelstudioai/cli)。npm版本与完整性摘要以项目`tools/bailian/package-lock.json`为依赖来源；安装时由npm ci按锁文件获取依赖，不维护第二份依赖版本表。
+
+| 能力 | 固定源码依据 | 本项目处理 |
 | --- | --- | --- |
-| 每次输入 | 一个文件 URL | 只接受单文件 |
-| 模型大小/时长 | ≤2 GB，≤12 小时 | 还须满足临时存储限制 |
-| 采样率 | 任意 | 检测但不强制改为 16 kHz |
-| 格式 | aac、amr、avi、flac、flv、m4a、mkv、mov、mp3、mp4、mpeg、ogg、opus、wav、webm、wma、wmv | 首版UI面向音频；视频容器是否展示待定，不承诺视频编辑 |
+| 配置目录 | [paths.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/config/paths.ts) | BAILIAN_CONFIG_DIR指向项目.state/bailian |
+| 环境Key | [resolver.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/auth/resolver.ts) | 用DASHSCOPE_API_KEY子进程环境，不把Key放argv |
+| 官方登录 | [login-console.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/login-console.ts)、[status.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/status.ts) | BL负责回调与保存；登录后检查模型Key存在，不再调用模型验证 |
+| 完整ASR | [recognize.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/speech/recognize.ts) | 本地上传、提交、轮询、下载、out保存均由BL完成 |
+| 临时上传 | [upload.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/files/upload.ts) | 国内策略15秒、上传120秒；整文件读入内存，接近上限的大文件未全面验收 |
+| 失败/轮询 | [http.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/client/http.ts)、[polling.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/runtime/src/utils/polling.ts) | 当前ASR请求失败上抛，正常未完成才轮询；不据此声称整个CLI所有命令都没有重试 |
 
-依据：[音频规格 A02](https://help.aliyun.com/zh/model-studio/asr-model)。本地须验证真实媒体内容，扩展名合法不能证明可识别。
+使用recognize完整模式，不传--async。项目传timeout=3600、poll-interval=5；Python进程上限3900秒。这是项目等待策略，不是官方处理承诺。最后JSON下载使用原生fetch，没有单独下载超时，保留外层进程上限。
 
-## 临时 OSS
+BL可能跳过失败子项、写空数组，或在没有子结果时不写文件；因此退出0仍需检查实际JSON。固定单文件成功结果已实测为对象，包含file_url/properties/transcripts；句子含begin_time/end_time/text及可空speaker_id，时间单位毫秒。Python不猜字段别名，也不声称获得了全部云端子任务信封。
 
-单文件上传上限 **1 GB**；资源有效 **48 小时**，与模型和阿里云主账号绑定。上传后不能查询、修改或下载；官方说明会在到期后清理，未找到本流程可主动删除临时音频的公开接口。获取上传凭证按主账号和模型限 **100 QPS**。`oss://` 识别请求需要 `X-DashScope-OssResourceResolve: enable`。官方不建议用于生产、高并发或压测。[A06](https://help.aliyun.com/zh/model-studio/get-temporary-file-url/)
+完整模式不稳定暴露task_id，未提供已验收的独立恢复流程。本项目不为此补HTTP客户端。BL会在真实本地文件dry-run判断前执行上传，所以probe只能使用固定虚构URL。
 
-**项目方案**：采用保守阈值 1,000,000,000 字节，UI 明示为项目上传上限；这是 GB 单位未进一步澄清时的设计选择，不声称官方精确字节数。限制作用于实际上传文件：无需合并时检查原文件，需要合并时检查生成的单声道副本。实际上传文件超过阈值则停止，不自动压缩/切片重试。转换本身的资源限制在S1单独验证。
+### 增强文本与Windows参数
 
-## 请求和结果注意事项
+锁定的BL 2.1.0发布包中，bailian-cli-runtime/dist/index.mjs的parsePath先识别独立的--help/--version，parseFlags将分离参数中以--开头的值视为缺少参数值。解析器也支持以首个等号分隔选项和值，因此本项目将上下文构造成单个`--context=<原文>`参数；其中后续等号、引号、换行和反斜杠作为文本保留。该行为已用真实BL和127.0.0.1模拟接口核对。
 
-- 固定模型必须有 `parameters` 对象，空配置也需 `{}`。
-- 上下文位置为 `input.context`；即时热词位置为 `parameters.vocabulary`。
-- `channel_id` 默认 `[0]`，多音轨独立计费；首版不提供多音轨选择。
-- 官方`diarization_enabled`默认关闭，仅单声道；开启建议≤2小时。项目按用户决定默认开启，显式传BL的`--diarization`，不混淆产品默认值与官方默认值。可选`speaker_count`为2–100，仅是算法参考。
-- `keep_dialect` 为 3.1 专属，不给固定 3.0 开放。
-- 成功需检查任务和 `results[*].subtask_status`；转写链接有效 24 小时；句/词时间单位为毫秒。
-- 官方示例与字段表对全文/时长字段命名存在差异（`text`/`transcript`、`content_duration_in_milliseconds`/`content_duration`），S3 必须核实真实响应。
+热词由`json.dumps`编码为一个JSON参数，再由BL的parseInstantVocabulary通过JSON.parse还原。bailian-cli-core/dist/index.mjs中的buildAsrContextMessages将上下文直接包装为input_text。本项目使用参数数组、Node入口和shell=False；Windows参数引用交给Python标准库处理。[Python参数传递规则](https://docs.python.org/3.12/library/subprocess.html#converting-an-argument-sequence-to-a-string-on-windows)、[JSON序列化](https://docs.python.org/3.12/library/json.html#json.dumps)
 
-依据：[A03](https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-http-api)。此页同一示例同时包含input.context与parameters.vocabulary；BL2.1.0同一请求也同时构造二者。已修正旧三选一界面，使用两个独立开关；联合请求构造探针再次通过。
+本机合约测试覆盖17个特殊字符词条与12组上下文，并逐字比对BL发出的HTTP请求。验证的是传递保真，不代表云端识别准确率。完整命令仍受Windows的32767个UTF-16单元限制（含末尾NUL）；超限在执行准备阶段明确停止。[CreateProcessW](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw)
 
-### 单声道准备：取证范围与设计决定
+### Windows登录转交
 
-用户已要求说话人默认开启，多声道合并为单声道且网页提醒。2026-09-28针对固定CLI提交检查`recognize.ts`、`upload.ts`及命令注册表，识别参数有`--diarization`和`--channel-id`，已检查路径未见声道合并入口。此结论限定于上述源码，不声称所有BL版本均无此能力；S1仍需核对安装版本公开帮助。
+2.1.0的[local-server.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/shared/local-server.ts)用cmd/start传入未正确引用的URL，&needapikey参数会被拆开。BL失败后输出完整备用链接并保持原回调服务；本项目验证URL格式后用os.startfile打开一次，不修改BL源码、不建立第二个授权会话。这是针对固定版本链接引用问题的转交处理。
 
-现采用PyAV18.1.0官方wheel，自带FFmpeg库；AudioResampler支持改变格式、声道布局、采样率，传None用于flush。项目仅调用其声道转换并保留采样率，随后编码FLAC，不调用独立FFmpeg程序、不实现混音计算。[M01](https://github.com/PyAV-Org/PyAV/blob/v18.1.0/docs/overview/installation.rst)、[M02](https://github.com/PyAV-Org/PyAV/blob/v18.1.0/av/audio/resampler.py)
+### 更新与安装副作用
 
-网页合并提示属于本项目交互；转换后的单声道要求来自模型接口。`channel_id`是音轨选择，不能代替媒体声道合并。
+BL中间件会检查版本并可能写update-state.json；quiet阻止后续自动升级/提示，不完全禁止版本查询。DO_NOT_TRACK=1关闭遥测。依据：[middleware.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/runtime/src/middleware.ts)、[update-checker.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/runtime/src/utils/update-checker.ts)。
 
-## 热词与上下文
+安装使用官方[npm ci](https://docs.npmjs.com/cli/v11/commands/npm-ci/)和[pip require-hashes](https://pip.pypa.io/en/stable/topics/secure-installs/)；BL与Python依赖分别由`package-lock.json`、`requirements.txt`锁定。Python包摘要来自官方PyPI，对应Windows x64 CPython3.12或py3-none-any包：[PyAV](https://pypi.org/pypi/av/18.1.0/json)、[dotenv](https://pypi.org/pypi/python-dotenv/1.2.3/json)、[python-docx](https://pypi.org/pypi/python-docx/1.2.0/json)、[lxml](https://pypi.org/pypi/lxml/6.1.3/json)、[typing-extensions](https://pypi.org/pypi/typing-extensions/4.16.0/json)。[pip官方说明](https://pip.pypa.io/en/stable/cli/pip_install/)支持用`--index-url`指定替代索引，[阿里云镜像站](https://developer.aliyun.com/mirror/pypi/)公布了其PyPI镜像地址。本项目使用HTTPS阿里云镜像获取全部Python依赖，仍按原PyPI摘要校验；没有随包wheel。PyAV许可见[官方LICENSE](https://github.com/PyAV-Org/PyAV/blob/v18.1.0/LICENSE.txt)；项目自身LICENSE不替代第三方许可。
 
-| 项目 | 官方规则 | 项目策略 |
-| --- | --- | --- |
-| 即时热词 | 请求携带词→权重映射，无须建云表 | 用户已确定采用；可与上下文同时使用 |
-| 总词数 | 最多 2,000 | 本地阻止超限，避免服务端选择部分词 |
-| 权重 | 普通 1–5；50 为超级热词，超级词最多 50 个 | 不默认启用超级热词 |
-| 词长 | 含非 ASCII 字符时总长≤15字符；纯 ASCII 按空格分段≤7段 | 逐行校验并解释 |
-| 词义 | 真实词语、语种受模型支持 | 只能校验结构；不能承诺自动判断所有词义 |
-| 预编译配额 | 每账号最多10表，共享配额；更新建议间隔≥5分钟 | 不复用用户既有表，不做更新循环 |
-| 上下文 | 每轮合计≤400字符；最多保留最近5轮；服务端可能截断 | 首版单段文本≤400字符，超限阻止 |
-| 上下文效果 | 应包含待识别的相关原词 | 不把它当作摘要/行为指令 |
-| 海外限制 | 新加坡子业务空间暂不支持热词 | 海外不列首版保证 |
+## 本机窗口与成品
 
-依据：[A04](https://help.aliyun.com/zh/model-studio/improve-asr-accuracy)。字符计数须在实现时明确 Unicode 语义，不能用 UTF-8 字节数或估计 token 数替代。
+- [tkinter.askdirectory](https://docs.python.org/3.12/library/dialog.html#tkinter.filedialog.askdirectory)：选择现有目录。当前无人工总时限，取消与进程回收由项目处理。正常桌面的可见性属于本机运行证据，不用“可import”替代验收。
+- [python-docx文本/分页](https://python-docx.readthedocs.io/en/latest/user/text.html)：段落、keep_with_next和widow_control；不代表无需实际页面检查。
+- [openpyxl样式](https://openpyxl.readthedocs.io/en/stable/styles.html)及[Excel规格](https://support.microsoft.com/en-us/excel/excel-specifications-and-limits)：单元格32767字符、工作表1048576行、行高409。项目正文自动换行，按内容估算展示行高并封顶409，单元格保留长段全文；存储超限不截断。
+- [Ant Design表单](https://ant.design/docs/spec/research-form/)与[输入](https://ant.design/docs/spec/data-entry/)为界面组织参考；不是本项目使用了Ant组件库，也不是阿里官方产品认证。
 
-预编译方案使用 `speech-biasing` 的 create/query/delete 操作；`target_model` 必须等于固定模型。前缀只能含数字、小写字母且≤10字符，查询状态 `OK` 可用、`UNDEPLOYED` 不可用。管理与识别需同账号。[A05](https://help.aliyun.com/zh/model-studio/vocabulary-http-api)
-
-**差异**：A05 的权重说明仍为 1–5，A04/A03 已支持 50。预编译方案若被采用，先仅开放 1–5，等实际契约明确后再讨论超级词；不可用不确定的“兼容”代码掩盖差异。
-
-## CLI 取证版本
-
-- 官方仓库：[modelstudioai/cli](https://github.com/modelstudioai/cli)。
-- 已检查源码提交：`8bbbbc722d70fb200641ef22b6f6d033aeae9f74`，提交时间 `2026-09-28T05:23:20Z`。
-- [固定提交 package.json](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/cli/package.json) 与 [npm latest 元数据](https://registry.npmjs.org/bailian-cli/latest) 均显示 `2.1.0`，Node 要求 `>=18.17.0`。
-- [2.1.0 发布包](https://registry.npmjs.org/bailian-cli/-/bailian-cli-2.1.0.tgz) integrity：`sha512-G90UvW74qgMzZWSonLsbfCAca9+md6jnP99xFI8KkDR2xUPH7TlUmNKQENDTB2GeVAGcvCWSbUysjIAZtrn8Kw==`。
-- npm 元数据缺少 `gitHead`；源码与发布包是否一致仍需 S1 核验。不把搜索缓存中的旧版 1.25.0 当作当前版本。
-
-### 安装与鉴权源码事实
-
-| 发现 | 实现影响 | 官方源码 |
-| --- | --- | --- |
-| `BAILIAN_CONFIG_DIR` 可重定位配置/凭据 | 设计项目内独立目录，安装后验证实际写入 | [paths.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/config/paths.ts) |
-| postinstall下载Wiki，也使用该配置目录 | 安装钩子也需考虑缓存和网络，不执行未经审查的默认全局安装脚本 | [postinstall.js](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/cli/postinstall.js) |
-| 模型请求支持 `DASHSCOPE_API_KEY` | Key可由内存注入子进程环境；不必放argv | [resolver.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/auth/resolver.ts) |
-| `auth login --api-key` 在线校验但Key在argv；未见stdin入口 | 不能直接用于本项目安全输入流程；校验方式待定 | [login-api-key.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/login-api-key.ts) |
-| `auth status`只检查本地配置 | 不能把authenticated等同于模型可用 | [status.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/status.ts) |
-| 源码读取 `DASHSCOPE_BASE_URL`，帮助资料写过 `BAILIAN_BASE_URL` | 固定版本实测，不能凭名称猜环境变量 | [loader.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/config/loader.ts) |
-
-### 自动更新与遥测
-
-命令中间件存在更新检查与条件自动更新，可能运行全局 npm 更新和 `bl skill update`。`--quiet` 可阻止这一步实际更新，但不完全禁止检查网络和写更新状态。`DO_NOT_TRACK=1` 关闭遥测，不能代替关闭更新。未查到可直接使用的禁更新环境变量，不创造变量名。
-
-依据：[middleware.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/runtime/src/middleware.ts)、[update-checker.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/runtime/src/utils/update-checker.ts)。
-
-### ASR 命令契约（发布包/本机合约已验证，真实云端待验）
-
-2026-09-28再次核对：`handleAsyncMode`在未指定`--async`时内置提交、`poll(...)`、结果下载及`--out`写文件；本地文件上传亦在同一命令内完成。**因此首选复用完整命令，不能把这些已有功能归为Python待开发项。**
-
-S3正式流程采用的命令模板：
-
-```text
-bl speech recognize --config default --model qwen-audio-3.0-asr-flash-filetrans --url <上传文件绝对路径> --base-url https://dashscope.aliyuncs.com --diarization --out <JSON绝对路径> --timeout 3600 --poll-interval 5 --quiet --output json
-```
-
-模板对应项目默认开启说话人；若需要合并，上传路径为已通过校验的单声道副本，用户关闭说话人时省略`--diarization`。Python读取`--out`文件而非把stdout当JSON；S3丢弃可能含正文的stdout。本机真实CLI合约已确认完整模式通常不暴露task_id、子任务失败可能退出0并写空数组，以及取消/未知状态超时；真实云端鉴权、音频和结果格式仍须S3验收。存在接口限制不代表CLI没有相应云端能力。3600秒为项目等待策略，不是官方处理时限。
-
-以下`--async`只是待研究的另一模式，不是默认实现路线：
-
-```text
-bl speech recognize --model qwen-audio-3.0-asr-flash-filetrans --url <上传文件绝对路径> --diarization --async --quiet --output json
-```
-
-`--async --quiet` 分支仍返回 `task_id` JSON；`--out` 在该分支不保存结果。该模板只用于说明契约，完整启动方式应使用锁定的本地 CLI 入口，避免 PATH 上的另一版本。
-
-参数：`--context <text>` 转为上下文；`--vocabulary <json>` 为即时词映射；`--vocabulary-id` 为预编译表；`--diarization`、`--speaker-count`、`--channel-id` 分别控制相关参数。没有查到 `--context-file`，不得编造。[recognize.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/speech/recognize.ts)
-
-**Windows 已实施边界**：按subprocess.list2cmdline的完整参数计算UTF-16单元并计入终止NUL，超过32767即在启动前拒绝；引号、反斜线和代理对测试通过。2,000条是模型上限，不保证全部能放入Windows命令行；不截词或改用云表。[W01](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw)
-
-### 需要规避的行为
-
-1. `recognize` 在检查 dry-run 之前可能上传本地音频；本地预检不得调用此路径。
-2. 默认等待模式的 stdout 不能保证为完整 JSON；子任务失败可能仅打印信息而退出0。
-3. 等待代码对 `CANCELED/UNKNOWN` 的处理不能满足本项目终态语义，需要自行有界管理。
-
-依据：[recognize.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/speech/recognize.ts)。
-
-独立恢复入口限制：注册表未提供`speech task get`；`bl video task get`实际使用通用任务查询路径，但名称与正式能力文档不匹配，且`--quiet`会丢弃`results`。这不表示BL缺少正常转写中的轮询或下载。仅在需要恢复任务时核实入口，不据此另建Python云端客户端。[task-get.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/video/task-get.ts)、[commands.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/cli/src/commands.ts)
-
-### 鉴权复用的边界
-
-2026-09-29复核：npm最新仍为2.1.0，integrity与锁文件一致，GitHub main仍为上述固定提交。S3控制台登录使用`auth login --console --console-site domestic --config default`，不能同时指定--base-url；识别命令才显式覆盖国内端点。BL会打开默认浏览器，15分钟空等也可能退出0，auth status的authenticated也可能仅代表控制台token或AK，因此结束后必须检查api_key对象。只检查模型凭据存在性，不额外在线验证。[login.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/login.ts)、[login-console.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/login-console.ts)、[status.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/status.ts)
-
-recognize的模型鉴权优先级为显式--api-key、DASHSCOPE_API_KEY、profile的api_key；项目不使用明文argv Key，API Key模式由.env环境注入覆盖已有控制台配置，控制台模式不读.env。固定default profile避免继承其他活动配置。
-
-本次真实控制台尝试印证了状态差别：BL本地authenticated=true、console凭据存在，但api_key缺失。login-console.ts允许只收到access_token时保存并结束，因此包装器分别报告控制台凭据与模型Key，而不把前者当作ASR可用。具体为何未收到/保存模型Key尚未取得官方页面证据，不推断原因，也不修改BL协议。
-
-用户随后提供A10b。已实际读取该页：官方预期是控制台登录同时配置模型调用所需凭据，用户无需手动复制Key；成功后只需auth status，不应重复模型调用来校验登录。因此本项目观察到的“页面成功但模型Key缺失”应作为集成异常，不能描述成账号登录正常要求用户另填Key。通过官方config list/show核对，本项目只有default且为当前配置，配置文件在项目隔离目录，包含控制台令牌但无api_key；没有输出凭据值，尚未确定未写入模型Key的根因。
-
-### Windows登录链接问题：已复现并修复
-
-以下记录补充并解决上述缺Key观察。2.1.0的[local-server.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/shared/local-server.ts)在Windows使用execFile(cmd, ['/c', 'start', '', url])；[login-console.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/login-console.ts)在需要模型Key时追加&needapikey=true。实际传给cmd的URL未按cmd规则引用，&后的参数被当作第二条命令。[W02](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/cmd)
-
-本机以echo替代start、使用固定合成URL复现：stdout链接截止state参数，退出1，stderr提示needapikey不是命令；没有打开浏览器或访问合成URL。这与旧登录页面只完成控制台授权的结果一致。BL在打开失败时会把完整登录URL单独写入stdout，并继续保持原回调服务；旧Python包装却丢弃了stdout。
-
-修复仅转交这一公开备用链接：登录期间消费stdout，校验固定官方origin/path、127.0.0.1回调端口、32位hex state及已知参数；使用os.startfile打开一次。链接只在内存，不输出/保存，不构造state，不修改BL源代码或自建回调服务。真实修复后BL公开状态返回模型Key和控制台凭据均存在；没有额外模型调用验证登录。[W03](https://docs.python.org/3.12/library/os.html#os.startfile)
-
-最后下载JSON使用原生fetch而没有独立AbortSignal；S3外层3900秒终止并回收BL进程，不能称为取消云端。--out单份下载写对象、零份写[]、多份写列表；顶层results为空时甚至不写文件。S3只验收单文件对象的稳定句子字段，空/异常结果保留且不重提；该JSON不包含子任务元数据，不能声称Python验证了所有云端子状态。[recognize.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/speech/recognize.ts)
-
-2026-09-29经用户明确授权的API Key单样本真实验收：BL完整命令成功落盘，结果为对象，根包含file_url/properties/transcripts；音轨全文字段实际为text，时长为content_duration_in_milliseconds。句子含begin_time/end_time、sentence_id、speaker_id、text、words。原始响应仅保存在忽略目录，详见S3_VERIFICATION；这一样本不证明所有格式、无语音或多音轨场景。
-
-普通Key登录已包含在线有效性校验，`auth status`只反映本地配置。本项目按用户最新决定使用.env本地检查，并通过BL支持的DASHSCOPE_API_KEY子进程环境变量正式调用；不执行带明文Key参数的登录命令、不另做在线预验证。[安装与鉴权](https://help.aliyun.com/zh/model-studio/cli/installation)、[resolver.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/auth/resolver.ts)
-
-本地解析使用`dotenv_values`，显式指定项目文件并关闭变量展开；结果状态不会暴露原值。配置存在只表示已填写，不代表在线有效。[C01](https://bbc2.github.io/python-dotenv/)
-
-### 上传和失败次数
-
-当前上传实现使用国内端点，整体读入文件再构造 Blob；上传凭证超时15秒、上传超时120秒。大文件内存和网络耗时可能早于官方大小上限成为限制，S1/S3 必须验证，不能承诺任意接近1GB的文件都可成功。[upload.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/files/upload.ts)
-
-已审查的 ASR 主路径中，HTTP/上传失败直接抛出，正常未终结状态才轮询，未发现自动重提识别。此结论不覆盖整个 CLI；控制台域存在令牌刷新后再次调用的分支。安装包必须用请求计数测试复核。[http.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/client/http.ts)、[polling.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/runtime/src/utils/polling.ts)
-
-## Codex 文件约定
-
-`AGENTS.md` 是项目常驻规则，按目录发现；`SKILL.md` 是可按需加载的工作流，元数据需说明触发边界。项目技能由 `.agents/skills` 发现，单独 ZIP 未安装/未置于发现目录不等于可在所有聊天自动使用。首版在本项目范围内接入，后续若需跨项目调用另行讨论安装范围。[O01](https://learn.chatgpt.com/docs/agent-configuration/agents-md)、[O02](https://learn.chatgpt.com/docs/build-skills)
-
-## 取证局限
-
-尝试查看用户已打开的浏览器标签页时，浏览器工具先返回连接失败，后续超时；未取得标签页正文、登录状态或账户配置。公开官方资料已经另行读取。没有访问密钥内容、创建资源、上传音频或产生模型调用。
-
-S1已安装真实CLI发布包并执行公开帮助、虚构URL dry-run及本机模拟服务识别命令。没有真实阿里云ASR调用或用户音频上传，不能据此认定云端权限/质量/媒体兼容性通过。未确认项目见[ISSUES.md](ISSUES.md)。
-
-## S1安装资料
-
-- BL使用npm生成的锁文件与`npm ci --ignore-scripts`；隔离userconfig/globalconfig/cache，禁止安装阶段重试。参数依据：[npm ci](https://docs.npmjs.com/cli/v11/commands/npm-ci/)、[npm配置](https://docs.npmjs.com/cli/v11/using-npm/config/)。
-- Python库版本/wheel摘要来源：[av18.1.0 PyPI元数据](https://pypi.org/pypi/av/18.1.0/json)、[python-dotenv1.2.3元数据](https://pypi.org/pypi/python-dotenv/1.2.3/json)，已写入requirements.txt；仅使用二进制wheel。
-- pip通过原生require-hashes验证安装包；项目未保留自建下载器。[pip安全安装](https://pip.pypa.io/en/stable/topics/secure-installs/)
-
-## S2界面设计依据
-
-核验日期：2026-09-28。以下为设计参考，非百炼API约束，也不表示本项目是阿里官方产品。
-
-- [Ant Design：Form Page](https://ant.design/docs/spec/research-form/)：按相关性组织表单，使用清楚的标题与提示，减少冗余说明，并提供核对和完成反馈。本项目据此采用三组表单和“填写、核对、保存”进度指示。
-- [Ant Design：Data Entry](https://ant.design/docs/spec/data-entry/)：提供合理默认值、上下文帮助；复选框支持多选；上传区说明格式、大小及传入状态。本项目保留双增强独立复选框、原生文件选择与拖拽，使用不定进度条表示正在传入，不显示未经测量的百分比。
-
-橙色强调、中性背景、字号、间距、折叠默认目录和底部操作栏是本项目设计选择，不冒充官方强制规范。采用较深橙色保证白色按钮文案可读，键盘焦点采用独立蓝色轮廓。
-
-## 产品文案核验（2026-09-29）
-
-- [提升识别准确率](https://help.aliyun.com/zh/model-studio/improve-asr-accuracy)：热词与上下文均用于专有词汇增强；上下文应包含音频中待识别的原词，泛泛的语义背景效果有限。页面采用“热词增强”“上下文增强”和“参考文本”，示例给出具体术语及人名。即时热词及400字符限制不变。
-- [Filetrans HTTP API](https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-http-api)：核对固定模型支持的context、vocabulary与diarization_enabled。“区分发言人”是说话人分离的产品用语，不表示识别真实身份；单声道要求与超过2小时的建议继续明确提示。
-- [百炼CLI安装与鉴权](https://help.aliyun.com/zh/model-studio/cli/installation)：账号登录通过官方浏览器页面完成。产品页保留登录与API Key两个选择；预览版尚不执行登录，本地Key检测不能写成“验证成功”。
-- [通义听悟官网](https://tingwu.aliyun.com/)：参考以录音场景、发言人和操作动作描述用途的表达方式。仅参考公开首页，不借用其速度、实时翻译、总结等能力承诺，也未访问用户的听悟内容。
-
-## 模型参数与当前界面覆盖（2026-09-29）
-
-范围固定为qwen-audio-3.0-asr-flash-filetrans和已安装BL2.1.0。API依据：[Filetrans参数](https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-http-api)。
-
-| 参数 | 官方模型能力 | BL2.1.0公开入口与项目处理 |
-| --- | --- | --- |
-| language_hints | 最多4种语言，省略时自动识别 | --language只接受一个字符串并包装为单元素数组；UI仅自动/一种语言，不拼接伪多选 |
-| speaker_count | 2–100参考值，需开启说话人分离，不保证精确人数 | --speaker-count，UI自动或指定整数，关闭分离时不传 |
-| diarization_enabled | 单声道，建议不超过2小时 | --diarization；项目多声道合并方案保留 |
-| context / vocabulary | 上下文与即时热词可并用 | --context / --vocabulary；继续独立展开输入 |
-| channel_id | 音轨索引数组，各轨单独计费 | --channel-id只接受一个ID；BL帮助称“声道”，PyAV流到云端轨道对应尚未实测，暂不开放UI选择 |
-| special_word_filter | API支持敏感词过滤 | BL公开help及已安装commands/core包没有该选项或请求透传入口；不自造参数/HTTP后备 |
-| keep_dialect | 仅3.1模型支持 | 固定3.0不开放 |
-
-已实际运行锁定BL帮助及保留域名URL的dry-run：--language zh --diarization --speaker-count 3 --channel-id 1，输出parameters包含language_hints:["zh"]、speaker_count:3、diarization_enabled:true、channel_id:[1]。无真实Key或音频。证据位于安装包bailian-cli-commands/dist/index.mjs识别命令及bailian-cli-core/dist/index.mjs语言构造函数；通用参数表不能替代发布包验证。
-
-目录窗口使用Python3.12标准库[tkinter.filedialog.askdirectory](https://docs.python.org/3.12/library/dialog.html#tkinter.filedialog.askdirectory)，支持initialdir/parent和mustexist。用户已授权选择项目外保存位置；当前只选现有目录，不用浏览器文件上传控件冒充保存位置选择。
-
-目录故障补充：Python[线程模型说明](https://docs.python.org/3.12/library/tkinter.html#threading-model)允许Tk解释器属于单独线程，不能仅凭HTTP工作线程创建Tk认定违规。本机对照确认默认受限执行与正常交互桌面的原生窗口显示结果不同；这是运行证据，不是官方文档对Codex实现的结论。独立GUI进程用于取消/超时回收，正常桌面启动解决已观察的可见性问题。
-
-## S4本地格式导出依据（2026-09-29）
-
-- BL2.1.0本机`speech recognize --help`的--out保存完整JSON，输出选择只有text/json；结合A13及已核对的recognize实现，未提供本项目需要的xlsx/docx/md成品入口。Python只补本地导出，不另行下载或轮询。
-- [python-docx1.2.0官方文档](https://python-docx.readthedocs.io/en/latest/)及[文本/分页属性](https://python-docx.readthedocs.io/en/latest/user/text.html)：段落、样式、keep_with_next和widow_control。实际字体与分页仍需要渲染/目标应用核验。
-- [openpyxl样式文档](https://openpyxl.readthedocs.io/en/stable/styles.html)：单元格格式、对齐、行列设置；本项目运行版本为3.1.5，实际roundtrip由测试验证。
-- [Microsoft Excel规格](https://support.microsoft.com/en-us/excel/excel-specifications-and-limits)：单元格32767字符、工作表1048576行、行高409磅。显示行高由本地字体/列宽估算，超限明确拒绝该格式；这是项目导出策略，不是模型限制。
-- 新依赖官方wheel摘要：[python-docx1.2.0](https://pypi.org/pypi/python-docx/1.2.0/json)、[lxml6.1.3](https://pypi.org/pypi/lxml/6.1.3/json)、[typing-extensions4.16.0](https://pypi.org/pypi/typing-extensions/4.16.0/json)。仅选择CPython3.12 Windows x64或py3-none-any wheel，写入requirements.txt并通过实际安装。
+使用步骤见[HELP.md](HELP.md)，任务状态和错误解释见[ERRORS.md](ERRORS.md)。

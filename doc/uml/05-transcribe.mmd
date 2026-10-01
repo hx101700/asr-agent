@@ -1,0 +1,69 @@
+sequenceDiagram
+actor C as Codex＋Skill
+participant T as transcription（函数模块）
+participant J as job_files（函数模块）
+participant L as tools（函数模块组）
+participant B as BL外部进程
+participant A as 百炼／临时OSS
+participant D as delivery（函数模块）
+participant F as 原始JSON与成品
+Note over C,D: 成功主路径：输入有效且记录均写入成功；失败见07-state、08-failure<br/>各lifeline为函数模块或外部进程，未建立同名服务类
+C->>T: transcribe --job ID --authorize-upload
+T->>T: 核对显式上传授权
+T->>J: read_config()核对协议及配置SHA
+T->>J: reserve_execution()独占创建execution
+alt execution已存在
+    J-->>T: FileExistsError
+    T->>T: job_status()读取本地记录
+    T-->>C: 既有任务回执
+else 本次取得执行占用
+    T->>J: _save_status()调用save_record(PREPARING / not_started)
+    T->>L: files.file_fingerprint()核对音频size＋SHA
+    T->>J: result_path(config)取得确认的目标位置
+    T->>L: bailian.recognition_arguments(config, prepared, destination)
+    T->>L: bailian.prepare_command()准备参数和凭据环境
+    Note over T,L: 热词由json.dumps生成JSON参数<br/>上下文是单个argv元素：--context=原文<br/>以--开头的原文仍按选项值传递；subprocess处理Windows参数引用<br/>shell=false；命令长度检查和运行Key读取各一次
+    opt requires_mono为true
+        T->>L: media.convert_to_mono(source, mono.flac, 已确认AudioInfo)
+        L-->>T: 新副本AudioInfo
+        T->>T: rules.check_audio_limits(converted, true)
+    end
+    T->>J: prepare_result()独占创建JSON目录
+    T->>J: _save_status()调用save_record(RUNNING / unknown)
+    T->>L: bailian.run_recognition(command, private_values)
+    L->>B: Popen(PreparedCommand.argv / env)
+    B->>A: 使用凭据上传音频并提交识别
+    loop 云端PENDING或RUNNING
+        B->>A: BL执行正常轮询
+        A-->>B: 当前云端状态
+    end
+    A-->>B: 完成信息与结果地址
+    B->>A: BL下载转写结果
+    B->>F: 按--out写原始JSON
+    B-->>L: 进程正常结束
+    L-->>T: run_recognition()返回
+    T->>L: results.load_transcript(destination)
+    L->>F: 读取原始JSON并核对结构和正文
+    F-->>L: 结果内容
+    L-->>T: Transcript＋SHA
+    T->>J: _save_status()调用save_record(JSON_READY / result_received)
+    T->>T: _deliver(project, config, transcript, report)
+    T->>D: export_documents(job_root, config, transcript)
+    D->>D: 用UTC时间和UUID生成export_id
+    D->>J: reserve_export()；save_record(EXPORTING)
+    D->>J: prepare_documents()创建本轮成品目录
+    loop xlsx、docx、md逐格式各执行一次
+        D->>L: documents.publish_document(writer, transcript, final_path)
+        L->>F: 写partial文件并发布final<br/>Excel和Word回读；Markdown编码写入
+        L-->>D: 字节数或格式异常
+        D->>J: save_record()保存该格式READY / FAILED
+    end
+    D->>J: save_record(COMPLETE / PARTIAL / FAILED)
+    D-->>T: 本轮delivery回执
+    T->>T: _attach_delivery()计算documents_ready
+    T-->>C: JSON状态＋本轮delivery＋已知文件位置
+end
+Note over B,F: 云端鉴权、临时上传、提交、轮询、下载和原JSON落盘属于BL<br/>Python等待完整命令；云端失败停止，job占用保持<br/>job_id是本机编号；Python未提供可靠task_id恢复入口
+Note over T,F: JSON：已选根 / job_id / json / transcription.json<br/>成品：已选根 / job_id / documents / export_id<br/>json_path先记录目标位置，其存在本身不是JSON成功证明
+Note over T,D: Excel和Word回读核验；Markdown编码写入<br/>COMPLETE表示三成品就绪；识别准确率由人工评价
+Note over C,D: src/asr_agent/application/transcription.py、delivery.py<br/>src/asr_agent/tools/bailian.py::recognition_arguments、prepare_command、run_recognition<br/>tools/media.py、results.py、documents.py、job_files.py、files.py<br/>context参数合约探针：application/diagnostics.py::probe

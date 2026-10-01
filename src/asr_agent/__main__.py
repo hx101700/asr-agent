@@ -5,14 +5,15 @@ import json
 import sys
 from pathlib import Path
 
-from .bootstrap import bootstrap
-from .auth import api_key_status
-from .environment import Project, SetupError, doctor
-from .probe import probe
-from .bailian import BailianFailure, console_status, login_console
+from .application.bootstrap import bootstrap
+from .application.diagnostics import doctor, probe
+from .tools.auth import api_key_status
+from .tools.environment import Project, SetupError
+from .tools.bailian import BailianFailure, console_status, login_console
 
 
 def main(argv: list[str] | None = None) -> int:
+    """分派项目命令并输出JSON回执，按已知错误和交付状态确定退出码。"""
     # Windows重定向输出时也保持UTF-8，使Codex和JSON解析器正确读取中文。
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
@@ -37,13 +38,13 @@ def main(argv: list[str] | None = None) -> int:
             serve(project, port=args.port, open_browser=not args.no_browser)
             return 0
         if args.command == "transcribe":
-            from .transcription import transcribe
+            from .application.transcription import transcribe
             report = transcribe(project, args.job, authorize_upload=args.authorize_upload)
         elif args.command == "export":
-            from .transcription import export_job
+            from .application.transcription import export_job
             report = export_job(project, args.job)
         elif args.command == "job-status":
-            from .transcription import job_status
+            from .application.transcription import job_status
             report = job_status(project, args.job)
         else:
             if args.command == "login":

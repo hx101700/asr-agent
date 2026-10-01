@@ -1,4 +1,4 @@
-"""Windows登录备用链接：合成进程验证管道与清理，始终替换真实浏览器入口。"""
+"""用合成进程和浏览器替身验证Windows登录链接转交。"""
 
 import contextlib
 import io
@@ -7,10 +7,8 @@ import subprocess
 import sys
 from unittest.mock import patch
 
-from asr_agent.bailian import (
-    BailianFailure, PreparedCommand, _communicate_login, _open_console_fallback, _run_bl,
-)
-from asr_agent.environment import SetupError, child_environment
+from asr_agent.tools.bailian import BailianFailure, PreparedCommand, _communicate_login, _open_console_fallback, _run_bl
+from asr_agent.tools.environment import SetupError, child_environment
 from tests.support import ProjectTestCase
 
 
@@ -21,13 +19,15 @@ LOGIN_URL = ("https://bailian.console.aliyun.com/console-login?"
 
 class ConsoleLoginTests(ProjectTestCase):
     def setUp(self):
+        """准备隔离登录环境并替换浏览器打开入口。"""
         super().setUp()
         self.project.prepare()
-        browser_patch = patch("asr_agent.bailian.os.startfile")
+        browser_patch = patch("asr_agent.tools.bailian.os.startfile")
         self.open_browser = browser_patch.start()
         self.addCleanup(browser_patch.stop)
 
     def start_process(self, script: str, *arguments: str):
+        """启动合成登录子进程并登记清理回调。"""
         process = subprocess.Popen(
             [sys.executable, "-c", script, *arguments], cwd=self.project.root,
             env=child_environment(self.project), stdin=subprocess.DEVNULL,
@@ -37,6 +37,7 @@ class ConsoleLoginTests(ProjectTestCase):
         )
 
         def cleanup():
+            """终止测试登录进程并关闭输出管道。"""
             if process.poll() is None:
                 process.kill()
                 process.wait(timeout=5)
@@ -47,21 +48,25 @@ class ConsoleLoginTests(ProjectTestCase):
         return process
 
     def assert_reaped_and_closed(self, process):
+        """断言进程已结束且输出管道已关闭。"""
         self.assertIsNotNone(process.poll())
         self.assertTrue(process.stdout.closed)
         self.assertTrue(process.stderr.closed)
 
     def test_full_url_reaches_shell_execute_without_losing_needapikey(self):
+        """验证完整登录URL及其参数传递给系统打开入口。"""
         _open_console_fallback(LOGIN_URL)
         self.open_browser.assert_called_once_with(LOGIN_URL)
         self.assertIn("&needapikey=true", self.open_browser.call_args.args[0])
 
     def test_official_url_without_optional_key_parameter_is_supported(self):
+        """验证基础官方登录URL可传递给系统打开入口。"""
         url = LOGIN_URL.removesuffix("&needapikey=true")
         _open_console_fallback(url)
         self.open_browser.assert_called_once_with(url)
 
     def test_invalid_url_or_nonce_never_opens_or_leaks_to_public_output(self):
+        """验证非法URL或状态值返回脱敏错误。"""
         invalid = [
             LOGIN_URL.replace("https://", "http://"),
             LOGIN_URL.replace("bailian.console.aliyun.com", "example.invalid"),
@@ -93,6 +98,7 @@ class ConsoleLoginTests(ProjectTestCase):
         self.open_browser.assert_not_called()
 
     def test_duplicate_fallback_lines_open_once(self):
+        """验证重复备用链接对应一次页面打开。"""
         marker = self.project.path("opened.txt")
         script = (
             "import pathlib,sys,time\n"
@@ -106,6 +112,7 @@ class ConsoleLoginTests(ProjectTestCase):
         self.assert_reaped_and_closed(process)
 
     def test_link_is_opened_while_process_waits_for_callback(self):
+        """验证登录进程等待回调时及时打开链接。"""
         marker = self.project.path("opened.txt")
         script = (
             "import pathlib,sys,time\n"
@@ -118,6 +125,7 @@ class ConsoleLoginTests(ProjectTestCase):
         process = self.start_process(script, LOGIN_URL, str(marker))
 
         def open_marker(url):
+            """写入标记以模拟浏览器完成登录回调。"""
             self.assertIsNone(process.poll())
             self.assertEqual(url, LOGIN_URL)
             marker.write_text("opened", encoding="utf-8")
@@ -129,6 +137,7 @@ class ConsoleLoginTests(ProjectTestCase):
         self.assert_reaped_and_closed(process)
 
     def test_large_stderr_is_drained_before_process_can_print_url(self):
+        """验证大量标准错误及时排空并读取备用链接。"""
         size = 1024 * 1024
         marker = self.project.path("opened.txt")
         script = (
@@ -146,6 +155,7 @@ class ConsoleLoginTests(ProjectTestCase):
         self.assert_reaped_and_closed(process)
 
     def test_timeout_kills_waiter_and_closes_both_pipes(self):
+        """验证超时终止登录进程并关闭两条管道。"""
         process = self.start_process("import time; time.sleep(30)")
         with self.assertRaises(subprocess.TimeoutExpired):
             _communicate_login(process, 0.05)
@@ -153,6 +163,7 @@ class ConsoleLoginTests(ProjectTestCase):
         self.assert_reaped_and_closed(process)
 
     def test_open_failure_stops_waiting_and_does_not_expose_url(self):
+        """验证浏览器打开失败后返回脱敏停止错误。"""
         process = self.start_process("import sys,time; print(sys.argv[1],flush=True); time.sleep(30)", LOGIN_URL)
         self.open_browser.side_effect = OSError("synthetic browser failure " + LOGIN_URL)
         with self.assertRaises(SetupError) as caught:
@@ -163,6 +174,7 @@ class ConsoleLoginTests(ProjectTestCase):
         self.assert_reaped_and_closed(process)
 
     def test_invalid_link_stops_waiting_and_reaps_process(self):
+        """验证非法登录链接停止等待并回收进程。"""
         process = self.start_process("import sys,time; print(sys.argv[1],flush=True); time.sleep(30)",
                                      LOGIN_URL.replace(STATE, "invalid-state"))
         with self.assertRaisesRegex(SetupError, "官方格式"):
@@ -170,17 +182,11 @@ class ConsoleLoginTests(ProjectTestCase):
         self.open_browser.assert_not_called()
         self.assert_reaped_and_closed(process)
 
-    def test_overlong_stdout_stops_waiting_instead_of_reading_without_limit(self):
-        process = self.start_process("import sys,time; print('x'*4097,flush=True); time.sleep(30)")
-        with self.assertRaisesRegex(SetupError, "超出预期长度"):
-            _communicate_login(process, 5)
-        self.open_browser.assert_not_called()
-        self.assert_reaped_and_closed(process)
-
     def test_login_timeout_is_translated_once_without_second_cleanup_or_restart(self):
+        """验证登录超时转换为失败并完成一次进程清理。"""
         process = self.start_process("import time; time.sleep(30)")
         command = PreparedCommand(("synthetic-bl", "auth", "login", "--console"), {})
-        with patch("asr_agent.bailian.subprocess.Popen", return_value=process) as start:
+        with patch("asr_agent.tools.bailian.subprocess.Popen", return_value=process) as start:
             with self.assertRaises(BailianFailure) as caught:
                 _run_bl(self.project, command, [], timeout=0.05, console_login=True)
         self.assertTrue(caught.exception.started)

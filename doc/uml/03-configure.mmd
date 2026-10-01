@@ -1,0 +1,64 @@
+sequenceDiagram
+actor U as 用户
+participant C as Codex＋Skill
+participant W as 本机网页
+participant H as web（HTTP函数模块）
+participant S as Session对象
+participant P as DirectoryPicker对象
+participant I as inputs（函数模块）
+participant F as 本机文件
+C->>H: scripts/asr.py serve
+H->>S: 创建本次Session
+H-->>C: 启动回执url、pid
+H->>W: 按启动选项打开本机网页
+Note over W,H: 127.0.0.1动态端口；HTTP来源与会话校验<br/>前端app编排、model状态、view界面、api传输
+U->>W: 选择一个音频
+W->>H: POST /api/upload-audio，传文件字节
+H->>S: upload(audio, name, rfile, size)
+S->>F: 保存.state/web-uploads/会话ID/副本
+S-->>H: upload_id
+H-->>W: 接收回执
+opt 启用热词
+    U->>W: 选择热词Excel
+    W->>H: POST /api/upload-hotwords
+    H->>S: upload(hotwords, name, rfile, size)
+    S->>F: 保存Excel临时副本
+    S-->>H: 热词upload_id
+    H-->>W: 接收回执
+end
+U->>W: 设置语种、说话人与参考人数；热词及上下文
+opt 选择自定义保存位置
+    W->>H: POST /api/select-directory
+    H->>S: select_directory(kind, picker_id)
+    S->>P: select(initial, request_id)
+    P->>U: choose_directory函数打开原生窗口
+    U-->>P: 选择目录或取消
+    P-->>S: Path或None
+    S->>S: 选定时试写一次并登记精确目录
+    S-->>H: 所选路径或cancelled
+    H-->>W: 目录回执
+end
+U->>W: 检查并预览
+W->>H: POST /api/validate，提交upload_id和选项
+H->>S: validate(payload)
+S->>S: rules.validate_options()校验选项
+S->>I: validate_audio()；按需load_hotwords()
+I->>F: 探测音频并建立SHA；按需读取Excel
+I-->>S: 媒体信息、词典和提示
+S->>S: 按需validate_context()；建立内存draft
+S-->>H: validation_id＋summary
+H-->>W: 预览回执
+Note over W,S: 热词与上下文可并用；即时vocabulary进入确认快照<br/>多声道且开启说话人时，预览提示单声道FLAC副本
+U->>W: 核对后保存
+W->>H: POST /api/confirm(validation_id)
+H->>S: confirm(validation_id)
+S->>F: files.check_file_unchanged()核对size/mtime
+S->>F: job_files.publish_config()写配置与摘要并发布配置
+S-->>H: 同一job_id的确认回执
+H-->>C: 同一serve进程stdout：event=configured
+H-->>W: HTTP回执：job_id与保存位置
+Note over U,C: Codex随后确认本次音频、增强内容及费用的上传授权<br/>当前会话已有覆盖本次任务的授权可复用
+Note over H,S: 以上是完整成功路径；字段或文件错误返回422并供网页定位<br/>配置保存不启动BL：execution_started=false<br/>config.execution_authorized=false；凭据在执行时读取
+Note over W,S: 输入变化使旧预览失效；确认结果未知时网页持续冻结<br/>关闭网页不关闭serve；服务正常退出保留已确认音频并清理临时副本
+Note over I,F: 默认保存根为outputs；JSON和成品可分别选择根目录<br/>热词在预览解析，执行使用词典快照
+Note over C,F: src/asr_agent/web.py；application/session.py、inputs.py、rules.py<br/>tools/job_files.py、files.py、directory_picker.py<br/>static/app.mjs、model.mjs、view.mjs、api.mjs

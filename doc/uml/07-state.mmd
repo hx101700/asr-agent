@@ -1,0 +1,45 @@
+stateDiagram-v2
+direction TB
+state "CONFIGURED<br/>确认配置已保存" as Configured
+state "PREPARING<br/>本次取得执行占用" as Preparing
+state "RUNNING<br/>准备进入BL进程调用" as Running
+state "STOPPED<br/>本次操作停止" as Stopped
+state "JSON_READY<br/>原JSON结构和正文检查通过" as JsonReady
+[*] --> Configured : confirm成功 / 发布配置及摘要
+Configured --> Preparing : transcribe明确授权、配置有效且execution不存在 / 独占创建目录
+Preparing --> Running : prepare_input完成 / 内存设置RUNNING与unknown
+Preparing --> Stopped : 准备失败或首次记录保存失败 / not_started
+Running --> Stopped : RUNNING保存失败或BL进程启动失败 / not_started
+Running --> Stopped : BL等待失败或该阶段本地异常 / unknown
+Running --> JsonReady : BL结束且结果结构与正文通过检查 / result_received
+JsonReady --> JsonReady : 成功记录已保存 / 附加本轮delivery
+note right of Configured
+  配置文件保持CONFIGURED与execution_authorized=false
+  执行授权和状态另记入execution/status.json
+  授权或配置错误发生在占用之前
+end note
+note right of Running
+  先设置RUNNING；记录保存成功后调用BL
+  磁盘RUNNING是保守记录，不证明进程存活或云端受理
+  unknown表示当前可证实的云端范围未知
+end note
+note right of Stopped
+  execution目录永久保留，同job最多取得一次执行占用
+  授权与配置通过后的重复调用读取既有记录
+  业务异常由error.phase定位
+  记录保存失败由record_error.phase说明
+end note
+note right of JsonReady
+  当次JSON_READY回执与磁盘记录分开理解
+  成功记录保存失败则提前返回，documents_ready=false
+  磁盘仍可能为RUNNING，当前export因此拒绝
+  成功记录已保存后才开始导出
+  delivery为COMPLETE时documents_ready=true
+end note
+note left of Preparing
+  本图建模dict中的状态字符串，代码没有State类
+  交付轮次另用EXPORTING、COMPLETE、PARTIAL、FAILED
+  读取损坏记录或导出中断可合成OUTCOME_UNKNOWN
+  源码：src/asr_agent/application/transcription.py、delivery.py
+  文件协议：src/asr_agent/tools/job_files.py
+end note

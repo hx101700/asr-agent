@@ -1,21 +1,18 @@
-"""BL薄适配器合约：只用合成凭据和本地进程，不登录或访问真实ASR。"""
+"""验证BL适配器的参数、进程生命周期和错误报告。"""
 
 import io
 import json
 import os
-import shutil
 import subprocess
 import sys
 import unittest
 from unittest.mock import Mock, patch
 
 from asr_agent import BAILIAN_VERSION, MODEL
-from asr_agent.auth import read_api_key
-from asr_agent.bailian import (
-    BailianFailure, PreparedCommand, check_command_length, console_status, explain_cli_error,
-    login_console, prepare_command, redact_message, run_recognition,
-)
-from asr_agent.environment import SetupError, bl_command
+from asr_agent.tools.auth import read_api_key
+from asr_agent.tools.bailian import BailianFailure, PreparedCommand, check_command_length, console_status, explain_cli_error, login_console, prepare_command, redact_message, run_recognition
+from asr_agent.tools.environment import Project, SetupError, find_node
+from asr_agent.tools.bailian import bl_command
 from tests.support import ProjectTestCase, ROOT
 
 
@@ -24,6 +21,7 @@ _REAL_POPEN = subprocess.Popen
 
 class BailianTests(ProjectTestCase):
     def setUp(self):
+        """准备项目内BL入口、参数和进程替身。"""
         super().setUp()
         self.project.prepare()
         # 仅创建假入口供命令构造使用，所有BL进程均由测试替身接管。
@@ -45,14 +43,15 @@ class BailianTests(ProjectTestCase):
         self.process = Mock()
         self.process.returncode = 0
         self.process.communicate.return_value = (None, "")
-        node_patch = patch("asr_agent.environment.find_node", return_value=self.node)
-        process_patch = patch("asr_agent.bailian.subprocess.Popen", return_value=self.process)
+        node_patch = patch("asr_agent.tools.bailian.find_node", return_value=self.node)
+        process_patch = patch("asr_agent.tools.bailian.subprocess.Popen", return_value=self.process)
         node_patch.start()
         self.popen = process_patch.start()
         self.addCleanup(node_patch.stop)
         self.addCleanup(process_patch.stop)
 
     def test_recognition_uses_local_entry_and_public_arguments_without_shell(self):
+        """验证识别通过本地CLI入口及参数数组启动。"""
         command = prepare_command(self.project, self.arguments, "api_key")
         run_recognition(self.project, command, [])
         self.popen.assert_called_once()
@@ -64,6 +63,7 @@ class BailianTests(ProjectTestCase):
         self.assertEqual(self.popen.call_args.kwargs["cwd"], self.project.root)
 
     def test_api_key_only_reaches_child_environment_and_transcript_is_not_captured(self):
+        """验证Key注入识别子进程并配置输出通道。"""
         with patch.dict(os.environ, {"DASHSCOPE_API_KEY": "unrelated-synthetic-key",
                                      "NODE_OPTIONS": "--require unwanted.cjs"}):
             command = prepare_command(self.project, self.arguments, "api_key")
@@ -79,6 +79,7 @@ class BailianTests(ProjectTestCase):
         self.assertNotIn(self.key, repr(self.popen.call_args.args))
 
     def test_console_mode_does_not_inherit_api_key(self):
+        """验证控制台模式使用隔离的子进程环境。"""
         with patch.dict(os.environ, {"DASHSCOPE_API_KEY": "unrelated-synthetic-key"}):
             command = prepare_command(self.project, self.arguments, "console")
             run_recognition(self.project, command, [])
@@ -87,9 +88,10 @@ class BailianTests(ProjectTestCase):
                          str(self.project.path(".state/bailian")))
 
     def test_prepare_and_run_use_one_checked_snapshot_without_rereading_secrets(self):
-        with patch("asr_agent.auth.read_api_key", wraps=read_api_key) as read_key, \
-             patch("asr_agent.bailian.bl_command", wraps=bl_command) as build_command, \
-             patch("asr_agent.bailian.check_command_length", wraps=check_command_length) as check_length:
+        """验证识别执行复用一次准备的参数和凭据快照。"""
+        with patch("asr_agent.tools.auth.read_api_key", wraps=read_api_key) as read_key, \
+             patch("asr_agent.tools.bailian.bl_command", wraps=bl_command) as build_command, \
+             patch("asr_agent.tools.bailian.check_command_length", wraps=check_command_length) as check_length:
             command = prepare_command(self.project, self.arguments, "api_key")
             self.assertIsInstance(command, PreparedCommand)
             self.assertIsInstance(command.argv, tuple)
@@ -110,17 +112,20 @@ class BailianTests(ProjectTestCase):
             self.assertNotIn(private, repr(command))
 
     def test_command_length_includes_terminating_nul(self):
+        """验证命令长度包含末尾NUL字符。"""
         check_command_length(["a" * 32766])
         with self.assertRaisesRegex(SetupError, "32768"):
             check_command_length(["a" * 32767])
 
     def test_command_length_counts_surrogate_pairs(self):
+        """验证命令长度按UTF-16计算代理对。"""
         check_command_length(["😀" * 16383])
         with self.assertRaises(SetupError):
             check_command_length(["😀" * 16383 + "a"])
 
     def test_command_length_includes_windows_quotes_and_escaped_trailing_slash(self):
         # 空格触发外层引号，末尾反斜线在结束引号前必须翻倍。
+        """验证命令长度包含Windows引号和末尾反斜杠。"""
         argument = "prefix " + "a" * 32755 + "\\"
         self.assertEqual(len(subprocess.list2cmdline([argument])), 32766)
         check_command_length([argument])
@@ -128,13 +133,15 @@ class BailianTests(ProjectTestCase):
             check_command_length([argument + "\\"])
 
     def test_oversized_command_stops_before_loading_credentials_or_starting_bl(self):
-        with patch("asr_agent.bailian.bailian_environment") as environment:
+        """验证超长命令在读凭据或启动BL前停止。"""
+        with patch("asr_agent.tools.bailian.bailian_environment") as environment:
             with self.assertRaises(SetupError):
                 prepare_command(self.project, [*self.arguments, "--context", "a" * 32767], "api_key")
         self.popen.assert_not_called()
         environment.assert_not_called()
 
     def test_process_start_failure_is_distinct_from_unknown_cloud_result(self):
+        """验证启动失败与已启动后的云端未知结果分开。"""
         self.popen.side_effect = OSError("synthetic process start failure")
         command = prepare_command(self.project, self.arguments, "api_key")
         with self.assertRaises(BailianFailure) as caught:
@@ -144,6 +151,7 @@ class BailianTests(ProjectTestCase):
         self.popen.assert_called_once()
 
     def test_failed_recognition_is_not_retried_and_redacts_key_from_error(self):
+        """验证识别失败返回脱敏错误且调用次数为一。"""
         self.process.returncode = 1
         self.process.communicate.return_value = (None, json.dumps({"error": {
             "code": 1, "api_code": "InvalidApiKey", "http_status": 401,
@@ -161,6 +169,7 @@ class BailianTests(ProjectTestCase):
         self.process.kill.assert_not_called()
 
     def test_interrupted_wait_kills_and_reaps_the_existing_process_without_retry(self):
+        """验证中断等待时终止并回收原进程。"""
         command = prepare_command(self.project, self.arguments, "api_key")
         for failure in (subprocess.TimeoutExpired("synthetic", 1), KeyboardInterrupt(),
                         OSError("synthetic pipe failure")):
@@ -181,9 +190,11 @@ class BailianTests(ProjectTestCase):
 
     def test_timeout_reaps_an_actual_local_waiting_process(self):
         # 真进程只等待，不读凭据、不访问网络，验证超时处理确实回收Windows进程。
+        """验证超时能回收真实本机等待进程。"""
         children = []
 
         def start_waiter(*args, **kwargs):
+            """启动本机等待进程作为超时回收测试替身。"""
             child = _REAL_POPEN([sys.executable, "-c", "import time; time.sleep(30)"],
                                cwd=self.project.root, stdin=subprocess.DEVNULL,
                                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
@@ -195,7 +206,7 @@ class BailianTests(ProjectTestCase):
         self.popen.side_effect = start_waiter
         command = prepare_command(self.project, self.arguments, "console")
         try:
-            with patch("asr_agent.bailian.PROCESS_SECONDS", 0.05):
+            with patch("asr_agent.tools.bailian.PROCESS_SECONDS", 0.05):
                 with self.assertRaises(BailianFailure) as caught:
                     run_recognition(self.project, command, [])
             self.assertTrue(caught.exception.started)
@@ -208,6 +219,7 @@ class BailianTests(ProjectTestCase):
                     child.communicate()
 
     def test_error_report_separates_cli_exit_code_from_api_error(self):
+        """验证报告区分CLI退出码和API错误码。"""
         payload = {"error": {"code": 999, "api_code": "InvalidParameter", "http_status": 400,
                              "request_id": "synthetic-request", "message": "bad parameter",
                              "cause": {"message": "private detail"}, "hint": "private hint"}}
@@ -221,6 +233,7 @@ class BailianTests(ProjectTestCase):
         self.assertNotIn("hint", report)
 
     def test_unknown_api_code_preserves_scalar_evidence_without_inventing_meaning(self):
+        """验证未知API码保留标量证据并标记字典范围。"""
         report = explain_cli_error(91, json.dumps({"error": {
             "api_code": "Synthetic.NewError", "http_status": 599,
             "request_id": "synthetic-request", "message": "synthetic problem",
@@ -232,6 +245,7 @@ class BailianTests(ProjectTestCase):
         self.assertIsNone(report["source_url"])
 
     def test_malformed_stderr_is_not_forwarded(self):
+        """验证异常标准错误返回固定解析说明。"""
         for payload in ("raw private stderr", "null", "[]", '{"error": []}',
                         '{"error":{"api_code":[],"request_id":{},"http_status":true,"message":{}}}'):
             with self.subTest(payload=payload):
@@ -242,6 +256,7 @@ class BailianTests(ProjectTestCase):
                 self.assertIn("未提供可解析", report["message"])
 
     def test_redaction_covers_private_values_urls_tokens_and_all_visible_error_fields(self):
+        """验证私有输入、URL和令牌在错误字段中隐藏。"""
         private = ["synthetic-token", "合成私密上下文", "合成词"]
         text = ("synthetic-token 合成私密上下文 合成词 "
                 "https://example.invalid/result?signature=secret oss://synthetic/audio "
@@ -259,6 +274,7 @@ class BailianTests(ProjectTestCase):
         self.assertLessEqual(len(redact_message("a" * 1000, [])), 800)
 
     def test_console_status_requires_model_key_not_just_authenticated(self):
+        """验证模型Key存在才表示可执行识别。"""
         for status, configured in (({"authenticated": True, "console": {"masked": "masked"}}, False),
                                    ({"authenticated": True, "openapi": {"source": "config"}}, False),
                                    ({"authenticated": True, "api_key": "invalid"}, False),
@@ -275,6 +291,7 @@ class BailianTests(ProjectTestCase):
         self.assertEqual(argv[2:], ("auth", "status", "--config", "default", "--output", "json", "--quiet"))
 
     def test_console_status_rejects_nonobject_or_invalid_json(self):
+        """验证控制台状态拒绝非对象或无效JSON。"""
         for output in ("not json", "[]", "null", "true"):
             with self.subTest(output=output):
                 self.process.communicate.return_value = (output, "")
@@ -282,6 +299,7 @@ class BailianTests(ProjectTestCase):
                     console_status(self.project)
 
     def test_console_only_callback_is_reported_without_telling_user_to_login_again(self):
+        """验证控制台凭据存在且模型Key缺失时返回配置说明。"""
         self.process.communicate.return_value = (json.dumps({
             "authenticated": True, "console": {"source": "config", "masked": "synthetic-masked"},
         }), "")
@@ -295,6 +313,7 @@ class BailianTests(ProjectTestCase):
         self.assertNotIn("synthetic-masked", json.dumps(report))
 
     def test_successful_login_process_still_checks_public_status(self):
+        """验证登录进程成功后仍检查公开状态。"""
         self.process.stdout = io.StringIO("")
         self.process.stderr = io.StringIO("")
         self.process.communicate.return_value = (json.dumps({"authenticated": False}), "")
@@ -309,6 +328,7 @@ class BailianTests(ProjectTestCase):
         self.assertNotIn("DASHSCOPE_API_KEY", first.kwargs["env"])
 
     def test_failed_login_does_not_repeat_login_or_request_status(self):
+        """验证登录失败立即返回原进程错误。"""
         self.process.returncode = 6
         self.process.stdout = io.StringIO("")
         self.process.stderr = io.StringIO('{"error":{"code":6,"message":"synthetic network failure"}}')
@@ -316,16 +336,15 @@ class BailianTests(ProjectTestCase):
             login_console(self.project)
         self.popen.assert_called_once()
 
-    @unittest.skipUnless((ROOT / ".tools/bailian/node_modules/bailian-cli/dist/bailian.mjs").is_file()
-                         and shutil.which("node"), "需要项目内BL和Node运行本机状态合约")
+    @unittest.skipUnless(Project(ROOT).bl_entry.is_file(), "需要项目内BL运行本机状态合约")
     def test_real_cli_status_reads_only_synthetic_project_configuration(self):
+        """验证真实CLI返回合成项目的登录状态。"""
         config = self.project.path(".state/bailian/config.json")
         config.write_text(json.dumps({"api_key": self.key,
                                      "base_url": "https://dashscope.aliyuncs.com"}), encoding="utf-8")
         self.popen.side_effect = _REAL_POPEN
-        entry = ROOT / ".tools/bailian/node_modules/bailian-cli/dist/bailian.mjs"
-        with patch("asr_agent.bailian.bl_command", side_effect=lambda project, args:
-                   [shutil.which("node"), str(entry), *args, "--quiet"]):
+        with patch("asr_agent.tools.bailian.bl_command", side_effect=lambda project, args:
+                   [str(find_node()), str(Project(ROOT).bl_entry), *args, "--quiet"]):
             report = console_status(self.project)
         self.assertTrue(report["configured"])
         self.assertFalse(report["verified_online"])

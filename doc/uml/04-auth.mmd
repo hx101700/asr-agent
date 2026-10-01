@@ -1,0 +1,58 @@
+sequenceDiagram
+actor U as 用户
+participant C as Codex＋Skill
+participant W as 本机网页
+participant S as Session对象
+participant P as Python CLI入口
+participant K as bailian（函数模块）
+participant B as BL进程
+participant A as 官方登录页
+participant F as 本机凭据
+Note over U,F: 两种模式使用同一ASR模型；区别为凭据来源和首次配置<br/>serve与transcribe分属独立Python进程<br/>转写片段是05-transcribe中命令准备的凭据视图
+alt 使用指定API Key
+    U->>F: 在项目.env填写DASHSCOPE_API_KEY
+    U->>W: 编辑期间勾选指定Key
+    W->>S: 受保护的POST /api/api-key，经web分派
+    S->>F: auth.read_api_key()读取并检查本地格式
+    F-->>S: API Key值
+    S-->>W: 仅向本机页面返回显示值
+    W->>W: 设置只读密码控件
+    Note over W,F: 前端Model保存读取状态；config保存auth_mode<br/>切换方式或保存成功清空Key控件
+    C->>P: 确认配置且授权后调用transcribe
+    P->>K: prepare_command()，由转写用例调用
+    K->>F: auth.bailian_environment()读取执行当时的Key
+    F-->>K: 运行时Key
+    K-->>P: PreparedCommand(argv, env)
+    P->>K: run_recognition(command, private_values)
+    K->>B: Popen(argv, env含DASHSCOPE_API_KEY)
+else 使用控制台配置
+    Note over C,P: 状态不明时按需console-status；已知配置可直接复用<br/>首次配置或主动重新登录时调用login
+    opt 首次配置或主动重新登录
+        C->>P: scripts/asr.py login
+        P->>K: login_console(project)
+        K->>B: bl auth login --console
+        B->>A: 建立官方授权会话
+        opt BL输出Windows备用URL
+            B-->>K: 原会话的完整官方登录URL
+            K->>K: _open_console_fallback()校验URL
+            K->>A: 用系统打开完整URL一次
+        end
+        U->>A: 完成登录授权
+        A-->>B: 原BL授权会话的回调
+        B->>F: 保存.state/bailian凭据
+        B-->>K: 登录进程结束
+        K->>B: console_status()调用bl auth status
+        B-->>K: 本地模型Key与控制台凭据状态
+        K-->>P: configured、console_configured
+        P-->>C: 登录及本地状态回执
+    end
+    C->>P: 确认配置且授权后调用transcribe
+    P->>K: prepare_command()构造项目隔离环境
+    K-->>P: PreparedCommand(argv, env)
+    P->>K: run_recognition(command, private_values)
+    K->>B: Popen(argv, BAILIAN_CONFIG_DIR指向项目)
+    B->>F: 使用.state/bailian模型凭据
+end
+Note over K,A: Python转交BL输出的官方URL<br/>授权会话、回调及凭据保存由BL负责
+Note over C,B: configured表示模型Key存在；console_configured表示控制台凭据存在<br/>均为本地状态；不同于网页event=configured
+Note over C,F: 入口直接分派单一工具命令；bailian是函数模块而非服务类<br/>src/asr_agent/application/session.py::api_key_display<br/>tools/auth.py::read_api_key、bailian_environment<br/>tools/bailian.py::prepare_command、login_console、console_status

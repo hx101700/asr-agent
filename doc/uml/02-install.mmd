@@ -1,0 +1,51 @@
+sequenceDiagram
+actor U as 用户
+participant C as Codex＋Skill
+participant B as bootstrap（函数模块）
+participant R as 本机运行时
+participant M as pip／npm进程
+participant F as 项目文件
+Note over U,F: Windows 10/11 x64；本机CPython 3.12 x64、Node及npm<br/>固定模型qwen-audio-3.0-asr-flash-filetrans、北京、单文件
+U->>C: 提供ZIP和安装目录
+C->>F: 展开发行包到项目根
+Note over C,F: ZIP含运行代码、Skill、依赖锁及用户说明<br/>Python、Node、安装依赖和开发文档由发行清单排除
+C->>B: python -S -X utf8 scripts/asr.py bootstrap
+B->>R: check_python()；check_node()执行node --version
+B->>F: 读取requirements.txt和BL的package-lock.json
+B->>F: 检查既有.tools/bailian版本与目录
+alt 运行时、依赖锁或BL目录冲突
+    B-->>C: SetupError；CLI返回失败说明
+else 前置条件满足
+    opt 已有匹配的BL安装
+        B->>R: verify_bl_installation()执行项目BL --version
+    end
+    opt 本轮需安装BL
+        B->>R: npm_entry()检查npm入口
+    end
+    B->>F: Project.prepare()创建运行目录与空npm配置
+    B->>F: 检查既有.venv的身份和入口
+    opt .venv不存在
+        B->>R: venv.EnvBuilder(with_pip=false).create()
+        R->>F: 建立项目.venv
+    end
+    B->>R: 启动项目Python核对版本与平台
+    B->>R: installed_python_versions()加载依赖并比较锁定版本
+    opt Python依赖与锁不一致
+        opt 项目环境缺少pip
+            B->>R: python -m ensurepip --default-pip
+        end
+        B->>M: pip install --require-hashes --only-binary
+        Note over M,F: 阿里云PyPI镜像；安装全部锁定wheel至.venv<br/>含PyAV；网络失败返回实际原因
+        M->>F: 安装Python依赖
+        B->>R: 再次核对实际依赖加载和版本
+    end
+    opt BL尚未安装
+        B->>F: 复制BL package.json和package-lock.json
+        B->>M: npm ci --prefix .tools/bailian
+        M->>F: 安装锁定BL及依赖
+        B->>R: verify_bl_installation()验证新安装入口
+    end
+    B-->>C: installed / already_installed
+end
+Note over B,M: 顺序调用；任一步失败即结束<br/>完整安装可复用；BL非空残留或版本冲突需明确处理<br/>bootstrap负责环境，鉴权另见04-auth
+Note over C,F: 函数模块：src/asr_agent/application/bootstrap.py<br/>工具：src/asr_agent/tools/environment.py、bailian.py<br/>入口：scripts/asr.py；使用步骤：.agents/skills/asr-agent/SKILL.md

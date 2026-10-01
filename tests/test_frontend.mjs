@@ -1,13 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createPresenter, createApi } from "../src/asr_agent/static/app.mjs";
+import { createPresenter } from "../src/asr_agent/static/app.mjs";
+import { createApi } from "../src/asr_agent/static/api.mjs";
 import { createModel, availability, configuration, receiveSaveError } from "../src/asr_agent/static/model.mjs";
 
 const limits = { audio_bytes: 2_000_000_000, hotwords_bytes: 5_000_000, context_chars: 400, speaker_min: 2, speaker_max: 100 };
-const description = { model: "fixed-model", region: "beijing", limits, languages: [["zh", "中文"]], output_defaults: { json: "outputs", document: "outputs" } };
+const description = { model: "fixed-model", region: "华北2（北京）", limits, audio_suffixes: [".wav"], languages: [["zh", "中文"]], output_defaults: { json: "outputs", document: "outputs" } };
 const audio = { name: "sample.wav", size: 64000 };
+// 生成指定编号的合成预览回执。
 const validation = (id = "validation-1") => ({ validation_id: id, summary: {} });
 
+// 创建由测试主动决定成功或失败的等待任务。
 function deferred() {
   let resolve;
   let reject;
@@ -15,51 +18,60 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-// 测试替身只有 View/API 的公开契约；浏览器原生行为另做实际页面验证。
+// View/API 替身提供前端交互测试所需的公开方法。
+// 组合表单、界面和接口替身并记录交互顺序。
 function harness(overrides = {}) {
   const events = [];
   const calls = [];
   const form = { useApiKey: false, diarizationEnabled: true, hotwordsEnabled: false, contextEnabled: false, context: "", language: "", speaker: { value: "", badInput: false } };
   const view = {
     apiKey: "", current: null, error: null, focus: null,
-    bind() {}, initialize() {}, readForm: () => structuredClone(form),
+    /* 提供事件绑定契约的空替身。 */ bind() {}, /* 提供页面初始化契约的空替身。 */ initialize() {}, /* 返回测试表单的独立副本。 */ readForm: () => structuredClone(form),
+    // 保存本轮界面状态并记录渲染顺序。
     render(model, available) {
       this.current = { phase: model.phase, available: structuredClone(available) };
       events.push(["render", model.phase, available.editable]);
     },
-    showError(error) { this.error = error; events.push(["error", error.field]); },
-    clearError() { this.error = null; },
-    clearApiKey() { this.apiKey = ""; },
-    setApiKey(value) { this.apiKey = value; },
-    clearFile() {}, fileExtensions: (kind) => kind === "audio" ? [".wav"] : [".xlsx"],
-    focusPreview() { this.focus = "preview"; }, focusForm() { this.focus = "form"; },
-    focusReceipt() { this.focus = "receipt"; }, download() {},
+    /* 保存字段错误并记录呈现顺序。 */ showError(error) { this.error = error; events.push(["error", error.field]); },
+    /* 清除测试界面的当前错误。 */ clearError() { this.error = null; },
+    /* 清除界面替身持有的合成Key。 */ clearApiKey() { this.apiKey = ""; },
+    /* 在界面替身中显示指定合成Key。 */ setApiKey(value) { this.apiKey = value; },
+    /* 提供文件控件清理契约的空替身。 */ clearFile() {},
+    /* 记录焦点已移至预览区。 */ focusPreview() { this.focus = "preview"; }, /* 记录焦点已移至表单区。 */ focusForm() { this.focus = "form"; },
+    /* 记录焦点已移至保存回执。 */ focusReceipt() { this.focus = "receipt"; }, /* 提供文件下载契约的空替身。 */ download() {},
   };
   const handlers = {
+    // 返回合成的会话规则和默认保存位置。
     "/api/session": () => description,
+    // 返回测试音频已接收的合成回执。
     "/api/upload-audio": () => ({ upload_id: "audio-1", name: audio.name, size_bytes: audio.size }),
+    // 返回测试热词已接收的合成回执。
     "/api/upload-hotwords": () => ({ upload_id: "words-1", name: "words.xlsx", size_bytes: 100 }),
+    // 返回默认的合成配置预览。
     "/api/validate": () => validation(),
     ...overrides,
   };
   const api = {
+    // 记录接口调用并交给对应的本机测试处理器。
     async request(path, payload, file) {
       calls.push({ path, payload: structuredClone(payload), file });
       assert.ok(handlers[path], `未预期的请求：${path}`);
       return handlers[path](payload, file);
     },
-    template: async () => "fixture-blob",
+    /* 返回供下载流程使用的合成模板。 */ template: async () => "fixture-blob",
   };
   let sequence = 0;
   const presenter = createPresenter(view, api, () => `request-${++sequence}`);
   return { ...presenter, form, view, events, calls, handlers };
 }
 
+// 初始化测试页面并添加合成音频。
 async function addAudio(page) {
   await page.actions.start();
   await page.actions.upload("audio", [audio]);
 }
 
+// 添加音频并确认测试页面进入预览状态。
 async function preview(page) {
   await addAudio(page);
   await page.actions.validate();
@@ -213,6 +225,36 @@ test("API Key 只交给 View，关闭模式清空，迟到结果不能恢复凭�
   assert.equal(page.model.auth.status, "idle");
 });
 
+test("API Key 读取失败不能预览，关闭该模式后可以继续", async () => {
+  const page = harness({ "/api/api-key": () => { throw new Error("请填写项目 .env"); } });
+  await addAudio(page);
+  page.form.useApiKey = true;
+  await page.actions.changed("use-api-key");
+  assert.equal(page.model.auth.status, "failed");
+  await page.actions.validate();
+  assert.equal(page.view.error.field, "auth_mode");
+  assert.equal(page.calls.filter((call) => call.path === "/api/validate").length, 0);
+  page.form.useApiKey = false;
+  await page.actions.changed("use-api-key");
+  await page.actions.validate();
+  assert.equal(page.model.phase, "review");
+});
+
+test("预览后切换鉴权方式使预览失效，不能确认旧设置", async () => {
+  const page = harness({ "/api/api-key": () => ({ value: "fixture-only" }) });
+  await addAudio(page);
+  page.form.useApiKey = true;
+  await page.actions.changed("use-api-key");
+  await page.actions.validate();
+  assert.equal(page.model.phase, "review");
+  page.form.useApiKey = false;
+  await page.actions.changed("use-api-key");
+  await page.actions.confirm();
+  assert.equal(page.calls.filter((call) => call.path === "/api/confirm").length, 0);
+  assert.equal(page.model.phase, "editing");
+  assert.equal(page.model.preview, null);
+});
+
 test("关闭发言人区分不提交之前的人数或非法输入", async () => {
   const page = harness();
   await addAudio(page);
@@ -248,8 +290,8 @@ test("等待目录窗口可以编辑和上传；取消使用当前 ID，返回�
   assert.equal(page.calls.at(-1).payload.speaker_count, 4);
 });
 
-test("目录超时恢复按钮后再定位，不自动重开窗口", async () => {
-  const page = harness({ "/api/select-directory": () => { throw Object.assign(new Error("窗口等待超时"), { httpStatus: 422 }); } });
+test("目录窗口异常恢复按钮后再定位，不自动重开窗口", async () => {
+  const page = harness({ "/api/select-directory": () => { throw Object.assign(new Error("窗口异常退出"), { httpStatus: 422 }); } });
   await preview(page);
   await page.actions.selectDirectory("json");
   assert.equal(page.model.picker, null);
@@ -280,6 +322,16 @@ test("人数和上下文使用服务端 limits，而非重复的固定数值", a
   page.form.context = "甲乙丙丁";
   await page.actions.validate();
   assert.match(page.view.error.message, /3 个字符/);
+});
+
+test("音频扩展名使用服务端列表，不从 DOM 反读业务规则", async () => {
+  const page = harness({ "/api/session": () => ({ ...description, audio_suffixes: [".flac"] }) });
+  await page.actions.start();
+  await page.actions.upload("audio", [audio]);
+  assert.equal(page.view.error.field, "audio_upload_id");
+  assert.equal(page.calls.filter((call) => call.path === "/api/upload-audio").length, 0);
+  await page.actions.upload("audio", [{ name: "sample.FLAC", size: 64000 }]);
+  assert.equal(page.calls.filter((call) => call.path === "/api/upload-audio").length, 1);
 });
 
 test("上传期间禁止同类并发，成功后显示接收结果，失败不自动重试", async () => {
@@ -341,4 +393,21 @@ test("HTTP 适配器保留明确错误状态，未知 JSON 结果不能当作明
   model.phase = "saving";
   try { await invalid.request("/api/confirm", {}); } catch (error) { receiveSaveError(model, error); }
   assert.equal(model.phase, "save_unknown");
+});
+
+test("上下文中的引号、换行、路径和Unicode保留到HTTP JSON参数", async () => {
+  const page = harness();
+  await addAudio(page);
+  page.form.contextEnabled = true;
+  page.form.context = '--help a=b "中文"\r\nC:\\voice files\\\t😀𠮷 cafe\u0301 $HOME &|<>^%! `文本`';
+  await page.actions.validate();
+  const payload = page.calls.at(-1).payload;
+  assert.equal(payload.context, page.form.context);
+  let sent;
+  const api = createApi(async (url, options) => {
+    sent = JSON.parse(options.body);
+    return { ok: true, json: async () => ({ ok: true }) };
+  }, "fixture-token");
+  await api.request("/api/validate", payload);
+  assert.deepEqual(sent, payload);
 });
