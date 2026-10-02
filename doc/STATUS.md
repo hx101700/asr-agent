@@ -33,7 +33,7 @@
 - UML已按源码核对并检查渲染图；发行清单、CRC、源码逐字节一致性及包内/开发文档链接通过。
 - 当前本地发行包为dist/asr-agent.zip，46个文件、119356字节。SHA-256：`8e2a200733187707a26c3941dae633e25cb0be7c226d844597f800277dbe1c6b`。新增README.en.md、AGENTS.en.md；原有文件仅README、AGENTS、REFERENCES内容变化，业务代码保持一致。
 - 双语更新已通过9项打包测试、8份双语文档链接/锚点/代码字面量核对、ZIP的CRC及逐文件内容比较；本轮未重复安装或执行识别。
-- 已有GitHub预览版[v0.1.0-preview.1](https://github.com/hx101700/asr-agent/releases/tag/v0.1.0-preview.1)对应双语更新之前的包。双语包准备发布为v0.1.0-preview.2，发布完成前以本地包为准；旧发布记录保留。
+- 已有GitHub预览版[v0.1.0-preview.1](https://github.com/hx101700/asr-agent/releases/tag/v0.1.0-preview.1)对应双语更新之前的包。双语内容已本地提交，但推送连续两次无法连接github.com:443，按约定停止。新Release尚未创建；当前双语包仅在本地dist中，README下载入口继续指向有效的Releases列表。
 - README更新后9项打包测试、文档链接与目录锚点、ZIP的CRC和源码一致性检查通过；本次没有重复安装或执行识别。
 - 运行代码与`0f76157f39099413a146532fa3ff7f2c2ff17909`一致。后续README及交付记录修改通过[dev分支](https://github.com/hx101700/asr-agent/tree/dev)的Git历史追溯，当前包以本节摘要核对。
 - 根README/README.en、AGENTS/AGENTS.en和.gitignore来自release模板。包内doc仅HELP、ERRORS、REFERENCES；开发文档、截图、测试、UML图、运行时、依赖包、凭据、数据和成品均不发布。
@@ -47,3 +47,5 @@
 新Codex对话的完整编排、官方登录、云端识别质量、原生目录窗口可见性和Office逐页视觉仍待专家验收。本轮没有读取用户录音、使用真实凭据或调用云端识别；不能用本机模拟替代上述验收。
 
 接续先核对Git工作区和实际远端引用，按[ACCEPTANCE](ACCEPTANCE.md)执行相称验证。开发分支为dev，master保持验收里程碑用途；本地提交不代表推送完成。现有恢复、安装反馈和任务找回限制见[ISSUES](ISSUES.md)，模块及协议见[DEVELOPMENT](DEVELOPMENT.md)。
+
+本轮交付待办：网络恢复并继续任务后，先同步dev，再以包含双语模板的准确提交发布v0.1.0-preview.2，上传本节摘要对应的ZIP并核对公开下载。不要把preview.1附件当成双语包，也不要覆盖其既有摘要。

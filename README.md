@@ -8,7 +8,7 @@ asr-agent 是一个面向 Windows 用户的录音转写工具，适合处理会�
 
 语音识别由阿里云百炼的 `qwen-audio-3.0-asr-flash-filetrans` 提供，使用北京地域。当前为 Windows 预览版，每次处理一个文件。
 
-[下载安装包](https://github.com/hx101700/asr-agent/releases/download/v0.1.0-preview.2/asr-agent.zip) · [开始使用](#开始使用) · [输出文件](#输出文件) · [常见问题](#常见问题) · [详细使用说明](doc/HELP.md)
+[下载安装包](https://github.com/hx101700/asr-agent/releases) · [开始使用](#开始使用) · [输出文件](#输出文件) · [常见问题](#常见问题) · [详细使用说明](doc/HELP.md)
 
 ## 主要功能
 

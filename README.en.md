@@ -8,7 +8,7 @@ asr-agent is a recording transcription tool for Windows. It is designed for exis
 
 Speech recognition uses Alibaba Cloud Model Studio's `qwen-audio-3.0-asr-flash-filetrans` in the Beijing region. This Windows preview processes one file at a time. The current web UI and generated document labels are in Chinese.
 
-[Download the package](https://github.com/hx101700/asr-agent/releases/download/v0.1.0-preview.2/asr-agent.zip) · [Get started](#get-started) · [Output files](#output-files) · [FAQ](#faq) · [Detailed guide (Chinese)](doc/HELP.md)
+[Download the package](https://github.com/hx101700/asr-agent/releases) · [Get started](#get-started) · [Output files](#output-files) · [FAQ](#faq) · [Detailed guide (Chinese)](doc/HELP.md)
 
 ## Features
 
