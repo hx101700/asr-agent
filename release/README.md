@@ -6,7 +6,7 @@
 
 asr-agent 适合处理会议、访谈、课程等已经录制好的音频。在 Codex 中提出需求，在本机网页选择文件和设置，完成后获得三种转写文档及原始识别 JSON。
 
-语音识别由阿里云百炼北京地域的 `qwen-audio-3.0-asr-flash-filetrans` 提供。支持 Windows 10/11 x64，每次处理一个文件，支持时间戳、发言人区分，以及热词和上下文同时使用。
+语音识别由[阿里云百炼](https://help.aliyun.com/zh/model-studio/what-is-model-studio)北京地域的 `qwen-audio-3.0-asr-flash-filetrans` 提供，通过官方 [BL CLI](https://github.com/modelstudioai/cli) 调用。支持 Windows 10/11 x64，每次处理一个文件，支持时间戳、发言人区分，以及热词和上下文同时使用。
 
 ## 开始之前
 
@@ -66,5 +66,13 @@ Codex 会安装项目依赖和阿里云百炼 CLI，再打开本机网页。首�
 - [详细使用说明](doc/HELP.md)：手动安装命令、文件要求、保存位置和退出方法。
 - [状态与错误说明](doc/ERRORS.md)：遇到失败时如何处理。
 - [官方能力依据](doc/REFERENCES.md)：模型参数与输入限制。
+
+## 服务与上游项目
+
+阿里云百炼提供云端语音识别服务，官方 BL CLI 负责账号登录、上传与识别调用；asr-agent 提供本机设置页面和文档导出。项目安装流程会配置所需的 CLI 版本。
+
+- [百炼控制台](https://bailian.console.aliyun.com/)：配置账号与 API Key。
+- [百炼官方文档](https://help.aliyun.com/zh/model-studio/)：模型和接口说明。
+- [BL CLI 官网](https://bailian.console.aliyun.com/cli) · [BL CLI GitHub 源码](https://github.com/modelstudioai/cli)。
 
 本项目采用 [Apache-2.0](LICENSE) 许可证。

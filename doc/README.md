@@ -23,7 +23,7 @@
 | [ACCEPTANCE](ACCEPTANCE.md) | 已执行的验证、复测方法与未覆盖场景 |
 | [ISSUES](ISSUES.md) | 当前功能不足、运行限制与待验证事项 |
 | [DEVLOG](DEVLOG.md) | 重要实现决策与里程碑 |
-| [发布说明稿](../release/NOTES.md) | 当前版本面向用户的变化与下载说明，供发布时使用 |
+| [发布说明：中文](../release/NOTES.md) / [English](../release/NOTES.en.md) | 当前版本面向用户的变化与下载说明，供发布时使用 |
 
 ## 文档维护
 

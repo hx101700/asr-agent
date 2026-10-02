@@ -6,7 +6,7 @@
 
 asr-agent 是一个面向 Windows 用户的录音转写工具，适合处理会议、访谈、课程等已经录制好的音频。在 Codex 中提出转写需求，在本机网页选择文件和设置，完成后就能获得可阅读、编辑和归档的转写文档。
 
-语音识别由阿里云百炼的 `qwen-audio-3.0-asr-flash-filetrans` 提供，使用北京地域。支持 Windows 10/11 x64，每次处理一个文件。
+语音识别由[阿里云百炼](https://help.aliyun.com/zh/model-studio/what-is-model-studio)的 `qwen-audio-3.0-asr-flash-filetrans` 提供，通过官方 [BL CLI](https://github.com/modelstudioai/cli) 调用，使用北京地域。支持 Windows 10/11 x64，每次处理一个文件。
 
 [下载安装包](https://github.com/hx101700/asr-agent/releases) · [开始使用](#开始使用) · [输出文件](#输出文件) · [常见问题](#常见问题) · [详细使用说明](doc/HELP.md)
 
@@ -146,6 +146,21 @@ python -S -X utf8 scripts/asr.py bootstrap
 ```
 
 这两条命令安装环境并打开设置页面。登录、执行转写和本地重导的完整命令见[使用说明](doc/HELP.md)。
+
+## 服务与上游项目
+
+[阿里云百炼](https://help.aliyun.com/zh/model-studio/what-is-model-studio)是阿里云的模型服务与 AI 应用开发平台。本项目使用其中的云端语音识别能力，账号和 API Key 由你在百炼配置。
+
+[百炼 CLI（BL CLI）](https://github.com/modelstudioai/cli)是百炼的官方命令行工具。在 asr-agent 中，它负责登录、上传录音、提交识别和获取结果；asr-agent 提供本机网页、增强输入和文档导出。
+
+| 官方入口 | 用途 |
+| --- | --- |
+| [百炼控制台](https://bailian.console.aliyun.com/) | 管理账号、模型访问与 API Key |
+| [百炼文档](https://help.aliyun.com/zh/model-studio/) | 查看模型、接口与使用要求 |
+| [BL CLI 官网](https://bailian.console.aliyun.com/cli) | 了解官方 CLI 的能力与用法 |
+| [BL CLI GitHub](https://github.com/modelstudioai/cli) | 查看源码、版本记录及上游问题 |
+
+项目安装流程会配置所需的 CLI 版本，使用时按本文步骤操作即可。
 
 ## 文档与参与开发
 

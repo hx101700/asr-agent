@@ -6,7 +6,7 @@
 
 asr-agent processes existing meeting, interview, and lecture recordings. Ask Codex to start, select a file and options on a local web page, and receive three document formats plus the original recognition JSON.
 
-Speech recognition uses Alibaba Cloud Model Studio's `qwen-audio-3.0-asr-flash-filetrans` in Beijing. The tool supports Windows 10/11 x64 and processes one file at a time, with timestamps, speaker diarization, and combined hotword and context support. The current web UI and generated document labels are in Chinese.
+Speech recognition uses [Alibaba Cloud Model Studio](https://help.aliyun.com/zh/model-studio/what-is-model-studio)'s `qwen-audio-3.0-asr-flash-filetrans` in Beijing through the official [BL CLI](https://github.com/modelstudioai/cli). The tool supports Windows 10/11 x64 and processes one file at a time, with timestamps, speaker diarization, and combined hotword and context support. The current web UI and generated document labels are in Chinese.
 
 ## Before you start
 
@@ -66,5 +66,13 @@ To regenerate documents, retain the project folder and original JSON, then ask C
 - [Detailed guide (Chinese)](doc/HELP.md): manual commands, file requirements, output locations, and stopping the application.
 - [Status and errors (Chinese)](doc/ERRORS.md): what to do when an operation fails.
 - [Official references (Chinese)](doc/REFERENCES.md): model parameters and input limits.
+
+## Services and upstream projects
+
+Alibaba Cloud Model Studio provides cloud speech recognition. Its official BL CLI handles login, upload, and recognition calls; asr-agent adds the local settings page and document exports. The project installer sets up the required CLI version.
+
+- [Model Studio console](https://bailian.console.aliyun.com/): manage your account and API keys.
+- [Official documentation (Chinese)](https://help.aliyun.com/zh/model-studio/): model and API guidance.
+- [BL CLI website](https://bailian.console.aliyun.com/cli) · [BL CLI source on GitHub](https://github.com/modelstudioai/cli).
 
 This project is licensed under [Apache-2.0](LICENSE).

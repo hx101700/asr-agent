@@ -6,7 +6,7 @@
 
 asr-agent is a recording transcription tool for Windows. It is designed for existing meeting, interview, and lecture recordings. Ask Codex to start, choose a file and options on a local web page, and receive documents you can read, edit, and archive.
 
-Speech recognition uses Alibaba Cloud Model Studio's `qwen-audio-3.0-asr-flash-filetrans` in the Beijing region. The tool supports Windows 10/11 x64 and processes one file at a time. The current web UI and generated document labels are in Chinese.
+Speech recognition uses [Alibaba Cloud Model Studio](https://help.aliyun.com/zh/model-studio/what-is-model-studio)'s `qwen-audio-3.0-asr-flash-filetrans` through its official [BL CLI](https://github.com/modelstudioai/cli), in the Beijing region. The tool supports Windows 10/11 x64 and processes one file at a time. The current web UI and generated document labels are in Chinese.
 
 [Download the package](https://github.com/hx101700/asr-agent/releases) · [Get started](#get-started) · [Output files](#output-files) · [FAQ](#faq) · [Detailed guide (Chinese)](doc/HELP.md)
 
@@ -146,6 +146,21 @@ python -S -X utf8 scripts/asr.py bootstrap
 ```
 
 The [detailed guide (Chinese)](doc/HELP.md) also covers login, transcription, and local re-export commands.
+
+## Services and upstream projects
+
+[Alibaba Cloud Model Studio (Bailian)](https://help.aliyun.com/zh/model-studio/what-is-model-studio) provides model services and tools for building AI applications. This project uses its cloud speech recognition service with your Model Studio account or API key.
+
+[BL CLI](https://github.com/modelstudioai/cli) is Model Studio's official command-line tool. It handles login, audio upload, recognition submission, and result retrieval here. asr-agent adds the local page, enhancement inputs, and document exports.
+
+| Official resource | Purpose |
+| --- | --- |
+| [Model Studio console](https://bailian.console.aliyun.com/) | Manage your account, model access, and API keys |
+| [Model Studio documentation (Chinese)](https://help.aliyun.com/zh/model-studio/) | Read model, API, and usage requirements |
+| [BL CLI website](https://bailian.console.aliyun.com/cli) | Explore the official CLI and its usage |
+| [BL CLI on GitHub](https://github.com/modelstudioai/cli) | Browse source code, releases, and upstream issues |
+
+The project installer sets up the required CLI version. Follow this guide to use it with asr-agent.
 
 ## Documentation and contributions
 
