@@ -12,7 +12,7 @@ from unittest.mock import patch
 from zipfile import ZipFile
 
 from scripts.build_zip import REQUIRED_FILES, SKILL_DIRECTORY, build_zip
-from asr_transcription.utils.environment import Runtime
+from asr_runtime.utils.environment import Runtime
 from tests.support import RuntimeTestCase, SKILL_ROOT
 
 
@@ -44,7 +44,7 @@ class PackageTests(RuntimeTestCase):
             ".asr-transcription/.env", ".asr-transcription/.state/jobs/config.json",
             ".asr-transcription/.venv/Lib/site-packages/private.py",
             "scripts/bailian/node_modules/private.js", "scripts/developer.py",
-            "scripts/asr_transcription/debug.py", "scripts/asr_transcription/static/debug.ts",
+            "scripts/asr_runtime/debug.py", "scripts/asr_runtime/static/debug.ts",
             "frontend/App.vue", "frontend/main.ts", "frontend/tsconfig.json", "mypy.ini", "requirements-dev.txt",
             "scripts/build_zip.py", "scripts/probe_bl.py", "tests/test_package.py",
             "doc/STATUS.md", "doc/DEVELOPMENT.md", "doc/ACCEPTANCE.md", "doc/uml/private.png",
@@ -185,7 +185,7 @@ class PackageTests(RuntimeTestCase):
         script = (
             "import importlib, pathlib, sys; "
             f"root=pathlib.Path({str(skill / 'scripts')!r}).resolve(); sys.path.insert(0,str(root)); "
-            "modules=[importlib.import_module('asr_transcription.'+name) for name in "
+            "modules=[importlib.import_module('asr_runtime.'+name) for name in "
             "['__main__','web','application.transcription','application.inputs','utils.media','utils.documents']]; "
             "assert all(pathlib.Path(module.__file__).is_relative_to(root) for module in modules)"
         )

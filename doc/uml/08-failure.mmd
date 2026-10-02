@@ -40,4 +40,4 @@ else STOPPED记录保存失败
 end
 Note over C,B: record_error在写入失败后附入当次回执；没有再次补写记录<br/>保持执行占用；失败停止；本图均不自动重试或取消云端任务
 Note over C,F: record_error.phase=save_status<br/>record_error.attempted_status指出失败的保存点<br/>业务异常使用error.phase；本地异常另含error.error_type
-Note over C,F: scripts/asr_transcription/application/transcription.py::_save_status、transcribe<br/>utils/job_files.py::save_record；utils/files.py::write_json_atomic
+Note over C,F: scripts/asr_runtime/application/transcription.py::_save_status、transcribe<br/>utils/job_files.py::save_record；utils/files.py::write_json_atomic

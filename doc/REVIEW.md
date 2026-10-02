@@ -8,7 +8,7 @@ Python 代码路径相对于 `skills/asr-transcription/`；前端与开发配置
 
 | 范围 | 完整阅读的文件 |
 | --- | --- |
-| 入口与共享定义 | scripts/asr.py；asr_transcription下的__init__.py、__main__.py、models.py、error_catalog.json |
+| 入口与共享定义 | scripts/asr.py；scripts/asr_runtime下的__init__.py、__main__.py、models.py、error_catalog.json |
 | 应用用例 | application下的__init__、bootstrap、diagnostics、inputs、rules、session、transcription、delivery |
 | 本机能力 | utils下的__init__、environment、auth、bailian、files、job_files、results、media、hotwords、documents、directory_picker、_directory_dialog、i18n |
 | 网页 | web.py；frontend下的App.vue、main.ts、useTranscription.ts、model.ts、api.ts、types.ts、preferences.ts、i18n.ts、style.css、index.html，以及UploadField、KeyDisplay、ReviewPanel组件 |

@@ -7,8 +7,8 @@ from pathlib import Path
 
 from openpyxl import Workbook
 
-from asr_transcription.utils.environment import Runtime
-from asr_transcription.web import create_server
+from asr_runtime.utils.environment import Runtime
+from asr_runtime.web import create_server
 from tests.support import SKILL_ROOT
 
 

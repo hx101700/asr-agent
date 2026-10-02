@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from asr_transcription.utils.environment import Runtime
+from asr_runtime.utils.environment import Runtime
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = ROOT / "skills/asr-transcription"

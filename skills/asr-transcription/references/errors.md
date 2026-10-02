@@ -32,7 +32,7 @@
 
 ## 状态字段参考
 
-本节供排障和 Codex 解释回执使用。上游CLI/API错误映射位于[错误字典](../scripts/asr_transcription/error_catalog.json)，记录固定版本、核验日期和官方来源；本地错误由项目代码定义。
+本节供排障和 Codex 解释回执使用。上游CLI/API错误映射位于[错误字典](../scripts/asr_runtime/error_catalog.json)，记录固定版本、核验日期和官方来源；本地错误由项目代码定义。
 
 ### 官方云端状态
 

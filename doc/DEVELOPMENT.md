@@ -6,6 +6,12 @@
 
 MemoFlow 是整个产品，目标是从语音输入生成符合用户习惯、重点要求和指定格式的会议纪要，并根据用户提供的范例与确认的修改反馈持续改善。`asr-transcription` 是当前已实现的第一阶段 Skill，承担录音转写与校对稿交付；项目名称与这个具体能力的名称分开维护。
 
+| 名称 | 作用与位置 |
+| --- | --- |
+| `MemoFlow` | 项目与产品名称 |
+| `asr-transcription` | Codex 使用的录音转写 Skill，位于 `skills/asr-transcription/` |
+| `asr_runtime` | Skill 内部的 Python 执行包，位于 `scripts/asr_runtime/`，由 `scripts/asr.py` 调用 |
+
 第一阶段将单个本地录音转为原始 JSON、Excel、Word、Markdown，交给用户检查。模型固定为 `qwen-audio-3.0-asr-flash-filetrans`，北京地域，通过 BL 的临时 OSS 上传。
 
 Codex 读取 Skill，选择工作目录、执行工具并解释回执。网页接收本机文件、编辑选项并保存配置。BL 负责鉴权、上传、提交、轮询、下载和原始 JSON 落盘。Python 负责本机文件、媒体处理、结果解析与文档生成。
@@ -32,7 +38,7 @@ skills/asr-transcription/       # 独立安装的 Skill，运行时只读
 │   ├── asr.py                 # CLI 入口
 │   ├── requirements.txt       # Python 固定版本与摘要
 │   ├── bailian/               # BL npm 依赖锁
-│   └── asr_transcription/     # Python 模块与网页
+│   └── asr_runtime/           # Python 模块与网页
 ├── references/                # 按需读取的操作、模型、错误说明
 ├── assets/env.example         # 空 Key 配置模板
 └── LICENSE
@@ -65,7 +71,7 @@ Python 包内的 `utils/` 集中提供文件、媒体、文档和 CLI 操作，a
 
 ## 模块职责
 
-Python 运行模块位于 `skills/asr-transcription/scripts/asr_transcription/`。多步骤用例按入口 → application → utils 组织，单一操作允许入口直接分派。下表中 `frontend/` 路径相对于仓库根目录，其余代码路径相对于 Python 包目录。
+Python 运行模块位于 `skills/asr-transcription/scripts/asr_runtime/`。多步骤用例按入口 → application → utils 组织，单一操作允许入口直接分派。下表中 `frontend/` 路径相对于仓库根目录，其余代码路径相对于 Python 包目录。
 
 | 模块 | 职责 |
 | --- | --- |
@@ -174,7 +180,7 @@ JSON 与文档保存根默认均为 `<workspace>/transcriptions/`，可分别通
 
 ## 构建与维护
 
-前端由 Vite 在开发阶段构建到 Skill 的 `scripts/asr_transcription/static/`，固定输出 `index.html`、`app.js` 和 `app.css`，并提供 `favicon.svg` 与 `THIRD_PARTY_LICENSES.txt`。Python 本机服务直接提供这些产物，用户安装和使用时无需安装前端构建依赖。源码在 `frontend/`，锁定的 Vue、Element Plus、Vite、TypeScript 及检查工具在仓库根 `package.json`、`package-lock.json`；构建行为见 [Vite 官方说明](https://vite.dev/guide/build.html)。
+前端由 Vite 在开发阶段构建到 Skill 的 `scripts/asr_runtime/static/`，固定输出 `index.html`、`app.js` 和 `app.css`，并提供 `favicon.svg` 与 `THIRD_PARTY_LICENSES.txt`。Python 本机服务直接提供这些产物，用户安装和使用时无需安装前端构建依赖。源码在 `frontend/`，锁定的 Vue、Element Plus、Vite、TypeScript 及检查工具在仓库根 `package.json`、`package-lock.json`；构建行为见 [Vite 官方说明](https://vite.dev/guide/build.html)。
 
 开发构建需要 Node.js `^20.19.0 || >=22.12.0`，与 Skill 运行时 BL 所需的 Node.js 18.17+ 分别管理。前端开发命令在仓库根执行：
 

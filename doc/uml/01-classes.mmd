@@ -55,7 +55,7 @@ Session --> Runtime : 持有外部传入的工作目录与资源边界
 Session "1" *-- "1" DirectoryPicker : 会话创建并关闭
 ThreadingHTTPServer <|-- LocalServer
 LocalServer "1" *-- "1" Session : 持有会话并在关闭时清理
-note for Runtime "scripts/asr_transcription/utils/environment.py<br/>resource读取Skill；path定位工作目录/.asr-transcription<br/>运行目录与Skill互不包含；check_output_path保护Skill<br/>output_root为工作目录/transcriptions"
-note for Session "scripts/asr_transcription/application/session.py<br/>上传短锁登记与发布，文件字节接收在锁外<br/>Draft与ConfirmationReceipt描述普通dict字段<br/>Key通过独立方法写入当前工作目录"
-note for DirectoryPicker "scripts/asr_transcription/utils/directory_picker.py<br/>choose_directory函数管理窗口子进程<br/>独立取消信号；Session登记所选精确路径"
-note for LocalServer "scripts/asr_transcription/web.py<br/>create_server创建对象并绑定127.0.0.1<br/>请求处理器使用language_scope隔离提示语言"
+note for Runtime "scripts/asr_runtime/utils/environment.py<br/>resource读取Skill；path定位工作目录/.asr-transcription<br/>运行目录与Skill互不包含；check_output_path保护Skill<br/>output_root为工作目录/transcriptions"
+note for Session "scripts/asr_runtime/application/session.py<br/>上传短锁登记与发布，文件字节接收在锁外<br/>Draft与ConfirmationReceipt描述普通dict字段<br/>Key通过独立方法写入当前工作目录"
+note for DirectoryPicker "scripts/asr_runtime/utils/directory_picker.py<br/>choose_directory函数管理窗口子进程<br/>独立取消信号；Session登记所选精确路径"
+note for LocalServer "scripts/asr_runtime/web.py<br/>create_server创建对象并绑定127.0.0.1<br/>请求处理器使用language_scope隔离提示语言"

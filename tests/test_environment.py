@@ -6,14 +6,14 @@ import subprocess
 import sys
 from unittest.mock import patch
 
-from asr_transcription import BAILIAN_VERSION
-from asr_transcription.application.bootstrap import bootstrap
-from asr_transcription.utils.environment import Runtime, SetupError, child_environment, check_python, find_node, installed_python_versions, locked_python_versions, run_process
-from asr_transcription.utils.bailian import bl_command, verify_bl_installation
-from asr_transcription.application.diagnostics import doctor
+from asr_runtime import BAILIAN_VERSION
+from asr_runtime.application.bootstrap import bootstrap
+from asr_runtime.utils.environment import Runtime, SetupError, child_environment, check_python, find_node, installed_python_versions, locked_python_versions, run_process
+from asr_runtime.utils.bailian import bl_command, verify_bl_installation
+from asr_runtime.application.diagnostics import doctor
 from scripts.probe_bl import SYNTHETIC_AUDIO_URL, probe
 from scripts.probe_bl import main as probe_main
-from asr_transcription.__main__ import main as runtime_main
+from asr_runtime.__main__ import main as runtime_main
 from tests.support import RuntimeTestCase
 
 
@@ -97,7 +97,7 @@ class EnvironmentTests(RuntimeTestCase):
             """用当前测试venv执行生产探针参数。"""
             return run_process(runtime, [sys.executable, *argv[1:]], **kwargs)
 
-        with patch("asr_transcription.utils.environment.run_process", side_effect=execute_probe):
+        with patch("asr_runtime.utils.environment.run_process", side_effect=execute_probe):
             versions = installed_python_versions(self.runtime, {"openpyxl": "3.1.5"})
         self.assertEqual(versions, {"openpyxl": "3.1.5"})
         for name in ("json", "sysconfig"):
@@ -125,8 +125,8 @@ class EnvironmentTests(RuntimeTestCase):
         for version, platform in (((3, 12, 1), "win-amd64"), ((3, 13, 0), "win-amd64"),
                                   ((3, 12, 1), "win32"), ((3, 12, 1), "win-arm64")):
             with self.subTest(version=version, platform=platform), \
-                 patch("asr_transcription.utils.environment.sys.version_info", version), \
-                 patch("asr_transcription.utils.environment.sysconfig.get_platform", return_value=platform):
+                 patch("asr_runtime.utils.environment.sys.version_info", version), \
+                 patch("asr_runtime.utils.environment.sysconfig.get_platform", return_value=platform):
                 if version[:2] == (3, 12) and platform == "win-amd64":
                     check_python()
                 else:
@@ -172,7 +172,7 @@ class EnvironmentTests(RuntimeTestCase):
 
     def test_failed_subprocess_is_not_retried_and_uses_argument_array(self):
         """验证子进程返回失败退出码且按参数数组调用一次。"""
-        with patch("asr_transcription.utils.environment.subprocess.run") as run:
+        with patch("asr_runtime.utils.environment.subprocess.run") as run:
             run.return_value = subprocess.CompletedProcess([], 6, "", "network failure")
             result = run_process(self.runtime, ["node.exe", "file with spaces.mjs", "--help"])
         self.assertEqual(result.returncode, 6)
@@ -182,7 +182,7 @@ class EnvironmentTests(RuntimeTestCase):
 
     def test_timeout_is_not_retried(self):
         """验证子进程超时返回环境错误且调用次数为一。"""
-        with patch("asr_transcription.utils.environment.subprocess.run", side_effect=subprocess.TimeoutExpired([], 1)) as run:
+        with patch("asr_runtime.utils.environment.subprocess.run", side_effect=subprocess.TimeoutExpired([], 1)) as run:
             with self.assertRaises(SetupError):
                 run_process(self.runtime, ["node.exe"], timeout=1)
         run.assert_called_once()
@@ -198,7 +198,7 @@ class EnvironmentTests(RuntimeTestCase):
         self.runtime.bl_entry.touch()
         manifest = self.runtime.path(".tools/bailian/node_modules/bailian-cli/package.json")
         manifest.write_text(json.dumps({"version": BAILIAN_VERSION}), encoding="utf-8")
-        with patch("asr_transcription.utils.bailian.find_node", return_value=self.runtime.root / "node.exe") as find:
+        with patch("asr_runtime.utils.bailian.find_node", return_value=self.runtime.root / "node.exe") as find:
             command = bl_command(self.runtime, ["speech", "recognize", "--dry-run"])
         find.assert_called_once_with()
         self.assertIn("--quiet", command)
@@ -207,15 +207,15 @@ class EnvironmentTests(RuntimeTestCase):
     def test_bootstrap_requires_lock_before_installing(self):
         """验证安装前必须存在依赖锁。"""
         self.runtime.resource("scripts/bailian/package-lock.json").unlink()
-        with patch("asr_transcription.application.bootstrap.check_node", return_value=(self.runtime.root / "node.exe", "v24.19.0")), \
-             patch("asr_transcription.application.bootstrap.npm_entry", return_value=self.runtime.root / "npm-cli.js"):
+        with patch("asr_runtime.application.bootstrap.check_node", return_value=(self.runtime.root / "node.exe", "v24.19.0")), \
+             patch("asr_runtime.application.bootstrap.npm_entry", return_value=self.runtime.root / "npm-cli.js"):
             with self.assertRaisesRegex(SetupError, "锁文件"):
                 bootstrap(self.runtime)
         self.assertFalse(self.runtime.path(".venv").exists())
 
     def test_node_requires_existing_path_installation(self):
         """验证Node必须来自已有本机安装。"""
-        with patch("asr_transcription.utils.environment.shutil.which", return_value=None) as which:
+        with patch("asr_runtime.utils.environment.shutil.which", return_value=None) as which:
             with self.assertRaisesRegex(SetupError, "未找到Node.js"):
                 find_node()
         which.assert_called_once_with("node")
@@ -223,20 +223,20 @@ class EnvironmentTests(RuntimeTestCase):
     def test_release_preparation_can_find_existing_node(self):
         """验证发行准备能够找到已安装Node。"""
         node = self.runtime.root / "existing/node.exe"
-        with patch("asr_transcription.utils.environment.shutil.which", return_value=str(node)):
+        with patch("asr_runtime.utils.environment.shutil.which", return_value=str(node)):
             self.assertEqual(find_node(), node.resolve())
 
     def test_doctor_does_not_require_npm(self):
         """验证环境诊断直接检查已安装的BL和Python依赖。"""
         node = self.runtime.root / "node.exe"
-        with patch("asr_transcription.application.diagnostics.check_node", return_value=(node, "v24.19.0")):
+        with patch("asr_runtime.application.diagnostics.check_node", return_value=(node, "v24.19.0")):
             report = doctor(self.runtime)
         self.assertEqual(report["node"], {"path": str(node), "version": "v24.19.0"})
 
     def test_metadata_alone_cannot_mark_incomplete_installation_ready(self):
         """验证BL入口启动失败被报告为安装异常。"""
-        with patch("asr_transcription.utils.bailian.bl_command", return_value=["node.exe", "bl.mjs", "--version", "--quiet"]), \
-             patch("asr_transcription.utils.bailian.run_process", return_value=subprocess.CompletedProcess([], 1, "", "missing dependency")) as run:
+        with patch("asr_runtime.utils.bailian.bl_command", return_value=["node.exe", "bl.mjs", "--version", "--quiet"]), \
+             patch("asr_runtime.utils.bailian.run_process", return_value=subprocess.CompletedProcess([], 1, "", "missing dependency")) as run:
             with self.assertRaisesRegex(SetupError, "不完整"):
                 verify_bl_installation(self.runtime)
         run.assert_called_once()
@@ -247,9 +247,9 @@ class EnvironmentTests(RuntimeTestCase):
         python.parent.mkdir(parents=True)
         python.touch()
         packages = {**locked_python_versions(self.runtime), "av": "0.0.0"}
-        with patch("asr_transcription.application.diagnostics.check_node", side_effect=SetupError("test Node unavailable")), \
-             patch("asr_transcription.application.diagnostics.installed_bl_version", return_value=None), \
-             patch("asr_transcription.utils.environment.run_process", return_value=subprocess.CompletedProcess([], 0, json.dumps(packages), "")):
+        with patch("asr_runtime.application.diagnostics.check_node", side_effect=SetupError("test Node unavailable")), \
+             patch("asr_runtime.application.diagnostics.installed_bl_version", return_value=None), \
+             patch("asr_runtime.utils.environment.run_process", return_value=subprocess.CompletedProcess([], 0, json.dumps(packages), "")):
             report = doctor(self.runtime)
         self.assertEqual(report["python_packages"], packages)
         self.assertTrue(any("av" in issue and "18.1.0" in issue for issue in report["issues"]))
@@ -259,7 +259,7 @@ class EnvironmentTests(RuntimeTestCase):
         manifest = self.runtime.path(".tools/bailian/node_modules/bailian-cli/package.json")
         manifest.parent.mkdir(parents=True)
         manifest.write_text("[]", encoding="utf-8")
-        with patch("asr_transcription.application.diagnostics.check_node", side_effect=SetupError("test Node unavailable")):
+        with patch("asr_runtime.application.diagnostics.check_node", side_effect=SetupError("test Node unavailable")):
             report = doctor(self.runtime)
         self.assertTrue(any("包信息损坏" in issue for issue in report["issues"]))
 
@@ -270,7 +270,7 @@ class EnvironmentTests(RuntimeTestCase):
         python.touch()
         for output in ("not JSON", "[]", '{"av": null}', '{}'):
             with self.subTest(output=output), \
-                 patch("asr_transcription.utils.environment.run_process", return_value=subprocess.CompletedProcess([], 0, output, "")):
+                 patch("asr_runtime.utils.environment.run_process", return_value=subprocess.CompletedProcess([], 0, output, "")):
                 with self.assertRaisesRegex(SetupError, "依赖检查返回异常"):
                     installed_python_versions(self.runtime, {"av": "18.1.0"})
 
@@ -293,7 +293,7 @@ class EnvironmentTests(RuntimeTestCase):
 
     def test_probe_uses_only_reserved_url_and_dedicated_environment(self):
         """验证探针使用虚构URL及独立环境。"""
-        from asr_transcription import MODEL
+        from asr_runtime import MODEL
         payload = {"request": {
             "model": MODEL,
             "input": {"file_urls": [SYNTHETIC_AUDIO_URL], "context": [{"content": [{"text": "本地合约探针"}]}]},

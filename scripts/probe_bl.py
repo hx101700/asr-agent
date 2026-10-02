@@ -8,9 +8,9 @@ from pathlib import Path
 SKILL_ROOT = Path(__file__).resolve().parents[1] / "skills/asr-transcription"
 sys.path.insert(0, str(SKILL_ROOT / "scripts"))
 
-from asr_transcription import BAILIAN_VERSION, MODEL
-from asr_transcription.utils.bailian import bl_command
-from asr_transcription.utils.environment import Runtime, SetupError, run_process
+from asr_runtime import BAILIAN_VERSION, MODEL
+from asr_runtime.utils.bailian import bl_command
+from asr_runtime.utils.environment import Runtime, SetupError, run_process
 
 SYNTHETIC_AUDIO_URL = "https://example.invalid/asr-transcription-probe.wav"
 

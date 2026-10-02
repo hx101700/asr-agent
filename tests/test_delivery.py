@@ -5,13 +5,13 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-from asr_transcription import MODEL
-from asr_transcription.utils.job_files import read_delivery
-from asr_transcription.utils.documents import DocumentError
-from asr_transcription.utils.environment import SetupError
-from asr_transcription.utils.results import load_transcript
-from asr_transcription.utils.documents import timestamp
-from asr_transcription.application.transcription import export_job, job_status, transcribe
+from asr_runtime import MODEL
+from asr_runtime.utils.job_files import read_delivery
+from asr_runtime.utils.documents import DocumentError
+from asr_runtime.utils.environment import SetupError
+from asr_runtime.utils.results import load_transcript
+from asr_runtime.utils.documents import timestamp
+from asr_runtime.application.transcription import export_job, job_status, transcribe
 from tests.support import RuntimeTestCase
 
 
@@ -42,7 +42,7 @@ class DeliveryTests(RuntimeTestCase):
             ]}]
         }, ensure_ascii=False), encoding="utf-8")
         self.save_execution()
-        cloud = patch("asr_transcription.application.transcription.run_recognition", side_effect=AssertionError("local export must not call BL"))
+        cloud = patch("asr_runtime.application.transcription.run_recognition", side_effect=AssertionError("local export must not call BL"))
         self.cloud = cloud.start()
         self.addCleanup(cloud.stop)
 
@@ -78,7 +78,7 @@ class DeliveryTests(RuntimeTestCase):
 
     def test_one_format_failure_retains_other_formats_and_never_retries(self):
         """验证单格式失败保留其他成品且各格式调用一次。"""
-        with patch("asr_transcription.application.delivery.write_docx", side_effect=RuntimeError("private transcript in exception")) as writer:
+        with patch("asr_runtime.application.delivery.write_docx", side_effect=RuntimeError("private transcript in exception")) as writer:
             report = export_job(self.runtime, self.job_id)
         writer.assert_called_once()
         self.assertFalse(report["documents_ready"])
@@ -99,7 +99,7 @@ class DeliveryTests(RuntimeTestCase):
         for error, message in ((DocumentError("已知格式限制"), "已知格式限制"),
                                (OSError("private path"), "目录权限")):
             with self.subTest(error=type(error).__name__), \
-                 patch("asr_transcription.application.delivery.write_docx", side_effect=error):
+                 patch("asr_runtime.application.delivery.write_docx", side_effect=error):
                 report = export_job(self.runtime, self.job_id)
             failure = report["delivery"]["files"]["docx"]
             self.assertIn(message, failure["message"])
@@ -108,7 +108,7 @@ class DeliveryTests(RuntimeTestCase):
 
     def test_unexpected_serializer_error_is_not_reported_as_disk_failure(self):
         """验证序列化异常返回对应的程序错误说明。"""
-        with patch("asr_transcription.utils.documents.Workbook.save", side_effect=ValueError("private transcript")):
+        with patch("asr_runtime.utils.documents.Workbook.save", side_effect=ValueError("private transcript")):
             report = export_job(self.runtime, self.job_id)
         failure = report["delivery"]["files"]["xlsx"]
         self.assertEqual(failure["error_type"], "ValueError")
@@ -146,7 +146,7 @@ class DeliveryTests(RuntimeTestCase):
             path.write_bytes(b"synthetic incomplete document")
             raise OSError("synthetic write failure")
 
-        with patch("asr_transcription.application.delivery.write_docx", side_effect=fail_docx) as writer:
+        with patch("asr_runtime.application.delivery.write_docx", side_effect=fail_docx) as writer:
             report = export_job(self.runtime, self.job_id)
         writer.assert_called_once()
         self.assertEqual(document.read_bytes(), original)
@@ -234,7 +234,7 @@ class DeliveryTests(RuntimeTestCase):
 
     def test_status_write_failure_still_reports_saved_json_without_reidentification(self):
         """验证状态写入失败仍说明JSON已保存。"""
-        with patch("asr_transcription.application.delivery.save_record", side_effect=OSError("synthetic disk full")):
+        with patch("asr_runtime.application.delivery.save_record", side_effect=OSError("synthetic disk full")):
             report = export_job(self.runtime, self.job_id)
         self.assertEqual(report["status"], "JSON_READY")
         self.assertEqual(report["cloud_outcome"], "result_received")
@@ -246,8 +246,8 @@ class DeliveryTests(RuntimeTestCase):
     def test_export_returns_current_delivery_without_status_lookup(self):
         """验证导出直接返回当前执行结果。"""
         expected = {"status": "PARTIAL", "message": "synthetic"}
-        with patch("asr_transcription.application.transcription.export_documents", return_value=expected), \
-             patch("asr_transcription.application.transcription.read_delivery", side_effect=AssertionError("导出不重新读取状态")):
+        with patch("asr_runtime.application.transcription.export_documents", return_value=expected), \
+             patch("asr_runtime.application.transcription.read_delivery", side_effect=AssertionError("导出不重新读取状态")):
             report = export_job(self.runtime, self.job_id)
         self.assertEqual(report["delivery"], expected)
 

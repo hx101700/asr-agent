@@ -1,6 +1,6 @@
 # 当前问题与限制
 
-本文记录仍存在的不足和运行限制。Python 源码在 `skills/asr-transcription/scripts/asr_transcription/`，前端源码在 `frontend/`；实际验证范围见 [ACCEPTANCE](ACCEPTANCE.md)，工作与发布状态见 [STATUS](STATUS.md)。
+本文记录仍存在的不足和运行限制。Python 源码在 `skills/asr-transcription/scripts/asr_runtime/`，前端源码在 `frontend/`；实际验证范围见 [ACCEPTANCE](ACCEPTANCE.md)，工作与发布状态见 [STATUS](STATUS.md)。
 
 ## 功能不足
 

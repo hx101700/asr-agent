@@ -7,8 +7,8 @@ import subprocess
 import sys
 from unittest.mock import patch
 
-from asr_transcription.utils.bailian import BailianFailure, PreparedCommand, _communicate_login, _open_console_fallback, _run_bl
-from asr_transcription.utils.environment import SetupError, child_environment
+from asr_runtime.utils.bailian import BailianFailure, PreparedCommand, _communicate_login, _open_console_fallback, _run_bl
+from asr_runtime.utils.environment import SetupError, child_environment
 from tests.support import RuntimeTestCase
 
 
@@ -22,7 +22,7 @@ class ConsoleLoginTests(RuntimeTestCase):
         """准备隔离登录环境并替换浏览器打开入口。"""
         super().setUp()
         self.runtime.prepare()
-        browser_patch = patch("asr_transcription.utils.bailian.os.startfile")
+        browser_patch = patch("asr_runtime.utils.bailian.os.startfile")
         self.open_browser = browser_patch.start()
         self.addCleanup(browser_patch.stop)
 
@@ -186,7 +186,7 @@ class ConsoleLoginTests(RuntimeTestCase):
         """验证登录超时转换为失败并完成一次进程清理。"""
         process = self.start_process("import time; time.sleep(30)")
         command = PreparedCommand(("synthetic-bl", "auth", "login", "--console"), {})
-        with patch("asr_transcription.utils.bailian.subprocess.Popen", return_value=process) as start:
+        with patch("asr_runtime.utils.bailian.subprocess.Popen", return_value=process) as start:
             with self.assertRaises(BailianFailure) as caught:
                 _run_bl(self.runtime, command, [], timeout=0.05, console_login=True)
         self.assertTrue(caught.exception.started)

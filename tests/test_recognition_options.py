@@ -1,7 +1,7 @@
 import unittest
 
-from asr_transcription.application.rules import LANGUAGES, validate_options
-from asr_transcription.application.rules import ValidationError
+from asr_runtime.application.rules import LANGUAGES, validate_options
+from asr_runtime.application.rules import ValidationError
 
 
 class RecognitionOptionsTests(unittest.TestCase):

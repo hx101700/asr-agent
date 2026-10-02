@@ -12,7 +12,9 @@ MemoFlow 的目标是把语音输入整理为符合用户习惯、重点要求�
 
 Vue 页面与 Python 类型改动已完成既有回归。本次对照官方 Skill 写作建议及实际代码完成独立情境复核，补充保存回执恢复、工作目录凭据范围和基础解释器诊断指引；新增终端回执丢失场景验证通过。详细证据见[ACCEPTANCE](ACCEPTANCE.md)。
 
-本地包：`dist/asr-transcription.zip`，42个文件、268874字节，SHA-256：`1a252216683db7867a2b68c15440fb9dc6995a190b96a655a1402de0f89d8bfb`。CRC、固定清单、每文件内容与 Skill 源码均核对通过；包内没有 TypeScript/Vue 源码、开发工具、测试、UML 或用户数据。
+内部 Python 执行包统一为 `asr_runtime`，与对外 Skill `asr-transcription` 区分。入口、导入、测试、构建清单和 UML 路径已同步；类型检查、13 项包与结构检查、真实 Edge 配置场景通过。现有命令、任务目录和业务协议保持一致。
+
+本地包：`dist/asr-transcription.zip`，42个文件、268497字节，SHA-256：`c199794834510a741936f67977465290b73b5a09f303755834a238d059528d03`。CRC、固定清单、每文件内容与 Skill 源码均核对通过；包内没有 TypeScript/Vue 源码、开发工具、测试、UML 或用户数据。
 
 ## 实现
 
@@ -25,7 +27,7 @@ Vue 页面与 Python 类型改动已完成既有回归。本次对照官方 Skil
 
 GitHub 仓库已重命名为 [hx101700/memoflow](https://github.com/hx101700/memoflow)，默认分支为 `dev`，本地 origin 已同步。项目版本保持 `0.1.0`；仅通过验收并发布到 `master` 时才变更项目版本，开发提交沿用当前版本。
 
-当前实现及文档提交 `ce2f8569137edd6cb73316a091fe33765452df4d` 已推送到 `dev`。现有 [v0.1.0](https://github.com/hx101700/memoflow/releases/tag/v0.1.0) 已更新为开发预览，旧附件已替换，[公开下载的 ZIP](https://github.com/hx101700/memoflow/releases/download/v0.1.0/asr-transcription.zip) 与本地包逐字节一致。未新增版本号；`master` 保持 `6c8371135d92b9f9d3bd52ca9ee246747f0c7f5e`，本次未合并。
+此前开发预览已同步至 `a308758cbcc74f7f21dbbc9b225169de5429803d`。本次包名调整正在同步 `dev` 和现有 [v0.1.0](https://github.com/hx101700/memoflow/releases/tag/v0.1.0)，完成后核对公开下载。项目版本号仍为 `0.1.0`；`master` 保持 `6c8371135d92b9f9d3bd52ca9ee246747f0c7f5e`，本次不合并。
 
 ## 接续
 

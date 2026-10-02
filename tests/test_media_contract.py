@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import av
 
-from asr_transcription.utils.media import MediaError, convert_to_mono, probe_audio
+from asr_runtime.utils.media import MediaError, convert_to_mono, probe_audio
 from tests.support import RuntimeTestCase
 
 
@@ -62,7 +62,7 @@ class MediaContractTests(RuntimeTestCase):
 
     def test_conversion_only_probes_the_new_output(self):
         """验证转换复用源信息并探测新副本。"""
-        with patch("asr_transcription.utils.media.probe_audio", wraps=probe_audio) as probe:
+        with patch("asr_runtime.utils.media.probe_audio", wraps=probe_audio) as probe:
             convert_to_mono(self.source, self.output, self.source_info)
         probe.assert_called_once_with(self.output)
 
@@ -78,7 +78,7 @@ class MediaContractTests(RuntimeTestCase):
                 os.utime(self.source, ns=(current.st_atime_ns, current.st_mtime_ns + 1_000_000_000))
             return container
 
-        with patch("asr_transcription.utils.media.av.open", side_effect=open_then_touch):
+        with patch("asr_runtime.utils.media.av.open", side_effect=open_then_touch):
             with self.assertRaisesRegex(MediaError, "源文件改变"):
                 convert_to_mono(self.source, self.output, self.source_info)
         self.assertTrue(self.source.is_file())

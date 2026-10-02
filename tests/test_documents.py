@@ -12,8 +12,8 @@ from docx.document import Document as WordDocument
 from openpyxl import load_workbook
 from openpyxl.workbook import Workbook
 
-from asr_transcription.utils.documents import DocumentError, write_docx, write_markdown, write_xlsx
-from asr_transcription.models import Sentence, Transcript
+from asr_runtime.utils.documents import DocumentError, write_docx, write_markdown, write_xlsx
+from asr_runtime.models import Sentence, Transcript
 from tests.support import RuntimeTestCase
 
 

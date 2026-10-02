@@ -12,13 +12,13 @@ from unittest.mock import patch
 
 from openpyxl import Workbook
 
-from asr_transcription import MODEL
-from asr_transcription.utils.auth import bailian_environment
-from asr_transcription.utils.bailian import bl_command
+from asr_runtime import MODEL
+from asr_runtime.utils.auth import bailian_environment
+from asr_runtime.utils.bailian import bl_command
 from scripts.probe_bl import SYNTHETIC_AUDIO_URL
-from asr_transcription.utils.bailian import PreparedCommand, run_recognition
-from asr_transcription.application.session import Session
-from asr_transcription.application.transcription import job_status, transcribe
+from asr_runtime.utils.bailian import PreparedCommand, run_recognition
+from asr_runtime.application.session import Session
+from asr_runtime.application.transcription import job_status, transcribe
 from tests.support import RuntimeTestCase, CONTRACT_BL_ENTRY, contract_runtime
 
 
@@ -222,8 +222,8 @@ class BailianContractTests(RuntimeTestCase):
             """使用开发环境中已安装的BL构造测试命令。"""
             return bl_command(contract_runtime(), arguments)
 
-        with patch("asr_transcription.utils.bailian.bl_command", side_effect=installed_command), \
-                patch("asr_transcription.application.transcription.run_recognition", side_effect=local_recognition):
+        with patch("asr_runtime.utils.bailian.bl_command", side_effect=installed_command), \
+                patch("asr_runtime.application.transcription.run_recognition", side_effect=local_recognition):
             report = transcribe(self.runtime, job_id, authorize_upload=True)
             calls = len(self.calls)
             repeated = transcribe(self.runtime, job_id, authorize_upload=True)

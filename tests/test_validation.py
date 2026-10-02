@@ -8,10 +8,10 @@ from unittest.mock import patch
 
 from openpyxl import Workbook
 
-from asr_transcription.models import AudioInfo
-from asr_transcription.application.rules import AUDIO_SUFFIXES, MAX_UPLOAD_BYTES, ValidationError, validate_context
-from asr_transcription.utils.files import FileError, file_fingerprint, resolve_input
-from asr_transcription.application.inputs import load_hotwords, validate_audio
+from asr_runtime.models import AudioInfo
+from asr_runtime.application.rules import AUDIO_SUFFIXES, MAX_UPLOAD_BYTES, ValidationError, validate_context
+from asr_runtime.utils.files import FileError, file_fingerprint, resolve_input
+from asr_runtime.application.inputs import load_hotwords, validate_audio
 from tests.support import RuntimeTestCase
 
 
@@ -123,7 +123,7 @@ class ValidationTests(RuntimeTestCase):
             os.utime(source, ns=(before.st_atime_ns, before.st_mtime_ns + 1_000_000))
             return AudioInfo(1, 8000, 1.0, before.st_size, "wav", 1)
 
-        with patch("asr_transcription.application.inputs.probe_audio", side_effect=changing_probe):
+        with patch("asr_runtime.application.inputs.probe_audio", side_effect=changing_probe):
             with self.assertRaisesRegex(ValidationError, "校验期间发生变化"):
                 validate_audio(self.runtime.root, path, True)
 
@@ -132,14 +132,14 @@ class ValidationTests(RuntimeTestCase):
         path = self.audio()
         normal = AudioInfo(1, 8000, 1.0, path.stat().st_size, "wav", 1)
         for duration in (None, 0, -1, float("nan"), float("inf"), 43200.001):
-            with self.subTest(duration=duration), patch("asr_transcription.application.inputs.probe_audio",
+            with self.subTest(duration=duration), patch("asr_runtime.application.inputs.probe_audio",
                     return_value=replace(normal, duration_seconds=duration)):
                 with self.assertRaises(ValidationError):
                     validate_audio(self.runtime.root, path, True)
-        with patch("asr_transcription.application.inputs.probe_audio", return_value=replace(normal, format_name="aiff")):
+        with patch("asr_runtime.application.inputs.probe_audio", return_value=replace(normal, format_name="aiff")):
             with self.assertRaisesRegex(ValidationError, "实际媒体格式"):
                 validate_audio(self.runtime.root, path, False)
-        with patch("asr_transcription.application.inputs.probe_audio",
+        with patch("asr_runtime.application.inputs.probe_audio",
                    return_value=replace(normal, duration_seconds=43200, audio_tracks=2)):
             result = validate_audio(self.runtime.root, path, True)
             self.assertEqual(len(result["warnings"]), 2)
@@ -149,10 +149,10 @@ class ValidationTests(RuntimeTestCase):
         """验证上传大小规则依据原文件或混音后副本。"""
         path = self.audio(channels=2)
         big = AudioInfo(2, 8000, 1.0, MAX_UPLOAD_BYTES + 1, "wav", 1)
-        with patch("asr_transcription.application.inputs.probe_audio", return_value=big):
+        with patch("asr_runtime.application.inputs.probe_audio", return_value=big):
             with self.assertRaisesRegex(ValidationError, "1 GB"):
                 validate_audio(self.runtime.root, path, False)
-            with patch("asr_transcription.application.inputs.file_fingerprint",
+            with patch("asr_runtime.application.inputs.file_fingerprint",
                        return_value={"size_bytes": big.size_bytes, "mtime_ns": path.stat().st_mtime_ns,
                                      "sha256": "synthetic"}):
                 self.assertTrue(validate_audio(self.runtime.root, path, True)["requires_mono"])
@@ -172,7 +172,7 @@ class ValidationTests(RuntimeTestCase):
         path = self.hotwords([("语音实验室", 4), (None, None), ("语音实验室", 4), ("hello world", 2)],
                              headers=("热词", "权重"))
         before = path.read_bytes()
-        with patch("asr_transcription.application.inputs.file_fingerprint", side_effect=AssertionError("热词导入不计算文件SHA")):
+        with patch("asr_runtime.application.inputs.file_fingerprint", side_effect=AssertionError("热词导入不计算文件SHA")):
             result = load_hotwords(self.runtime.root, path)
         self.assertEqual(result["vocabulary"], {"语音实验室": 4, "hello world": 2})
         self.assertIn("已忽略1个完全空白行。", result["warnings"])
@@ -234,10 +234,10 @@ class ValidationTests(RuntimeTestCase):
     def test_hotwords_bounds_archive_size_and_decompressed_size(self):
         """验证词表原始大小与解压大小上限。"""
         path = self.hotwords([("test", 4)])
-        with patch("asr_transcription.utils.hotwords.MAX_XLSX_BYTES", 1):
+        with patch("asr_runtime.utils.hotwords.MAX_XLSX_BYTES", 1):
             with self.assertRaisesRegex(ValidationError, "文件上限"):
                 load_hotwords(self.runtime.root, path)
-        with patch("asr_transcription.utils.hotwords.MAX_XLSX_UNCOMPRESSED_BYTES", 1):
+        with patch("asr_runtime.utils.hotwords.MAX_XLSX_UNCOMPRESSED_BYTES", 1):
             with self.assertRaisesRegex(ValidationError, "解压内容"):
                 load_hotwords(self.runtime.root, path)
 

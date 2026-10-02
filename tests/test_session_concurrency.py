@@ -7,9 +7,9 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
-from asr_transcription.application.session import Session
-from asr_transcription.application.rules import ValidationError
-from asr_transcription.application.inputs import validate_audio
+from asr_runtime.application.session import Session
+from asr_runtime.application.rules import ValidationError
+from asr_runtime.application.inputs import validate_audio
 from tests.support import RuntimeTestCase
 
 
@@ -67,7 +67,7 @@ class SessionConcurrencyTests(RuntimeTestCase):
                 raise AssertionError("目录选择未收到取消")
             return None
 
-        with patch("asr_transcription.utils.directory_picker.choose_directory", side_effect=wait_for_cancel), \
+        with patch("asr_runtime.utils.directory_picker.choose_directory", side_effect=wait_for_cancel), \
              ThreadPoolExecutor(max_workers=3) as pool:
             selecting = pool.submit(self.session.select_directory, "json", "during-upload")
             try:
@@ -225,8 +225,8 @@ class SessionConcurrencyTests(RuntimeTestCase):
                 raise AssertionError("测试未释放音频校验")
             return validate_audio(*args)
 
-        with patch("asr_transcription.utils.directory_picker.choose_directory", side_effect=wait_for_cancel), \
-             patch("asr_transcription.application.session.validate_audio", side_effect=paused_validation), \
+        with patch("asr_runtime.utils.directory_picker.choose_directory", side_effect=wait_for_cancel), \
+             patch("asr_runtime.application.session.validate_audio", side_effect=paused_validation), \
              ThreadPoolExecutor(max_workers=3) as pool:
             selecting = pool.submit(self.session.select_directory, "json", "during-validation")
             try:

@@ -7,7 +7,7 @@ export default defineConfig({
   root: fileURLToPath(new URL(".", import.meta.url)),
   plugins: [vue()],
   build: {
-    outDir: fileURLToPath(new URL("../skills/asr-transcription/scripts/asr_transcription/static", import.meta.url)),
+    outDir: fileURLToPath(new URL("../skills/asr-transcription/scripts/asr_runtime/static", import.meta.url)),
     emptyOutDir: true,
     target: "es2022",
     cssCodeSplit: false,

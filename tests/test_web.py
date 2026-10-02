@@ -10,11 +10,11 @@ from unittest.mock import patch
 
 from openpyxl import Workbook, load_workbook
 
-from asr_transcription.models import AudioInfo
-from asr_transcription.application.rules import ValidationError
-from asr_transcription.application.transcription import job_status
-from asr_transcription.web import create_server
-from asr_transcription.application.session import Session, output_directory
+from asr_runtime.models import AudioInfo
+from asr_runtime.application.rules import ValidationError
+from asr_runtime.application.transcription import job_status
+from asr_runtime.web import create_server
+from asr_runtime.application.session import Session, output_directory
 from tests.support import RuntimeTestCase
 
 
@@ -87,8 +87,8 @@ class SessionTests(WebFixture):
     def test_confirmation_uses_metadata_without_reading_audio_again(self):
         """验证确认通过文件元信息复用预览快照。"""
         preview = self.session.validate(self.payload)
-        with patch("asr_transcription.application.inputs.file_fingerprint", side_effect=AssertionError("must not hash again")), \
-             patch("asr_transcription.application.inputs.probe_audio", side_effect=AssertionError("must not probe again")):
+        with patch("asr_runtime.application.inputs.file_fingerprint", side_effect=AssertionError("must not hash again")), \
+             patch("asr_runtime.application.inputs.probe_audio", side_effect=AssertionError("must not probe again")):
             self.assertTrue(self.session.confirm(preview["validation_id"])["ok"])
 
     def test_api_key_is_not_written_to_config(self):
@@ -108,12 +108,12 @@ class SessionTests(WebFixture):
         path.write_text("DASHSCOPE_API_KEY=synthetic-key", encoding="utf-8")
         preview = self.session.validate({**self.payload, "auth_mode": "api_key"})
         path.write_text("DASHSCOPE_API_KEY=another-synthetic-key", encoding="utf-8")
-        with patch("asr_transcription.application.session.read_api_key", side_effect=AssertionError("must not read credentials")):
+        with patch("asr_runtime.application.session.read_api_key", side_effect=AssertionError("must not read credentials")):
             self.assertTrue(self.session.confirm(preview["validation_id"])["ok"])
 
     def test_description_and_configuration_do_not_read_dotenv(self):
         """验证页面说明与配置流程独立于运行凭据。"""
-        with patch("asr_transcription.application.session.read_api_key", side_effect=AssertionError("must not read credentials")):
+        with patch("asr_runtime.application.session.read_api_key", side_effect=AssertionError("must not read credentials")):
             self.assertNotIn("auth", self.session.description())
             preview = self.session.validate({**self.payload, "auth_mode": "api_key"})
             self.assertTrue(self.session.confirm(preview["validation_id"])["ok"])
@@ -137,7 +137,7 @@ class SessionTests(WebFixture):
         self.assertEqual(preview["summary"]["enhancement"]["context_chars"], len(payload["context"]))
         copy = Path(self.session.uploaded(uploaded["upload_id"], "hotwords")["path"])
         copy.unlink()
-        with patch("asr_transcription.application.session.load_hotwords", side_effect=AssertionError("must not parse Excel again")):
+        with patch("asr_runtime.application.session.load_hotwords", side_effect=AssertionError("must not parse Excel again")):
             receipt = self.session.confirm(preview["validation_id"])
         config = json.loads(Path(receipt["config_path"]).read_text(encoding="utf-8"))
         self.assertEqual(config["enhancement"]["hotwords"]["vocabulary"], {"术语": 50})
@@ -417,7 +417,7 @@ class WebServerTests(WebFixture):
     def test_english_preview_translates_audio_warnings_and_keeps_filename(self) -> None:
         """验证音频警告随页面语言显示，保留用户文件名。"""
         info = AudioInfo(2, 16000, 7201, self.audio.stat().st_size, "wav", 2)
-        with patch("asr_transcription.application.inputs.probe_audio", return_value=info):
+        with patch("asr_runtime.application.inputs.probe_audio", return_value=info):
             status, _, body = self.request("POST", "/api/validate", self.payload,
                                           headers={"Accept-Language": "en"})
         self.assertEqual(status, 200)

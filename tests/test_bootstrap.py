@@ -4,9 +4,9 @@ import subprocess
 import sys
 from unittest.mock import patch
 
-from asr_transcription import BAILIAN_VERSION
-from asr_transcription.application.bootstrap import bootstrap
-from asr_transcription.utils.environment import SetupError, locked_python_versions, run_process
+from asr_runtime import BAILIAN_VERSION
+from asr_runtime.application.bootstrap import bootstrap
+from asr_runtime.utils.environment import SetupError, locked_python_versions, run_process
 from tests.support import RuntimeTestCase
 
 
@@ -29,16 +29,16 @@ class BootstrapTests(RuntimeTestCase):
             ("npm_entry", self.runtime.root / "npm-cli.js"),
             ("verify_bl_installation", None),
         ):
-            patcher = patch(f"asr_transcription.application.bootstrap.{name}", return_value=value)
+            patcher = patch(f"asr_runtime.application.bootstrap.{name}", return_value=value)
             patcher.start()
             self.addCleanup(patcher.stop)
         self.expected = locked_python_versions(self.runtime)
 
     def test_complete_environment_skips_pip_and_npm_install(self):
         """验证完整环境跳过pip和npm安装。"""
-        with patch("asr_transcription.application.bootstrap.installed_python_versions", return_value=self.expected), \
-             patch("asr_transcription.application.bootstrap.npm_entry", side_effect=AssertionError("已有BL不需要npm")), \
-             patch("asr_transcription.application.bootstrap.run_process", return_value=subprocess.CompletedProcess([], 0, "", "")) as run:
+        with patch("asr_runtime.application.bootstrap.installed_python_versions", return_value=self.expected), \
+             patch("asr_runtime.application.bootstrap.npm_entry", side_effect=AssertionError("已有BL不需要npm")), \
+             patch("asr_runtime.application.bootstrap.run_process", return_value=subprocess.CompletedProcess([], 0, "", "")) as run:
             report = bootstrap(self.runtime)
         self.assertEqual(report["status"], "already_installed")
         self.assertEqual(run.call_count, 1)
@@ -54,8 +54,8 @@ class BootstrapTests(RuntimeTestCase):
             """用当前测试解释器执行生产版本检查参数。"""
             return run_process(runtime, [sys.executable, *argv[1:]], **kwargs)
 
-        with patch("asr_transcription.application.bootstrap.installed_python_versions", return_value=self.expected), \
-             patch("asr_transcription.application.bootstrap.run_process", side_effect=execute_version):
+        with patch("asr_runtime.application.bootstrap.installed_python_versions", return_value=self.expected), \
+             patch("asr_runtime.application.bootstrap.run_process", side_effect=execute_version):
             report = bootstrap(self.runtime)
         self.assertEqual(report["status"], "already_installed")
         self.assertFalse((self.runtime.workspace / "sysconfig-executed").exists())
@@ -63,8 +63,8 @@ class BootstrapTests(RuntimeTestCase):
     def test_ensurepip_and_pip_use_isolated_python(self):
         """验证缺少pip时两条安装命令都使用隔离模式。"""
         self.runtime.path(".venv/Lib/site-packages/pip").rmdir()
-        with patch("asr_transcription.application.bootstrap.installed_python_versions", side_effect=[None, self.expected]), \
-             patch("asr_transcription.application.bootstrap.run_process", return_value=subprocess.CompletedProcess([], 0, "", "")) as run:
+        with patch("asr_runtime.application.bootstrap.installed_python_versions", side_effect=[None, self.expected]), \
+             patch("asr_runtime.application.bootstrap.run_process", return_value=subprocess.CompletedProcess([], 0, "", "")) as run:
             bootstrap(self.runtime)
         commands = [call.args[1] for call in run.call_args_list]
         self.assertEqual(commands[1][1:4], ["-I", "-m", "ensurepip"])
@@ -73,7 +73,7 @@ class BootstrapTests(RuntimeTestCase):
     def test_conflicting_bl_is_rejected_before_python_mutation(self):
         """验证BL版本冲突在修改Python环境前停止。"""
         self.manifest.write_text(json.dumps({"version": "0.0.0"}), encoding="utf-8")
-        with patch("asr_transcription.application.bootstrap.run_process") as run:
+        with patch("asr_runtime.application.bootstrap.run_process") as run:
             with self.assertRaisesRegex(SetupError, "BL安装不匹配"):
                 bootstrap(self.runtime)
         run.assert_not_called()
@@ -82,15 +82,15 @@ class BootstrapTests(RuntimeTestCase):
     def test_corrupt_lock_stops_before_install(self):
         """验证损坏依赖锁在安装前停止。"""
         self.runtime.resource("scripts/bailian/package-lock.json").write_text("[]", encoding="utf-8")
-        with patch("asr_transcription.application.bootstrap.run_process") as run:
+        with patch("asr_runtime.application.bootstrap.run_process") as run:
             with self.assertRaisesRegex(SetupError, "锁文件"):
                 bootstrap(self.runtime)
         run.assert_not_called()
 
     def test_python_install_is_followed_by_dependency_check(self):
         """验证Python安装完成后检查实际依赖。"""
-        with patch("asr_transcription.application.bootstrap.installed_python_versions", side_effect=[None, self.expected]) as inspect, \
-             patch("asr_transcription.application.bootstrap.run_process", return_value=subprocess.CompletedProcess([], 0, "", "")) as run:
+        with patch("asr_runtime.application.bootstrap.installed_python_versions", side_effect=[None, self.expected]) as inspect, \
+             patch("asr_runtime.application.bootstrap.run_process", return_value=subprocess.CompletedProcess([], 0, "", "")) as run:
             bootstrap(self.runtime)
         self.assertEqual(inspect.call_count, 2)
         install_args = run.call_args_list[1].args[1]
@@ -103,8 +103,8 @@ class BootstrapTests(RuntimeTestCase):
 
     def test_pip_success_without_working_dependencies_is_not_success(self):
         """验证pip成功但依赖检查失败时返回安装错误。"""
-        with patch("asr_transcription.application.bootstrap.installed_python_versions", return_value=None), \
-             patch("asr_transcription.application.bootstrap.run_process", return_value=subprocess.CompletedProcess([], 0, "", "")) as run:
+        with patch("asr_runtime.application.bootstrap.installed_python_versions", return_value=None), \
+             patch("asr_runtime.application.bootstrap.run_process", return_value=subprocess.CompletedProcess([], 0, "", "")) as run:
             with self.assertRaisesRegex(SetupError, "依赖校验失败"):
                 bootstrap(self.runtime)
         self.assertEqual(run.call_count, 2)
@@ -113,8 +113,8 @@ class BootstrapTests(RuntimeTestCase):
         """验证pip失败后结束安装流程且调用次数为一。"""
         outputs = [subprocess.CompletedProcess([], 0, "", ""),
                    subprocess.CompletedProcess([], 1, "synthetic install failure", "")]
-        with patch("asr_transcription.application.bootstrap.installed_python_versions", return_value=None), \
-             patch("asr_transcription.application.bootstrap.run_process", side_effect=outputs) as run:
+        with patch("asr_runtime.application.bootstrap.installed_python_versions", return_value=None), \
+             patch("asr_runtime.application.bootstrap.run_process", side_effect=outputs) as run:
             with self.assertRaisesRegex(SetupError, "Python依赖安装失败"):
                 bootstrap(self.runtime)
         self.assertEqual(run.call_count, 2)
@@ -144,17 +144,17 @@ class BootstrapTests(RuntimeTestCase):
                 manifest.write_text(json.dumps({"version": BAILIAN_VERSION}), encoding="utf-8")
             return subprocess.CompletedProcess(argv, 0, "", "")
 
-        with patch("asr_transcription.application.bootstrap.check_python"), \
-             patch("asr_transcription.application.bootstrap.check_node", return_value=(node, "v24.0.0")), \
-             patch("asr_transcription.application.bootstrap.npm_entry", return_value=npm), \
-             patch("asr_transcription.application.bootstrap.venv.EnvBuilder.create", side_effect=lambda path: (
+        with patch("asr_runtime.application.bootstrap.check_python"), \
+             patch("asr_runtime.application.bootstrap.check_node", return_value=(node, "v24.0.0")), \
+             patch("asr_runtime.application.bootstrap.npm_entry", return_value=npm), \
+             patch("asr_runtime.application.bootstrap.venv.EnvBuilder.create", side_effect=lambda path: (
                  python.parent.mkdir(parents=True),
                  (path / "pyvenv.cfg").write_text("home = python\\n", encoding="utf-8"),
                  python.touch(),
              )), \
-             patch("asr_transcription.application.bootstrap.installed_python_versions", side_effect=[None, self.expected]), \
-             patch("asr_transcription.application.bootstrap.verify_bl_installation") as verify, \
-             patch("asr_transcription.application.bootstrap.run_process", side_effect=run):
+             patch("asr_runtime.application.bootstrap.installed_python_versions", side_effect=[None, self.expected]), \
+             patch("asr_runtime.application.bootstrap.verify_bl_installation") as verify, \
+             patch("asr_runtime.application.bootstrap.run_process", side_effect=run):
             result = bootstrap(self.runtime)
 
         self.assertEqual(result["status"], "installed")
@@ -176,10 +176,10 @@ class BootstrapTests(RuntimeTestCase):
         shutil.rmtree(destination)
         destination.mkdir(parents=True)
         (destination / "partial").touch()
-        with patch("asr_transcription.application.bootstrap.check_python"), \
-             patch("asr_transcription.application.bootstrap.check_node", return_value=(self.runtime.root / "node.exe", "v24.0.0")), \
-             patch("asr_transcription.application.bootstrap.npm_entry", return_value=self.runtime.root / "npm.js"), \
-             patch("asr_transcription.application.bootstrap.run_process") as run:
+        with patch("asr_runtime.application.bootstrap.check_python"), \
+             patch("asr_runtime.application.bootstrap.check_node", return_value=(self.runtime.root / "node.exe", "v24.0.0")), \
+             patch("asr_runtime.application.bootstrap.npm_entry", return_value=self.runtime.root / "npm.js"), \
+             patch("asr_runtime.application.bootstrap.run_process") as run:
             with self.assertRaisesRegex(SetupError, "非空"):
                 bootstrap(self.runtime)
         run.assert_not_called()

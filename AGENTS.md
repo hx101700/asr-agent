@@ -14,6 +14,7 @@
 ## Skill 与工作目录
 
 - Skill 源码在 `skills/asr-transcription/`，由 `SKILL.md`、`agents/openai.yaml`、`scripts/`、`references/`、`assets/` 组成。
+- `scripts/asr.py` 是调用入口，`scripts/asr_runtime/` 是内部 Python 执行包；Skill 名称仍为 `asr-transcription`。
 - `Runtime(workspace, skill_root)` 区分用户工作目录与 Skill 资源。`resource()` 读取 Skill 文件；`path()` 定位 `<workspace>/.asr-transcription/` 内的运行文件；默认输出根为 `<workspace>/transcriptions/`。私有运行目录与 Skill 目录互不包含，`check_output_path()` 在选择和生成文件时保护 Skill 资源。
 - 所有 CLI 命令使用 Skill 内 `scripts/asr.py` 的绝对路径，并显式传入 `--workspace`。依赖环境、BL 安装、凭据、暂存输入和任务记录写入工作目录，Skill 文件保持只读。
 - API Key 从私有运行目录 `.env` 读取；bootstrap 只复制空模板。网页允许用户填写或修改 Key，在“检查并预览”时保存到该固定文件。控制台模式使用 BL 在同一工作目录保存的配置。凭据不得写回 Skill。
@@ -44,7 +45,7 @@
 - 开发在 `dev`，`master` 用于验收里程碑。提交、推送、合并、发布需用户明确意图；精确路径暂存，不强推或重写历史；同次网络推送失败两次即停止。
 - 项目版本号仅在通过验收并发布到 `master` 时变更。`dev` 上的开发、修复和文档提交沿用当前版本；当前为 `0.1.0`。本阶段经用户授权更新现有预览包时，仍使用 `v0.1.0`，不新增版本号。正式发布时同步根 `package.json`、`package-lock.json`、标签和发布说明；依赖版本按其各自锁文件维护。
 - 固定发行清单位于 `scripts/build_zip.py`。ZIP 直接包含 Skill 文件，不包含仓库 README、AGENTS、开发文档、测试、UML、运行环境或用户数据。新增运行文件时同步清单和包边界检查。
-- 前端通过 Vite 构建到 Skill 的 `scripts/asr_transcription/static/`，核心产物为 `index.html`、`app.js` 和 `app.css`，同时交付 `favicon.svg` 与第三方许可说明。发行包使用构建产物；Vue/TypeScript 源码、开发配置、构建依赖及 `node_modules` 保留在开发仓库。
+- 前端通过 Vite 构建到 Skill 的 `scripts/asr_runtime/static/`，核心产物为 `index.html`、`app.js` 和 `app.css`，同时交付 `favicon.svg` 与第三方许可说明。发行包使用构建产物；Vue/TypeScript 源码、开发配置、构建依赖及 `node_modules` 保留在开发仓库。
 - Python 依赖由 Skill 中 `scripts/requirements.txt` 锁定版本与摘要；BL 锁在 `scripts/bailian/`。下载失败报告实际原因，不自动重试、换源或修改锁。
 - Python 安装与依赖检查子进程使用 `-I`，从指定虚拟环境加载依赖；用户工作目录中的同名模块不参与检查或安装。
 - 开发探针 `scripts/probe_bl.py` 不进入发行包，只使用固定虚构 URL；BL 合约测试使用 `127.0.0.1` 模拟服务与合成凭据。本机测试不等于真实云端验收。

@@ -7,10 +7,10 @@ from threading import Event, Timer
 from types import ModuleType
 from unittest.mock import MagicMock, patch
 
-from asr_transcription.utils._directory_dialog import show_directory_dialog
-from asr_transcription.utils.directory_picker import choose_directory, validate_directory
-from asr_transcription.utils.environment import SetupError
-from asr_transcription.utils.i18n import language_scope
+from asr_runtime.utils._directory_dialog import show_directory_dialog
+from asr_runtime.utils.directory_picker import choose_directory, validate_directory
+from asr_runtime.utils.environment import SetupError
+from asr_runtime.utils.i18n import language_scope
 from tests.support import RuntimeTestCase
 
 
@@ -22,10 +22,10 @@ class DirectoryPickerTests(RuntimeTestCase):
         self.process.returncode = 0
         self.process.poll.return_value = 0
         self.process.communicate.return_value = (json.dumps({"path": str(self.runtime.root)}), "")
-        start_process = patch("asr_transcription.utils.directory_picker.subprocess.Popen", return_value=self.process)
+        start_process = patch("asr_runtime.utils.directory_picker.subprocess.Popen", return_value=self.process)
         self.popen = start_process.start()
         self.addCleanup(start_process.stop)
-        platform = patch("asr_transcription.utils.directory_picker.sys.platform", "win32")
+        platform = patch("asr_runtime.utils.directory_picker.sys.platform", "win32")
         platform.start()
         self.addCleanup(platform.stop)
 
@@ -191,7 +191,7 @@ class DirectoryPickerTests(RuntimeTestCase):
 
     def test_unsupported_platform_does_not_start_process(self):
         """验证其他平台返回Windows支持范围说明。"""
-        with patch("asr_transcription.utils.directory_picker.sys.platform", "linux"):
+        with patch("asr_runtime.utils.directory_picker.sys.platform", "linux"):
             with self.assertRaisesRegex(SetupError, "仅支持 Windows"):
                 choose_directory(self.runtime.root)
         self.popen.assert_not_called()
@@ -218,7 +218,7 @@ class DirectoryPickerProcessTests(RuntimeTestCase):
             return child
 
         try:
-            with patch("asr_transcription.utils.directory_picker.subprocess.Popen", side_effect=start_sleeping_child):
+            with patch("asr_runtime.utils.directory_picker.subprocess.Popen", side_effect=start_sleeping_child):
                 self.assertIsNone(choose_directory(self.runtime.root, cancel_event=cancelled))
             self.assertEqual(len(children), 1)
             self.assertIsNotNone(children[0].poll())

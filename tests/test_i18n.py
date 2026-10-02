@@ -5,9 +5,9 @@ from string import Formatter
 from threading import Barrier
 import unittest
 
-from asr_transcription.utils.i18n import _ENGLISH, language_scope, translate
-from asr_transcription.application.rules import ValidationError, build_vocabulary
-from asr_transcription.models import HotwordRow
+from asr_runtime.utils.i18n import _ENGLISH, language_scope, translate
+from asr_runtime.application.rules import ValidationError, build_vocabulary
+from asr_runtime.models import HotwordRow
 
 
 class LocalizationTests(unittest.TestCase):

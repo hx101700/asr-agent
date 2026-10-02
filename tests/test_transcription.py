@@ -12,15 +12,15 @@ from unittest.mock import patch
 
 from openpyxl import Workbook
 
-from asr_transcription import MODEL
-from asr_transcription.utils.auth import read_api_key
-from asr_transcription.utils.bailian import BailianFailure
-from asr_transcription.utils.environment import SetupError
-from asr_transcription.utils.media import probe_audio
-from asr_transcription.application.session import Session
-from asr_transcription.application.transcription import export_job, job_status, transcribe
-from asr_transcription.utils.job_files import save_record
-from asr_transcription.utils.files import file_fingerprint
+from asr_runtime import MODEL
+from asr_runtime.utils.auth import read_api_key
+from asr_runtime.utils.bailian import BailianFailure
+from asr_runtime.utils.environment import SetupError
+from asr_runtime.utils.media import probe_audio
+from asr_runtime.application.session import Session
+from asr_runtime.application.transcription import export_job, job_status, transcribe
+from asr_runtime.utils.job_files import save_record
+from asr_runtime.utils.files import file_fingerprint
 from tests.support import RuntimeTestCase
 
 
@@ -43,12 +43,12 @@ class TranscriptionTests(RuntimeTestCase):
             f"DASHSCOPE_API_KEY={self.secret}\n", encoding="utf-8"
         )
         # 用例测试不安装或运行另一个CLI；参数长度检查仍走生产实现。
-        command = patch("asr_transcription.utils.bailian.bl_command", side_effect=lambda runtime, args: [
+        command = patch("asr_runtime.utils.bailian.bl_command", side_effect=lambda runtime, args: [
             "node", str(runtime.bl_entry), *args, "--quiet"
         ])
         command.start()
         self.addCleanup(command.stop)
-        execution = patch("asr_transcription.application.transcription.run_recognition", side_effect=self.write_result)
+        execution = patch("asr_runtime.application.transcription.run_recognition", side_effect=self.write_result)
         self.cli = execution.start()
         self.addCleanup(execution.stop)
 
@@ -195,10 +195,10 @@ class TranscriptionTests(RuntimeTestCase):
                     return probe_audio(path)
 
                 # 多声道仍实际解码/混音；只允许探测新FLAC，源内容摘要只在执行前核对一次。
-                with patch("asr_transcription.application.inputs.probe_audio", side_effect=AssertionError("重复探测原音频")), \
-                        patch("asr_transcription.utils.media.probe_audio", side_effect=only_probe_new_copy) as probe, \
-                        patch("asr_transcription.utils.hotwords.load_workbook", side_effect=AssertionError("重复解析Excel")), \
-                        patch("asr_transcription.application.transcription.file_fingerprint", wraps=file_fingerprint) as fingerprint:
+                with patch("asr_runtime.application.inputs.probe_audio", side_effect=AssertionError("重复探测原音频")), \
+                        patch("asr_runtime.utils.media.probe_audio", side_effect=only_probe_new_copy) as probe, \
+                        patch("asr_runtime.utils.hotwords.load_workbook", side_effect=AssertionError("重复解析Excel")), \
+                        patch("asr_runtime.application.transcription.file_fingerprint", wraps=file_fingerprint) as fingerprint:
                     report = transcribe(self.runtime, job_id, authorize_upload=True)
                 self.assertEqual(report["status"], "JSON_READY")
                 self.assertEqual(probe.call_count, 1 if channels == 2 else 0)
@@ -211,7 +211,7 @@ class TranscriptionTests(RuntimeTestCase):
     def test_api_key_is_read_once_for_the_prepared_command(self):
         """验证命令准备读取一次Key并隐藏对象表示中的凭据。"""
         job_id, _ = self.make_job()
-        with patch("asr_transcription.utils.auth.read_api_key", wraps=read_api_key) as read_key:
+        with patch("asr_runtime.utils.auth.read_api_key", wraps=read_api_key) as read_key:
             report = transcribe(self.runtime, job_id, authorize_upload=True)
         self.assertEqual(report["status"], "JSON_READY")
         read_key.assert_called_once_with(self.runtime)
@@ -222,9 +222,9 @@ class TranscriptionTests(RuntimeTestCase):
     def test_console_execution_does_not_run_auth_status_or_read_dotenv(self):
         """验证控制台模式使用独立凭据环境执行识别。"""
         job_id, _ = self.make_job(auth_mode="console")
-        with patch("asr_transcription.utils.bailian.console_status", side_effect=AssertionError("重复查询鉴权状态")), \
-                patch("asr_transcription.utils.bailian._run_bl", side_effect=AssertionError("执行识别前启动了额外BL命令")), \
-                patch("asr_transcription.utils.auth.read_api_key", side_effect=AssertionError("控制台模式读取了.env")):
+        with patch("asr_runtime.utils.bailian.console_status", side_effect=AssertionError("重复查询鉴权状态")), \
+                patch("asr_runtime.utils.bailian._run_bl", side_effect=AssertionError("执行识别前启动了额外BL命令")), \
+                patch("asr_runtime.utils.auth.read_api_key", side_effect=AssertionError("控制台模式读取了.env")):
             report = transcribe(self.runtime, job_id, authorize_upload=True)
         self.assertEqual(report["status"], "JSON_READY")
         self.assertNotIn("DASHSCOPE_API_KEY", self.cli.call_args.args[1].env)
@@ -333,7 +333,7 @@ class TranscriptionTests(RuntimeTestCase):
         """验证转换副本超出上传大小限制时停止准备。"""
         job_id, _ = self.make_job(channels=2)
         # 降低阈值以覆盖超限，不创建1GB测试文件；探测和FLAC转换仍真实执行。
-        with patch("asr_transcription.application.rules.MAX_UPLOAD_BYTES", 1):
+        with patch("asr_runtime.application.rules.MAX_UPLOAD_BYTES", 1):
             report = transcribe(self.runtime, job_id, authorize_upload=True)
         self.assertEqual(report["status"], "STOPPED")
         self.assertEqual(report["cloud_outcome"], "not_started")
@@ -501,7 +501,7 @@ class TranscriptionTests(RuntimeTestCase):
                         raise PermissionError("private synthetic path")
                     save_record(directory, report)
 
-                with patch("asr_transcription.application.transcription.save_record", side_effect=save_until_failure):
+                with patch("asr_runtime.application.transcription.save_record", side_effect=save_until_failure):
                     report = transcribe(self.runtime, job_id, authorize_upload=True)
                 self.assertEqual(report["status"], "STOPPED")
                 self.assertEqual(report["cloud_outcome"], "not_started")
@@ -526,8 +526,8 @@ class TranscriptionTests(RuntimeTestCase):
                 raise OSError("private synthetic disk failure")
             save_record(directory, report)
 
-        with patch("asr_transcription.application.transcription.save_record", side_effect=fail_success_record), \
-             patch("asr_transcription.application.transcription.export_documents") as export:
+        with patch("asr_runtime.application.transcription.save_record", side_effect=fail_success_record), \
+             patch("asr_runtime.application.transcription.export_documents") as export:
             report = transcribe(self.runtime, job_id, authorize_upload=True)
         self.assertEqual(report["status"], "JSON_READY")
         self.assertEqual(report["cloud_outcome"], "result_received")
@@ -558,7 +558,7 @@ class TranscriptionTests(RuntimeTestCase):
             with self.subTest(function=function, error=type(error).__name__):
                 self.cli.reset_mock()
                 job_id, _ = self.make_job()
-                with patch(f"asr_transcription.application.transcription.{function}", side_effect=error):
+                with patch(f"asr_runtime.application.transcription.{function}", side_effect=error):
                     report = transcribe(self.runtime, job_id, authorize_upload=True)
                 self.assertEqual(report["status"], "STOPPED")
                 self.assertEqual(report["cloud_outcome"], outcome)
@@ -578,8 +578,8 @@ class TranscriptionTests(RuntimeTestCase):
                 raise OSError("private synthetic disk failure")
             save_record(directory, report)
 
-        with patch("asr_transcription.application.transcription.prepare_input", side_effect=SetupError("已知输入错误")), \
-             patch("asr_transcription.application.transcription.save_record", side_effect=fail_stopped_record):
+        with patch("asr_runtime.application.transcription.prepare_input", side_effect=SetupError("已知输入错误")), \
+             patch("asr_runtime.application.transcription.save_record", side_effect=fail_stopped_record):
             report = transcribe(self.runtime, job_id, authorize_upload=True)
         self.assertEqual(report["status"], "STOPPED")
         self.assertEqual(report["cloud_outcome"], "not_started")

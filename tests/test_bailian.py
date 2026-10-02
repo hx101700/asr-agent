@@ -8,11 +8,11 @@ import sys
 import unittest
 from unittest.mock import Mock, patch
 
-from asr_transcription import BAILIAN_VERSION, MODEL
-from asr_transcription.utils.auth import read_api_key
-from asr_transcription.utils.bailian import BailianFailure, PreparedCommand, check_command_length, console_status, explain_cli_error, login_console, prepare_command, redact_message, run_recognition
-from asr_transcription.utils.environment import SetupError, find_node
-from asr_transcription.utils.bailian import bl_command
+from asr_runtime import BAILIAN_VERSION, MODEL
+from asr_runtime.utils.auth import read_api_key
+from asr_runtime.utils.bailian import BailianFailure, PreparedCommand, check_command_length, console_status, explain_cli_error, login_console, prepare_command, redact_message, run_recognition
+from asr_runtime.utils.environment import SetupError, find_node
+from asr_runtime.utils.bailian import bl_command
 from tests.support import RuntimeTestCase, CONTRACT_BL_ENTRY, contract_runtime
 
 
@@ -43,8 +43,8 @@ class BailianTests(RuntimeTestCase):
         self.process = Mock()
         self.process.returncode = 0
         self.process.communicate.return_value = (None, "")
-        node_patch = patch("asr_transcription.utils.bailian.find_node", return_value=self.node)
-        process_patch = patch("asr_transcription.utils.bailian.subprocess.Popen", return_value=self.process)
+        node_patch = patch("asr_runtime.utils.bailian.find_node", return_value=self.node)
+        process_patch = patch("asr_runtime.utils.bailian.subprocess.Popen", return_value=self.process)
         node_patch.start()
         self.popen = process_patch.start()
         self.addCleanup(node_patch.stop)
@@ -89,9 +89,9 @@ class BailianTests(RuntimeTestCase):
 
     def test_prepare_and_run_use_one_checked_snapshot_without_rereading_secrets(self):
         """验证识别执行复用一次准备的参数和凭据快照。"""
-        with patch("asr_transcription.utils.auth.read_api_key", wraps=read_api_key) as read_key, \
-             patch("asr_transcription.utils.bailian.bl_command", wraps=bl_command) as build_command, \
-             patch("asr_transcription.utils.bailian.check_command_length", wraps=check_command_length) as check_length:
+        with patch("asr_runtime.utils.auth.read_api_key", wraps=read_api_key) as read_key, \
+             patch("asr_runtime.utils.bailian.bl_command", wraps=bl_command) as build_command, \
+             patch("asr_runtime.utils.bailian.check_command_length", wraps=check_command_length) as check_length:
             command = prepare_command(self.runtime, self.arguments, "api_key")
             self.assertIsInstance(command, PreparedCommand)
             self.assertIsInstance(command.argv, tuple)
@@ -134,7 +134,7 @@ class BailianTests(RuntimeTestCase):
 
     def test_oversized_command_stops_before_loading_credentials_or_starting_bl(self):
         """验证超长命令在读凭据或启动BL前停止。"""
-        with patch("asr_transcription.utils.bailian.bailian_environment") as environment:
+        with patch("asr_runtime.utils.bailian.bailian_environment") as environment:
             with self.assertRaises(SetupError):
                 prepare_command(self.runtime, [*self.arguments, "--context", "a" * 32767], "api_key")
         self.popen.assert_not_called()
@@ -206,7 +206,7 @@ class BailianTests(RuntimeTestCase):
         self.popen.side_effect = start_waiter
         command = prepare_command(self.runtime, self.arguments, "console")
         try:
-            with patch("asr_transcription.utils.bailian.PROCESS_SECONDS", 0.05):
+            with patch("asr_runtime.utils.bailian.PROCESS_SECONDS", 0.05):
                 with self.assertRaises(BailianFailure) as caught:
                     run_recognition(self.runtime, command, [])
             self.assertTrue(caught.exception.started)
@@ -343,7 +343,7 @@ class BailianTests(RuntimeTestCase):
         config.write_text(json.dumps({"api_key": self.key,
                                      "base_url": "https://dashscope.aliyuncs.com"}), encoding="utf-8")
         self.popen.side_effect = _REAL_POPEN
-        with patch("asr_transcription.utils.bailian.bl_command", side_effect=lambda runtime, args:
+        with patch("asr_runtime.utils.bailian.bl_command", side_effect=lambda runtime, args:
                    [str(find_node()), str(contract_runtime().bl_entry), *args, "--quiet"]):
             report = console_status(self.runtime)
         self.assertTrue(report["configured"])

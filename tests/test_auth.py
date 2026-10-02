@@ -2,8 +2,8 @@ import json
 import os
 from unittest.mock import patch
 
-from asr_transcription.utils.auth import api_key_status, bailian_environment, read_api_key, write_api_key
-from asr_transcription.utils.environment import SetupError
+from asr_runtime.utils.auth import api_key_status, bailian_environment, read_api_key, write_api_key
+from asr_runtime.utils.environment import SetupError
 from tests.support import RuntimeTestCase
 
 
@@ -45,7 +45,7 @@ class ApiKeyTests(RuntimeTestCase):
 
     def test_console_does_not_read_dotenv(self):
         """验证控制台模式使用独立凭据环境。"""
-        with patch("asr_transcription.utils.auth.read_api_key", side_effect=AssertionError("must not read")):
+        with patch("asr_runtime.utils.auth.read_api_key", side_effect=AssertionError("must not read")):
             bailian_environment(self.runtime, "console")
 
     def test_multiline_key_is_rejected_without_echo(self):
