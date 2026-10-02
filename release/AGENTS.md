@@ -1,5 +1,9 @@
 # asr-agent 使用规则
 
+中文 | [English](AGENTS.en.md)
+
+本文为使用指令入口，英文对照见AGENTS.en.md；两种语言描述同一套规则。
+
 本目录是可安装的录音转写 Agent。收到安装、转写或本地重导请求时，先读 [.agents/skills/asr-agent/SKILL.md](.agents/skills/asr-agent/SKILL.md)，使用已有入口完成任务。
 
 - 固定模型 `qwen-audio-3.0-asr-flash-filetrans`、北京地域、单个音频、临时 OSS。没有批量、实时录音、翻译或摘要能力。

@@ -147,6 +147,6 @@ RUNNING仍在启动前保守落盘，以处理启动后进程崩溃的未知范�
 
 - 已执行：执行故障的针对性回归、命名函数说明检查、最终全量回归、空目录安装和发行环境检查。项目只在ACCEPTANCE集中维护最新测试范围及结果，避免多处计数漂移。
 - 排除的怀疑：HTTP关闭等待目录窗口导致必然卡住。实际ThreadingHTTPServer.daemon_threads为True，探针中server_close未被等待请求阻塞，取消事件已发出；不登记为bug，也未更改此代码。
-- 发行清单仍为44个文件，doc只含HELP、ERRORS、REFERENCES。本文及其它开发文档不发布；当前包核对情况见[STATUS](STATUS.md)。
+- 中英文README与AGENTS加入后，发行清单为46个文件，doc只含HELP、ERRORS、REFERENCES。本文及其它开发文档不发布；当前包核对情况见[STATUS](STATUS.md)。
 - 未执行：新对话中的完整Codex使用、原生目录窗口交互、Office逐页视觉与真实云端识别；不能据本轮结论宣称这些已通过。
 - 当前实现与最近修改范围以[STATUS](STATUS.md)为准，验证证据以[ACCEPTANCE](ACCEPTANCE.md)为准。

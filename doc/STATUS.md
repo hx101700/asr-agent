@@ -18,6 +18,8 @@
 
 随后按用户反馈重写仓库首页与发行README，以项目介绍、使用条件、Codex话术、网页操作、输出文件和常见问题组织内容；源码下载与精简发行包的区别已说明。此次仅改文档，运行代码、Skill、依赖和UML保持一致。
 
+中英文README与AGENTS现已在仓库和发行模板中配对提供；中文AGENTS.md保持指令入口，英文为同一规则的对照。热词/上下文说明按阿里云官方资料改写，去除具体人名示例。仓库两种语言README各预留3处HTML截图注释，位置为页面概览、增强设置、导出结果，真实截图等待用户提供。构建器明确收录两份英文使用文档，业务代码与界面语言未改。
+
 已删除ValidationError.message的重复赋值及热词文件名快照；异常文本继续由父类保存，网页文件名继续来自上传登记。旧平铺模块、离线运行时/依赖包及旧验收文档没有进入当前运行源码和发行清单；测试中的旧名称是排除反例。
 
 追加的增强输入验证复现了BL 2.1.0将--help、--version及--前缀上下文误认成命令选项的问题。recognition_arguments现采用单个--context=值，diagnostics中的合约探针也使用相同格式；17个特殊字符热词和12组上下文已通过真实BL本机HTTP请求的逐字核对。
@@ -29,11 +31,12 @@
 - README改写前的发行包在项目内新的独立空目录中联网安装成功，doctor未报告环境问题。使用新安装的源码、Python依赖和BL完成60项本机合约、媒体、网页及文档检查。
 - 实际Edge页面验证通过：合成文件添加、联合增强、Key密码显示与清空、多声道提示、预览保存、刷新恢复、转写信息停靠及三种视口无横向溢出。
 - UML已按源码核对并检查渲染图；发行清单、CRC、源码逐字节一致性及包内/开发文档链接通过。
-- 当前唯一发行包为dist/asr-agent.zip，44个文件、114583字节。SHA-256：`d9b1914e79f6dd7cd601ea2d02d51b894b7be658d4ff2f2c6f69fd6ccdbb83d5`。新包相较前包仅README内容改变，旧ZIP已替换。
-- 已发布GitHub预览版[v0.1.0-preview.1](https://github.com/hx101700/asr-agent/releases/tag/v0.1.0-preview.1)，标签对应`dec81ebd30c500223cd6d247975fff439c02ec9f`。[安装包附件](https://github.com/hx101700/asr-agent/releases/download/v0.1.0-preview.1/asr-agent.zip)已从公开链接下载核对，与本地ZIP逐字节一致；仓库README已加入下载入口。
+- 当前本地发行包为dist/asr-agent.zip，46个文件、119356字节。SHA-256：`8e2a200733187707a26c3941dae633e25cb0be7c226d844597f800277dbe1c6b`。新增README.en.md、AGENTS.en.md；原有文件仅README、AGENTS、REFERENCES内容变化，业务代码保持一致。
+- 双语更新已通过9项打包测试、8份双语文档链接/锚点/代码字面量核对、ZIP的CRC及逐文件内容比较；本轮未重复安装或执行识别。
+- 已有GitHub预览版[v0.1.0-preview.1](https://github.com/hx101700/asr-agent/releases/tag/v0.1.0-preview.1)对应双语更新之前的包。双语包准备发布为v0.1.0-preview.2，发布完成前以本地包为准；旧发布记录保留。
 - README更新后9项打包测试、文档链接与目录锚点、ZIP的CRC和源码一致性检查通过；本次没有重复安装或执行识别。
 - 运行代码与`0f76157f39099413a146532fa3ff7f2c2ff17909`一致。后续README及交付记录修改通过[dev分支](https://github.com/hx101700/asr-agent/tree/dev)的Git历史追溯，当前包以本节摘要核对。
-- 根README、AGENTS和.gitignore来自release模板。包内doc仅HELP、ERRORS、REFERENCES；开发文档、测试、UML图、运行时、依赖包、凭据、数据和成品均不发布。
+- 根README/README.en、AGENTS/AGENTS.en和.gitignore来自release模板。包内doc仅HELP、ERRORS、REFERENCES；开发文档、截图、测试、UML图、运行时、依赖包、凭据、数据和成品均不发布。
 
 ## 本机数据与接续
 

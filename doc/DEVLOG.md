@@ -20,5 +20,6 @@
 | 2026-10-02 | 清理本轮验收安装及合成数据，以0f76157提交发行源码并成功推送origin/dev；最终ZIP摘要与验证边界记录在STATUS和ACCEPTANCE |
 | 2026-10-02 | 参考公开Agent仓库的介绍与上手结构，重写首页及发行README，补齐用户操作、Codex话术、输出示例和常见问题；9项打包检查通过，新ZIP仅README内容变化 |
 | 2026-10-02 | 在GitHub Releases发布v0.1.0-preview.1，标签指向dec81eb；上传精简ZIP并通过公开下载逐字节核对，仓库首页接入发行附件入口 |
+| 2026-10-02 | 增加仓库及发行README/AGENTS英文对照，精度增强说明按阿里云资料改写；两种README预留三处真实截图位置，发行清单明确增加两份英文文档，9项打包及双语链接检查通过 |
 
 当前范围见[STATUS.md](STATUS.md)，复测方式见[ACCEPTANCE.md](ACCEPTANCE.md)。

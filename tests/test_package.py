@@ -58,6 +58,8 @@ class PackageTests(ProjectTestCase):
             self.assertEqual(len(names), report["file_count"])
             self.assertTrue(all(name.startswith("asr-agent/") for name in names))
             self.assertEqual(set(names), {f"asr-agent/{name}" for name in (*REQUIRED_FILES, *RELEASE_TEMPLATES)})
+            for name in ("README.md", "README.en.md", "AGENTS.md", "AGENTS.en.md"):
+                self.assertIn(f"asr-agent/{name}", names)
             for relative in REQUIRED_FILES:
                 self.assertIn(f"asr-agent/{relative}", names)
             for relative in excluded:

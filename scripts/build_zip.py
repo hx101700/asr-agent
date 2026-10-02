@@ -29,7 +29,9 @@ REQUIRED_FILES = (
 )
 RELEASE_TEMPLATES = {
     "README.md": "release/README.md",
+    "README.en.md": "release/README.en.md",
     "AGENTS.md": "release/AGENTS.md",
+    "AGENTS.en.md": "release/AGENTS.en.md",
     ".gitignore": "release/.gitignore",
 }
 

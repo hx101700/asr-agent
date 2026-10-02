@@ -127,7 +127,9 @@ JSON_READY仅表示原JSON结构通过。文档失败不改写云端结果，单
 
 __main__.py保持包根位置推导项目目录。tools/bailian从包根读error_catalog.json；两个原生窗口模块相邻；web仍从包根定位static。没有扩大搜索范围或保留旧模块转发壳。
 
-scripts/build_zip.py使用固定逐文件清单，不扫描目录。运行模块、静态页面及错误字典，源码入口、依赖锁、Skill、LICENSE和.env.example进入包；根README/AGENTS/.gitignore来自release模板。用户文档仅HELP、ERRORS、REFERENCES。
+scripts/build_zip.py使用固定逐文件清单，不扫描目录。运行模块、静态页面及错误字典，源码入口、依赖锁、Skill、LICENSE和.env.example进入包；根README.md/README.en.md、AGENTS.md/AGENTS.en.md及.gitignore来自release中的明确模板映射。doc中仅包含HELP、ERRORS、REFERENCES。
+
+中文AGENTS.md是指令入口，AGENTS.en.md为同一规则的英文对照；维护时同步，避免形成两套规则。仓库中英文README各保留overview、enhancement、outputs三个HTML注释占位，等待用户提供真实截图；注释给出建议文件名和配文，不引用尚不存在的图片。截图属于仓库展示材料，当前发行清单未收录。
 
 tests、构建器、pyproject和开发文档只在仓库维护；环境、下载文件、凭据、数据、结果及日志不发布。新增运行文件须同步清单和静态路由，内部Markdown链接必须在包内存在。
 
