@@ -20,7 +20,7 @@ MemoFlow 旨在把语音输入整理为符合用户习惯和指定格式的会�
 
 ## 分支与发布
 
-仓库：[hx101700/memoflow](https://github.com/hx101700/memoflow)，默认分支为 `dev`，项目版本保持 `0.1.0`。本轮按用户要求覆盖现有 [v0.1.0 开发预览](https://github.com/hx101700/memoflow/releases/tag/v0.1.0)，远端结果在实际发布和下载核对后补充。
+仓库：[hx101700/memoflow](https://github.com/hx101700/memoflow)，默认分支为 `dev`，项目版本保持 `0.1.0`。本轮修复、图稿与文档提交 `74d74ed0b1aefda830bc251e2cd80bc067eda7f4` 已推送，现有 [v0.1.0 开发预览](https://github.com/hx101700/memoflow/releases/tag/v0.1.0) 已覆盖。附件仅保留新的 `asr-transcription.zip`，公开下载与本地包逐字节一致，远端源码及安装图源稿、PNG核对通过。
 
 `master` 基线为 `6c8371135d92b9f9d3bd52ca9ee246747f0c7f5e`；本轮不合并。版本号仅在通过验收并正式发布到 `master` 时变更。
 
