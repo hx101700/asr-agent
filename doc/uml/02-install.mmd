@@ -4,7 +4,7 @@ participant C as Codex＋Skill
 participant E as Python CLI入口
 participant B as bootstrap（函数模块）
 participant R as Runtime对象
-participant M as pip／npm进程
+participant M as 本机检查与安装子进程
 participant S as Skill只读资源
 participant F as 用户工作目录
 Note over U,F: Windows 10/11 x64；本机CPython 3.12 x64、Node 18.17+及npm
@@ -15,7 +15,8 @@ C->>E: python -S -X utf8 Skill/scripts/asr.py --workspace 用户目录 bootstrap
 E->>R: Runtime(workspace, skill_root)
 R->>R: 规范化路径；工作目录须在Skill之外<br/>私有运行目录与Skill互不包含
 E->>B: bootstrap(runtime)
-B->>M: check_python()；check_node()执行node --version
+B->>B: check_python()核对当前解释器
+B->>M: check_node()执行node --version
 B->>S: resource()读取Python与BL依赖锁
 B->>F: 核对已有BL安装与目标目录
 alt 运行条件、锁或BL目录冲突

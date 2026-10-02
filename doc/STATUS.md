@@ -2,33 +2,28 @@
 
 更新：2026-10-03。
 
-## 产品
+## 产品与实现
 
-MemoFlow 的目标是把语音输入整理为符合用户习惯、重点要求和指定格式的会议纪要，并从用户确认的范例与修改反馈中持续学习。当前已实现第一阶段 `asr-transcription`：通过 BL 2.1.0 调用北京地域的固定模型，交付原始 JSON、Word、Excel 和 Markdown 校对稿。个性化纪要与反馈学习属于尚待实现的第二阶段。
+MemoFlow 旨在把语音输入整理为符合用户习惯和指定格式的会议纪要，并从确认后的范例与修改中改善后续结果。当前完成第一阶段 `asr-transcription` Skill：配置一个录音，经官方 BL CLI 转写，交付原始 JSON、Word、Excel 和 Markdown 供用户校对。个性化纪要与反馈学习尚待第二阶段实现。
 
-## 当前工作
+- Skill 源码：`skills/asr-transcription/`；CLI 入口：`scripts/asr.py`；内部 Python 包：`scripts/asr_runtime/`。
+- 代码保持入口 → application → utils；BL 负责鉴权、上传、提交、轮询与下载，本项目负责本机配置、媒体准备和文档生成。
+- Vue 3、TypeScript、Element Plus 页面提供中英文、系统/浅色/深色主题，以及网页 API Key 编辑。运行环境、凭据与任务保存在用户工作目录，Skill 资源保持只读。
 
-配置页面已采用 Vue 3、TypeScript 和 Element Plus，提供中文/English 切换及跟随系统、浅色、深色主题。API Key 可直接在网页填写、修改，在检查时保存到当前工作目录；转写执行继续从该固定文件读取。Python 已补充共享协议类型和开发阶段静态检查。前端源码放在仓库 `frontend/`，通过 Vite 构建为 Skill 内的网页资源，用户 ZIP 只包含构建结果。
+## 当前交付
 
-Vue 页面与 Python 类型改动已完成既有回归。本次对照官方 Skill 写作建议及实际代码完成独立情境复核，补充保存回执恢复、工作目录凭据范围和基础解释器诊断指引；新增终端回执丢失场景验证通过。详细证据见[ACCEPTANCE](ACCEPTANCE.md)。
+完整审查覆盖手写运行代码、前端、依赖声明、测试、使用与开发文档、UML及发行清单。修复了图表工作表输入导致热词解析异常、损坏交付记录导致状态查询异常，以及 Word 复杂文字字号未遵循统一设置的问题；删除了一项无消费者的前端文案。安装 UML 已区分当前解释器检查与安装子进程。
 
-内部 Python 执行包统一为 `asr_runtime`，与对外 Skill `asr-transcription` 区分。入口、导入、测试、构建清单和 UML 路径已同步；类型检查、13 项包与结构检查、真实 Edge 配置场景通过。现有命令、任务目录和业务协议保持一致。
+新空目录联网安装成功；实际 ZIP 解压代码的 291 项 Python 回归全部通过、无跳过。34 项前端测试、1 项真实 Edge 集成场景、Python 与 Vue 类型检查、Skill 格式及包边界检查通过。具体证据、首次测试发现和人工验收范围见 [ACCEPTANCE](ACCEPTANCE.md)，职责审查见 [REVIEW](REVIEW.md)。
 
-本地包：`dist/asr-transcription.zip`，42个文件、268497字节，SHA-256：`c199794834510a741936f67977465290b73b5a09f303755834a238d059528d03`。CRC、固定清单、每文件内容与 Skill 源码均核对通过；包内没有 TypeScript/Vue 源码、开发工具、测试、UML 或用户数据。
+本地发行包：`dist/asr-transcription.zip`，42 个文件，268948 字节。SHA-256：`f67d3c19aabbeeca89ce41f373234ec4738ae2f8819b07221b88c285e053c86c`。包仅包含独立 Skill 所需文件；开发文档、UML、测试、构建工具、运行环境和用户数据留在包外。
 
-## 实现
+## 分支与发布
 
-- Skill源位于skills/asr-transcription，代码按入口→application→utils组织。BL保持公开CLI适配模块，不另设BL Skill。
-- 用户工作目录显式传入--workspace；程序资源、私有运行目录与输出位置有明确边界。
-- 运行根与Skill重叠、原生选择/默认及最终输出写入Skill均被拒绝；Python检查和安装进程使用-I隔离工作目录模块。
-- Vue组件、页面用例、HTTP协议与Python业务边界已按实现核对，审查依据见[REVIEW](REVIEW.md)。
+仓库：[hx101700/memoflow](https://github.com/hx101700/memoflow)，默认分支为 `dev`，项目版本保持 `0.1.0`。本轮按用户要求覆盖现有 [v0.1.0 开发预览](https://github.com/hx101700/memoflow/releases/tag/v0.1.0)，远端结果在实际发布和下载核对后补充。
 
-## 版本与远端
+`master` 基线为 `6c8371135d92b9f9d3bd52ca9ee246747f0c7f5e`；本轮不合并。版本号仅在通过验收并正式发布到 `master` 时变更。
 
-GitHub 仓库已重命名为 [hx101700/memoflow](https://github.com/hx101700/memoflow)，默认分支为 `dev`，本地 origin 已同步。项目版本保持 `0.1.0`；仅通过验收并发布到 `master` 时才变更项目版本，开发提交沿用当前版本。
+## 下一步
 
-包名调整提交 `827c15fd30ae69fa9d124ade08e9de472b154886` 已同步到 `dev`，现有 [v0.1.0](https://github.com/hx101700/memoflow/releases/tag/v0.1.0) 开发预览已替换为新的 ZIP。公开下载与本地包逐字节一致，包中仅含新的内部路径。项目版本号仍为 `0.1.0`；`master` 保持 `6c8371135d92b9f9d3bd52ca9ee246747f0c7f5e`，本次未合并。
-
-## 接续
-
-先核对Git与本文件，沿[DEVELOPMENT](DEVELOPMENT.md)了解职责与协议；实际限制见[ISSUES](ISSUES.md)。使用入口为Skill内SKILL.md；开发脚本、测试和UML不进入用户ZIP。
+在目标 Windows 的新 Codex 对话中完成完整使用验收，补齐真实云端、原生目录窗口和 Office 视觉证据后，再决定第一阶段的 `master` 里程碑。当前限制见 [ISSUES](ISSUES.md)；模块与协议见 [DEVELOPMENT](DEVELOPMENT.md)，图示见 [UML](UML.md)。

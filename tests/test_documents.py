@@ -9,6 +9,7 @@ from zipfile import ZipFile
 
 from docx import Document
 from docx.document import Document as WordDocument
+from docx.oxml.ns import qn
 from openpyxl import load_workbook
 from openpyxl.workbook import Workbook
 
@@ -150,6 +151,22 @@ class DocumentTests(RuntimeTestCase):
         text = "长文本验证" * 8000
         path = self.write(write_docx, "docx", sample(text))
         self.assertEqual(Document(path).paragraphs[-1].text, text)
+
+    def test_word_complex_script_uses_the_same_font_sizes(self) -> None:
+        """验证阿拉伯语等复杂文字也使用标题20磅、正文和标签10磅。"""
+        text = "نص تجريبي للاختبار"
+        path = self.write(write_docx, "docx", sample(text))
+        document = Document(path)
+        self.assertEqual(document.paragraphs[-1].text, text)
+        for name, points in (("Normal", 10), ("Title", 20), ("Footer", 10),
+                             ("Transcript Metadata", 10), ("Transcript Marker", 10)):
+            with self.subTest(style=name):
+                properties = document.styles[name].element.rPr
+                sizes = properties.findall(qn("w:szCs"))
+                self.assertEqual(len(sizes), 1)
+                self.assertEqual(sizes[0].get(qn("w:val")), str(points * 2))
+                self.assertEqual(document.styles[name].font.cs_bold,
+                                 name in ("Title", "Transcript Marker"))
 
     def test_word_rejects_xml_control_character_without_echoing_content(self):
         """验证Word控制字符返回脱敏格式错误。"""

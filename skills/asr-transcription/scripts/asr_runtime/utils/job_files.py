@@ -108,7 +108,7 @@ def read_delivery(root: Path) -> DeliveryReport | None:
             raise ValueError("invalid report")
         if report["status"] == "COMPLETE":
             files = report.get("files", {})
-            if (set(files) != {"xlsx", "docx", "md"}
+            if (not isinstance(files, dict) or set(files) != {"xlsx", "docx", "md"}
                     or any(not isinstance(record, dict) or record.get("status") != "READY"
                            or not record.get("path") for record in files.values())):
                 raise ValueError("incomplete delivery")

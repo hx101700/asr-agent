@@ -224,8 +224,16 @@ def _word_style(style: ParagraphStyle, *, size: float, bold: bool = False) -> No
     style.font.name = FONT_NAME
     style.font.size = Pt(size)
     style.font.bold = bold
+    style.font.cs_bold = bold
     style.font.color.rgb = RGBColor(0, 0, 0)
-    fonts = style.element.get_or_add_rPr().rFonts
+    properties = style.element.get_or_add_rPr()
+    # Word对阿拉伯语等复杂文字使用独立的半磅字号，覆盖模板中的默认值。
+    complex_size = properties.find(qn("w:szCs"))
+    if complex_size is None:
+        complex_size = OxmlElement("w:szCs")
+        properties.get_or_add_sz().addnext(complex_size)
+    complex_size.set(qn("w:val"), str(int(size * 2)))
+    fonts = properties.rFonts
     # 同时覆盖中西文与复杂文字字体，移除模板主题字体对当前样式的影响。
     for script in ("ascii", "hAnsi", "eastAsia", "cs"):
         fonts.set(qn(f"w:{script}"), FONT_NAME)

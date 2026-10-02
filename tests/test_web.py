@@ -329,12 +329,16 @@ class WebServerTests(WebFixture):
         self.assertEqual(self.request("POST", "/api/auth-status", {"auth_mode": "api_key"})[0], 404)
 
     def test_api_key_save_requires_local_origin_and_session_token(self):
-        """验证未授权或跨来源请求无法修改工作区Key。"""
+        """验证服务在读取Key正文前拒绝无令牌或跨来源请求。"""
         for options in ({"token": False}, {"headers": {"Origin": "https://evil.example"}}):
             with self.subTest(options=options):
-                status, _, body = self.request("POST", "/api/save-api-key", {"value": "synthetic-secret"}, **options)
+                # 声明正文但先等拒绝回执，避免向已关闭的连接继续发正文。
+                headers = {"Content-Type": "application/json",
+                           "Content-Length": str(len(b'{"value":"synthetic-secret"}')),
+                           **options.get("headers", {})}
+                status, _, _ = self.request("POST", "/api/save-api-key",
+                                            token=options.get("token", True), headers=headers)
                 self.assertEqual(status, 403)
-                self.assertNotIn(b"synthetic-secret", body)
                 self.assertFalse(self.runtime.path(".env").exists())
 
     def test_api_key_save_uses_fixed_workspace_path_without_response_echo(self):

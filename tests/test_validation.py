@@ -7,10 +7,12 @@ from dataclasses import replace
 from unittest.mock import patch
 
 from openpyxl import Workbook
+from openpyxl.chart import BarChart, Reference
 
 from asr_runtime.models import AudioInfo
 from asr_runtime.application.rules import AUDIO_SUFFIXES, MAX_UPLOAD_BYTES, ValidationError, validate_context
 from asr_runtime.utils.files import FileError, file_fingerprint, resolve_input
+from asr_runtime.utils.i18n import language_scope
 from asr_runtime.application.inputs import load_hotwords, validate_audio
 from tests.support import RuntimeTestCase
 
@@ -276,3 +278,28 @@ class ValidationTests(RuntimeTestCase):
         result = load_hotwords(self.runtime.root, path)
         self.assertEqual(result["vocabulary"], {"test": 4})
         self.assertTrue(any("其他工作表" in warning for warning in result["warnings"]))
+
+    def test_hotwords_rejects_chart_sheet_with_field_error_and_releases_file(self) -> None:
+        """验证图表工作表返回双语热词字段错误，并立即释放Excel文件。"""
+        path = self.data / "chart-sheet.xlsx"
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "data"
+        sheet.append(["text", "weight"])
+        sheet.append(["test", 4])
+        chart = BarChart()
+        chart.add_data(Reference(sheet, min_col=2, min_row=1, max_row=2), titles_from_data=True)
+        workbook.create_chartsheet(title="热词").add_chart(chart)
+        workbook.save(path)
+        workbook.close()
+
+        for language, message in (
+            ("zh-CN", "请使用普通工作表填写热词，不支持图表工作表。"),
+            ("en", "Enter hotwords in a regular worksheet. Chart sheets are not supported."),
+        ):
+            with self.subTest(language=language), language_scope(language):
+                with self.assertRaises(ValidationError) as caught:
+                    load_hotwords(self.runtime.root, path)
+                self.assertEqual(caught.exception.field, "hotwords_path")
+                self.assertEqual(str(caught.exception), message)
+        path.unlink()  # Windows上仍被解析器占用的文件不能删除。

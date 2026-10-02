@@ -53,12 +53,15 @@ def read_hotwords(path: Path) -> tuple[list[HotwordRow], list[str]]:
         # 显式拥有句柄，XML解析失败时也立即关闭，便于Windows清理副本。
         with path.open("rb") as stream:
             workbook = load_workbook(stream, read_only=False, data_only=False, keep_links=False)
+        sheet: object
         if "热词" in workbook.sheetnames:
-            sheet = cast(Worksheet, workbook["热词"])
+            sheet = workbook["热词"]
         elif len(workbook.sheetnames) == 1:
-            sheet = cast(Worksheet, workbook.active)
+            sheet = workbook.active
         else:
             raise HotwordFileError("多个工作表时请将待使用的工作表命名为“热词”。")
+        if not isinstance(sheet, Worksheet):
+            raise HotwordFileError("请使用普通工作表填写热词，不支持图表工作表。")
         if sheet.max_row > MAX_WORKSHEET_ROWS or sheet.max_column > 2:
             raise HotwordFileError("热词工作表仅支持两列、最多10001行（含表头和空行）。")
         header = [sheet.cell(1, number).value for number in (1, 2)]

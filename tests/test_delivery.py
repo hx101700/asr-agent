@@ -232,6 +232,21 @@ class DeliveryTests(RuntimeTestCase):
         self.assertEqual(report["delivery"]["status"], "OUTCOME_UNKNOWN")
         self.assertFalse(report["documents_ready"])
 
+    def test_delivery_files_list_is_reported_as_unknown(self) -> None:
+        """验证成品映射损坏为列表时保留JSON并返回未知交付状态。"""
+        directory = self.root / "delivery"
+        directory.mkdir()
+        (directory / "status.json").write_text(json.dumps({
+            "job_id": self.job_id, "status": "COMPLETE", "message": "synthetic",
+            "files": ["xlsx", "docx", "md"],
+        }), encoding="utf-8")
+        report = job_status(self.runtime, self.job_id)
+        self.assertEqual(report["status"], "JSON_READY")
+        self.assertEqual(report["delivery"]["status"], "OUTCOME_UNKNOWN")
+        self.assertFalse(report["documents_ready"])
+        self.assertTrue(self.json_path.is_file())
+        self.cloud.assert_not_called()
+
     def test_status_write_failure_still_reports_saved_json_without_reidentification(self):
         """验证状态写入失败仍说明JSON已保存。"""
         with patch("asr_runtime.application.delivery.save_record", side_effect=OSError("synthetic disk full")):

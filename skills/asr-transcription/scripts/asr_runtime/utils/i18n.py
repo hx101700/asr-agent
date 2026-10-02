@@ -75,6 +75,7 @@ _ENGLISH: dict[str, str] = {
     "热词Excel结构过大：解压内容最多20 MiB、200个内部文件。": "The hotword workbook exceeds the local processing limit: 20 MiB of uncompressed content or 200 internal files. Use a smaller workbook based on the template.",
     "不支持加密的热词Excel，请保存为普通.xlsx文件。": "Encrypted workbooks are not supported. Save an unencrypted .xlsx file.",
     "多个工作表时请将待使用的工作表命名为“热词”。": "If the workbook has multiple sheets, name the sheet to use 热词.",
+    "请使用普通工作表填写热词，不支持图表工作表。": "Enter hotwords in a regular worksheet. Chart sheets are not supported.",
     "热词工作表仅支持两列、最多10001行（含表头和空行）。": "The hotword sheet must have two columns and no more than 10,001 rows, including the header and empty rows.",
     "首行必须依次为text、weight，或中文列名热词、权重。": "The first row must contain text and weight in that order. The Chinese headers 热词 and 权重 are also accepted.",
     "请按模板修改表头。": "Use the column headers from the template.",

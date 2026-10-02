@@ -2,7 +2,7 @@
 
 API资料核验基线：2026-09-29。CLI固定2.1.0，对照源码提交`8bbbbc722d70fb200641ef22b6f6d033aeae9f74`及本机发布包；不把未核实的新版本能力加入当前接口。
 
-精度增强[A04]与说话人分离[A03]资料最近核验：2026-10-02。产品输入方式和媒体处理以项目实现为准。
+精度增强[A04]与说话人分离[A03]资料最近核验：2026-10-03。产品输入方式和媒体处理以项目实现为准。
 
 ## 来源
 
@@ -85,6 +85,7 @@ BL中间件会检查版本并可能写update-state.json；quiet阻止后续自�
 
 - [tkinter.askdirectory](https://docs.python.org/3.12/library/dialog.html#tkinter.filedialog.askdirectory)：选择现有目录。当前无人工总时限，取消与进程回收由项目处理；显示窗口需要正常交互桌面。
 - [python-docx文本/分页](https://python-docx.readthedocs.io/en/latest/user/text.html)：段落、keep_with_next和widow_control；不代表无需实际页面检查。
+- [Word复杂文字字号](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.wordprocessing.fontsizecomplexscript?view=openxml-3.0.1)：`w:szCs`以半磅设置复杂文字的字号，缺省时沿样式层级继承。项目同时设置普通文字与复杂文字的字号，标题20磅，其余正文、元信息、时间标签及页码10磅。
 - [openpyxl样式](https://openpyxl.readthedocs.io/en/stable/styles.html)及[Excel规格](https://support.microsoft.com/en-us/excel/excel-specifications-and-limits)：单元格32767字符、工作表1048576行、行高409。项目正文自动换行，按内容估算展示行高并封顶409，单元格保留长段全文；存储超限不截断。
 
 使用步骤见[usage.md](usage.md)，任务状态和错误解释见[errors.md](errors.md)。
