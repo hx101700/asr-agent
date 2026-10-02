@@ -1,174 +1,81 @@
 # asr-agent
 
-中文 | [English](README.en.md)
+基于阿里云百炼的录音转写 Agent，在 Codex 中使用。
 
-**在 Codex 中，将录音转成带时间戳的 Word、Excel 和 Markdown。**
+中文 · [English](README.en.md) · [下载](https://github.com/hx101700/asr-agent/releases) · [使用文档](doc/HELP.md) · [百炼 CLI](https://github.com/modelstudioai/cli)
 
-asr-agent 是一个面向 Windows 用户的录音转写工具，适合处理会议、访谈、课程等已经录制好的音频。在 Codex 中提出转写需求，在本机网页选择文件和设置，完成后就能获得可阅读、编辑和归档的转写文档。
+会议、访谈、课程录音，转写为带时间戳和说话人信息的 Word、Excel、Markdown。你在网页中选择文件和识别选项，Codex 完成转写并给出文档位置。
 
-语音识别由[阿里云百炼](https://help.aliyun.com/zh/model-studio/what-is-model-studio)的 `qwen-audio-3.0-asr-flash-filetrans` 提供，通过官方 [BL CLI](https://github.com/modelstudioai/cli) 调用，使用北京地域。支持 Windows 10/11 x64，每次处理一个文件。
+## 功能特性
 
-[下载安装包](https://github.com/hx101700/asr-agent/releases) · [开始使用](#开始使用) · [输出文件](#输出文件) · [常见问题](#常见问题) · [详细使用说明](doc/HELP.md)
-
-## 主要功能
-
-- **一次转写，三种文档**：同时生成 Word、Excel 和 Markdown，并保留原始识别 JSON。
-- **时间戳与发言人**：按段保留时间信息，默认区分发言人，也可关闭或填写参考人数。
-- **热词与上下文**：通过 Excel 导入人名、产品名和专业术语，也可填写参考文本；两者可以同时使用。
-- **可视化设置**：选择或拖入音频，预览时长、声道与转写选项，通过系统弹窗选择保存位置。
-- **本地重新导出**：保留完整任务与原始结果后，可重新生成三种文档，无需再次识别录音。
+- **录音转写** — 支持 MP3、WAV、M4A、FLAC 等格式，每次处理一个音频文件。
+- **精度增强** — 从 Excel 导入热词，配合上下文参考文本，辅助识别专业词汇。
+- **说话人区分** — 默认开启，可设置参考人数。
+- **多格式导出** — 同时生成 Word、Excel、Markdown，保留原始 JSON，支持本地重新导出。
+- **可视化配置** — 在浏览器中选择文件、调整设置、预览信息和选择保存位置。
 
 <!-- SCREENSHOT: overview
-截图位置 1：在此插入本机转写页面的整体截图，展示添加音频、转写设置和转写信息栏。
+在此放实际页面全景：添加音频、转写设置和信息栏。
 建议文件：doc/images/01-transcription-overview.png
-建议配文：在同一页面添加录音、设置转写选项并核对信息。
-使用实际界面截图；截取前隐藏密钥、账号信息及私人文件路径。中英文README复用同一张图片。
+配文：在一个页面中完成录音选择与转写设置。隐藏密钥和私人路径。
 -->
 
-## 开始使用
+## 安装
 
-### 1. 准备环境并获取项目
+需要 **Windows 10/11 x64、Codex 桌面端、Python 3.12 x64 和 Node.js 18.17.0+（含 npm）**。Python 需包含 tkinter；安装依赖需要联网。
 
-| 准备项 | 要求 |
-| --- | --- |
-| 操作系统 | Windows 10 / 11，64 位 |
-| Codex | 已安装并可正常使用的桌面端 |
-| Python | [CPython 3.12](https://www.python.org/downloads/windows/)，Windows x64，包含 venv、ensurepip 和 tkinter |
-| Node.js | [18.17.0 或更高版本](https://nodejs.org/en/download)，包含 npm |
-| 百炼账号 | 具备该模型调用权限的阿里云账号，或北京地域的百炼 API Key |
-| 网络 | 首次安装需下载依赖；转写时需连接阿里云百炼 |
-
-从 [Releases](https://github.com/hx101700/asr-agent/releases) 的 Assets 下载 **asr-agent.zip**，解压后用 Codex 打开其中的 `asr-agent` 文件夹。这是只包含使用所需文件的精简安装包。
-
-需要完整源码与开发文档时，可以[下载 dev 分支源码](https://github.com/hx101700/asr-agent/archive/refs/heads/dev.zip)，解压后打开 `asr-agent-dev` 文件夹。Releases 中的 Source code 归档则对应所选发布版本的完整源码。
-
-### 2. 让 Codex 安装并打开页面
-
-在这个项目的 Codex 对话中输入：
+从 [Releases](https://github.com/hx101700/asr-agent/releases) 下载 **asr-agent.zip**，解压后用 Codex 打开其中的 `asr-agent` 文件夹，然后输入：
 
 > 请安装 asr-agent，并打开录音转写页面。
 
-Codex 会安装项目依赖和阿里云百炼 CLI，然后打开本机网页。首次安装需要等待下载完成；环境保存在项目文件夹内。后续使用时，在同一项目中说“帮我转写录音”即可。
+首次使用需要配置百炼账号：按提示完成控制台登录，或使用自己的北京地域 API Key。[安装与账号配置](doc/HELP.md)介绍了具体操作。
 
-### 3. 选择账号使用方式
+## 快速开始
 
-| 方式 | 你需要做什么 |
+安装完成后，直接告诉 Codex 你要做什么：
+
+| 场景 | 可以这样说 |
 | --- | --- |
-| 控制台登录 | 保持网页中的“使用指定 API Key”未勾选。首次使用时，按 Codex 提示在阿里云官方页面完成登录授权。 |
-| 指定 API Key | 将项目中的 `.env.example` 复制为 `.env`，在 `DASHSCOPE_API_KEY=` 后填写自己的 Key，然后在网页勾选“使用指定 API Key”。 |
+| 转写录音 | 帮我转写一段会议录音，区分发言人。 |
+| 添加专业词汇 | 这段录音有专业术语，我想添加热词和上下文再转写。 |
+| 重新生成文档 | 请把刚才的转写结果重新生成 Word、Excel 和 Markdown。 |
 
-API Key 由网页从本机文件读取，请勿把密钥发送到聊天中。识别使用你自己的阿里云服务，可能产生模型调用费用。
+网页打开后，选择音频，按需调整设置，点击**检查并预览**和**保存设置**，再返回 Codex 确认开始转写。完成后，Codex 会给出文档保存位置。
 
-### 4. 添加录音并核对设置
+识别使用你自己的百炼账号，可能产生调用费用；录音及启用的增强内容会在确认转写后发送到百炼。
 
-1. **添加音频**：选择或拖入一个文件，支持 MP3、WAV、M4A、FLAC 等格式。
-2. **设置转写选项**：选择音频语言，按需调整发言人区分和参考人数。
-3. **添加精度增强**：需要热词时下载模板、填写并导入 Excel；需要上下文时填写与录音相关的参考文本。
-4. **选择保存位置**：原始 JSON 和转写文档可以分别选择文件夹，默认保存在项目的 `outputs` 中。
-5. 点击 **“检查并预览”**，核对信息后点击 **“保存设置”**。
+## 热词与上下文
 
-按阿里云的[提升识别准确率说明](https://help.aliyun.com/zh/model-studio/improve-asr-accuracy)：
-
-- **热词增强**：将词语及权重随识别请求传入，辅助识别产品名称、行业术语等词汇。本项目通过 Excel 导入即时热词。
-- **上下文增强**：提供包含待识别原词的领域术语或参考文本；只有语义相关的描述，纠正效果有限。
-
-多声道录音开启发言人区分时，页面会提示生成单声道副本，原文件保留。
+热词用来指定重点识别的词语，可从 Excel 导入；上下文补充录音中可能出现的专业术语和参考文本。两种方式可以同时使用。[了解百炼精度增强](https://help.aliyun.com/zh/model-studio/improve-asr-accuracy)。
 
 <!-- SCREENSHOT: enhancement
-截图位置 2：在此插入“精度增强”区域与检查结果，展示热词和上下文同时启用。
+在此放热词与上下文同时启用的实际截图。
 建议文件：doc/images/02-accuracy-enhancement.png
-建议配文：按需同时启用热词与上下文，并在提交前检查转写信息。
-画面中的示例使用公开的产品或技术术语；不要包含真实人名、私人词表、录音正文或密钥。
+配文：为专业词汇添加识别参考。使用公开术语，不展示真实人名或私人内容。
 -->
 
-### 5. 返回 Codex 开始转写
+## 转写结果
 
-保存设置后，返回 Codex 确认本次上传，例如：
-
-> 同意将这次录音及所选热词、上下文发送到阿里云百炼北京进行转写，请开始。
-
-Codex 会执行转写，并在完成后告诉你文件保存在哪里。网页可以关闭，转写期间请保持电脑和执行进程运行。
-
-## 输出文件
-
-| 文件 | 适合用途 |
-| --- | --- |
-| `transcription.docx` | 按段阅读、修改和整理，包含时间标签与说话人信息 |
-| `transcription.xlsx` | 按时间、说话人及正文查看或筛选转写内容 |
-| `transcription.md` | 在 Markdown 编辑器、笔记或代码仓库中阅读与归档 |
-| `transcription.json` | 保留原始识别结果，供本地重新导出使用 |
-
-三种文档的标题为“录音文件名 录音转写”。说话人使用模型返回的编号，不会自动识别人名。
+Word 用于阅读和校对，Excel 便于逐段查看与筛选，Markdown 可直接用于笔记和归档。三种文档保留时间戳，开启说话人区分时包含说话人编号。
 
 <!-- SCREENSHOT: outputs
-截图位置 3：在此插入实际导出文档的截图，可并排展示Word、Excel和Markdown。
+在此放 Word、Excel、Markdown 的实际成品截图。
 建议文件：doc/images/03-transcription-outputs.png
-建议配文：同一份转写结果以三种格式保存，保留时间戳和发言人信息。
-使用已获授权、可公开的样本；补图本身不代表已完成识别准确率或逐页排版验收。
+配文：同一份录音，三种文档格式。使用可公开的样本。
 -->
 
-默认目录结构如下，任务编号由程序生成：
+重新导出在本机完成，会更新同一组文档；如需保留手工修改，请先另存副本。文件要求、保存规则和问题处理见[使用文档](doc/HELP.md)。
 
-```text
-outputs/
-└── 任务编号/
-    ├── json/
-    │   └── transcription.json
-    └── documents/
-        ├── transcription.docx
-        ├── transcription.xlsx
-        └── transcription.md
-```
+## 基于阿里云百炼
 
-需要重新生成文档时，保留项目文件夹和原始 JSON，并告诉 Codex：“请为任务 `<任务编号>` 重新导出三种文档。”文档会保存到该任务的 `documents` 文件夹，覆盖同名成品，无需再次识别录音。如果手动编辑过成品，请先另存一份。仅有一份 JSON 文件不足以恢复完整任务。
+[阿里云百炼](https://help.aliyun.com/zh/model-studio/what-is-model-studio)提供云端语音识别服务，[官方 BL CLI](https://github.com/modelstudioai/cli)负责登录、上传与识别调用。asr-agent 在此基础上提供本机配置页面和文档导出。
 
-## 常见问题
+当前使用 `qwen-audio-3.0-asr-flash-filetrans`，地域固定北京。
 
-**添加文件后，录音就上传到云端了吗？**
+[百炼控制台](https://bailian.console.aliyun.com/) · [百炼文档](https://help.aliyun.com/zh/model-studio/) · [BL CLI 官网](https://bailian.console.aliyun.com/cli) · [BL CLI 源码](https://github.com/modelstudioai/cli)
 
-添加文件和保存设置都在本机完成。确认开始转写后，录音和启用的热词、上下文才会发送到阿里云百炼北京。请使用有权上传的录音；密钥、录音和转写内容请勿提交到公开仓库。
+## 参与贡献
 
-**能实时录音、批量转写或自动生成摘要吗？**
+问题反馈和改进建议欢迎提交到 [Issues](https://github.com/hx101700/asr-agent/issues)。开发资料见[文档中心](doc/README.md)，代码结构见[UML](doc/UML.md)。
 
-当前处理已录制好的单个音频，每次一个文件。实时录音、批处理、翻译和自动摘要不在当前功能范围内。
-
-**转写失败后怎么办？**
-
-Codex 会说明已知失败原因和已保存的文件，不会自动再次提交识别。若仅文档导出失败，可以先查看保留的结果，再按提示决定是否重新导出。详细处理见[状态与错误说明](doc/ERRORS.md)。
-
-**需要自己敲命令安装吗？**
-
-可以直接使用上面的 Codex 话术。希望手动操作时，在项目目录执行：
-
-```powershell
-python -S -X utf8 scripts/asr.py bootstrap
-.venv\Scripts\python.exe -X utf8 scripts/asr.py serve
-```
-
-这两条命令安装环境并打开设置页面。登录、执行转写和本地重导的完整命令见[使用说明](doc/HELP.md)。
-
-## 服务与上游项目
-
-[阿里云百炼](https://help.aliyun.com/zh/model-studio/what-is-model-studio)是阿里云的模型服务与 AI 应用开发平台。本项目使用其中的云端语音识别能力，账号和 API Key 由你在百炼配置。
-
-[百炼 CLI（BL CLI）](https://github.com/modelstudioai/cli)是百炼的官方命令行工具。在 asr-agent 中，它负责登录、上传录音、提交识别和获取结果；asr-agent 提供本机网页、增强输入和文档导出。
-
-| 官方入口 | 用途 |
-| --- | --- |
-| [百炼控制台](https://bailian.console.aliyun.com/) | 管理账号、模型访问与 API Key |
-| [百炼文档](https://help.aliyun.com/zh/model-studio/) | 查看模型、接口与使用要求 |
-| [BL CLI 官网](https://bailian.console.aliyun.com/cli) | 了解官方 CLI 的能力与用法 |
-| [BL CLI GitHub](https://github.com/modelstudioai/cli) | 查看源码、版本记录及上游问题 |
-
-项目安装流程会配置所需的 CLI 版本，使用时按本文步骤操作即可。
-
-## 文档与参与开发
-
-- [使用说明](doc/HELP.md)：详细安装、配置、文件限制和故障处理。
-- [官方能力依据](doc/REFERENCES.md)：模型、参数及输入要求。
-- [开发说明](doc/DEVELOPMENT.md)与[UML设计视图](doc/UML.md)：了解实现和代码位置。
-- [验证范围](doc/ACCEPTANCE.md)与[已知问题](doc/ISSUES.md)：查看已验证场景及当前限制。
-
-欢迎通过 [Issues](https://github.com/hx101700/asr-agent/issues)反馈问题。请附上使用方式、环境版本和错误提示，并移除密钥、录音内容及其他敏感信息。
-
-本项目采用 [Apache-2.0](LICENSE) 许可证。
+[Apache-2.0](LICENSE)

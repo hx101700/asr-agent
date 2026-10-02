@@ -1,176 +1,81 @@
 # asr-agent
 
-[中文](README.md) | English
+A recording transcription agent for Codex, powered by Alibaba Cloud Model Studio.
 
-**Turn recordings into timestamped Word, Excel, and Markdown documents in Codex.**
+[中文](README.md) · English · [Download](https://github.com/hx101700/asr-agent/releases) · [User guide](doc/HELP.md) · [Model Studio CLI](https://github.com/modelstudioai/cli)
 
-asr-agent is a recording transcription tool for Windows. It is designed for existing meeting, interview, and lecture recordings. Ask Codex to start, choose a file and options on a local web page, and receive documents you can read, edit, and archive.
-
-Speech recognition uses [Alibaba Cloud Model Studio](https://help.aliyun.com/zh/model-studio/what-is-model-studio)'s `qwen-audio-3.0-asr-flash-filetrans` through its official [BL CLI](https://github.com/modelstudioai/cli), in the Beijing region. The tool supports Windows 10/11 x64 and processes one file at a time. The current web UI and generated document labels are in Chinese.
-
-[Download the package](https://github.com/hx101700/asr-agent/releases) · [Get started](#get-started) · [Output files](#output-files) · [FAQ](#faq) · [Detailed guide (Chinese)](doc/HELP.md)
+Turn meeting, interview, and lecture recordings into Word, Excel, and Markdown documents with timestamps and speaker labels. Choose a file and recognition options on the local page; Codex runs the transcription and shows you where the documents were saved.
 
 ## Features
 
-- **Three document formats from one transcription**: generate Word, Excel, and Markdown together, and keep the original recognition JSON.
-- **Timestamps and speakers**: retain segment timing and distinguish speakers by default. You can disable speaker diarization or provide an estimated speaker count.
-- **Hotwords and context**: import an Excel vocabulary and provide reference text. Both can be enabled together.
-- **Visual configuration**: select or drag in an audio file, preview its duration and channels, and choose output folders through the system dialog.
-- **Local re-export**: regenerate documents from a retained task and its original result without recognizing the recording again.
+- **File transcription** — MP3, WAV, M4A, FLAC, and other formats, one recording at a time.
+- **Accuracy enhancements** — Import hotwords from Excel and add reference context for specialist vocabulary.
+- **Speaker labels** — Enabled by default, with an optional estimated speaker count.
+- **Document export** — Generate Word, Excel, and Markdown together, retain the original JSON, and re-export locally.
+- **Visual setup** — Select files, adjust options, review audio details, and choose output folders in the browser.
 
 <!-- SCREENSHOT: overview
-Screenshot slot 1: insert an actual overview of the local page, showing audio selection, transcription settings, and the review panel.
+Insert an actual overview of audio selection, transcription settings, and the review panel.
 Suggested file: doc/images/01-transcription-overview.png
-Suggested caption: Add a recording, configure transcription, and review the details on one page.
-Hide keys, account details, and private file paths before capture. Share the same image with the Chinese README.
+Caption: Choose a recording and configure transcription on one page. Hide keys and private paths.
 -->
 
-## Get started
+## Installation
 
-### 1. Prepare your environment and get the project
+Requires **Windows 10/11 x64, Codex desktop, Python 3.12 x64, and Node.js 18.17.0+ with npm**. Python must include tkinter. Dependency installation requires network access.
 
-| Requirement | Details |
-| --- | --- |
-| Operating system | Windows 10 / 11, 64-bit |
-| Codex | A working installation of the desktop app |
-| Python | [Windows x64 CPython 3.12](https://www.python.org/downloads/windows/), including venv, ensurepip, and tkinter |
-| Node.js | [Version 18.17.0 or later](https://nodejs.org/en/download), including npm |
-| Model Studio access | An Alibaba Cloud account with permission to call the model, or a Model Studio API key for Beijing |
-| Network | Required to download dependencies during installation and to connect to Model Studio for transcription |
-
-Download **asr-agent.zip** from the Assets section of [Releases](https://github.com/hx101700/asr-agent/releases). Extract it and open the included `asr-agent` folder in Codex. This package contains the files needed to use the tool.
-
-For the full source and development documentation, [download the dev branch](https://github.com/hx101700/asr-agent/archive/refs/heads/dev.zip) and open the extracted `asr-agent-dev` folder. GitHub's Source code archives on a release page contain the full source for that release.
-
-### 2. Ask Codex to install and open the page
-
-In a Codex conversation for this project, enter:
+Download **asr-agent.zip** from [Releases](https://github.com/hx101700/asr-agent/releases), extract it, open the included `asr-agent` folder in Codex, and enter:
 
 > Install asr-agent and open the recording transcription page.
 
-Codex installs the project dependencies and the Alibaba Cloud Model Studio CLI, then opens the local page. Allow the initial downloads to finish. The environment stays inside the project folder. For later use, ask Codex to transcribe a recording in the same project.
+On first use, sign in to Model Studio as prompted or configure your own API key for Beijing. See the [setup guide](doc/HELP.md) for details. The web UI, document labels, and detailed guide are currently in Chinese.
 
-### 3. Choose how to connect your account
+## Quick start
 
-| Method | What you need to do |
+Once installed, tell Codex what you need:
+
+| Task | Example prompt |
 | --- | --- |
-| Console login | Leave `使用指定 API Key` (Use a specific API key) unchecked. On first use, follow Codex's instructions to authorize access on the official Alibaba Cloud login page. |
-| API key | Copy `.env.example` to `.env` in the project, enter your key after `DASHSCOPE_API_KEY=`, then select `使用指定 API Key` on the page. |
+| Transcribe a recording | Transcribe a meeting recording and distinguish the speakers. |
+| Add specialist vocabulary | I want to add hotwords and reference context before transcribing this recording. |
+| Regenerate documents | Regenerate Word, Excel, and Markdown for the recording we just transcribed. |
 
-The page reads your API key from the local file. Do not send the key in chat. Recognition uses your own Alibaba Cloud service and may incur model usage charges.
+On the page, select the recording and adjust the options. Click **检查并预览 (Check and preview)** and **保存设置 (Save settings)**, then return to Codex to authorize transcription. Codex reports the output locations when the task finishes.
 
-### 4. Add a recording and review the settings
+Recognition uses your Model Studio account and may incur charges. The recording and enabled enhancement content are sent to Model Studio after you authorize transcription.
 
-1. **Add audio**: select or drag in one file. Supported formats include MP3, WAV, M4A, and FLAC.
-2. **Set transcription options**: choose the audio language and adjust speaker diarization and the estimated speaker count if needed.
-3. **Add accuracy enhancements**: download the Excel template, fill it in, and upload the completed workbook for hotwords, or enter reference text related to the recording.
-4. **Choose output folders**: select separate destinations for JSON and documents if needed. The default is the project's `outputs` folder.
-5. Click **`检查并预览` (Check and preview)**, review the details, then click **`保存设置` (Save settings)**.
+## Hotwords and context
 
-Following Alibaba Cloud's [accuracy enhancement guidance](https://help.aliyun.com/zh/model-studio/improve-asr-accuracy):
-
-- **Hotwords** send terms and weights with the recognition request to help recognize product names and specialist vocabulary. This project imports an instant vocabulary from Excel.
-- **Context** supplies domain terms or reference text containing the exact words to recognize. Related meaning alone provides limited correction.
-
-When speaker diarization is enabled for multichannel audio, the page explains that a mono copy will be created. The original file is preserved.
+Import target terms from Excel as hotwords, or add domain terms and reference text as context. Include the words you expect in the recording; both options can be used together. See [Model Studio's accuracy guidance](https://help.aliyun.com/zh/model-studio/improve-asr-accuracy).
 
 <!-- SCREENSHOT: enhancement
-Screenshot slot 2: insert the accuracy enhancement section and review details, with hotwords and context both enabled.
+Insert an actual view with hotwords and context enabled together.
 Suggested file: doc/images/02-accuracy-enhancement.png
-Suggested caption: Enable hotwords and context together, then review the transcription settings before submission.
-Use public product or technical terms. Exclude actual people's names, private vocabularies, recording content, and keys.
+Caption: Add recognition references for specialist vocabulary. Use public terms, without actual people's names or private content.
 -->
 
-### 5. Return to Codex to start transcription
+## Transcription results
 
-After saving the settings, confirm the upload in Codex. For example:
-
-> I authorize uploading this recording and the selected hotwords and context to Alibaba Cloud Model Studio in Beijing. Start transcription.
-
-Codex runs the transcription and reports where the files were saved. You can close the web page; keep the computer and execution process running during transcription.
-
-## Output files
-
-| File | Use |
-| --- | --- |
-| `transcription.docx` | Read and edit the transcript in paragraphs with time labels and speaker information |
-| `transcription.xlsx` | View or filter transcript rows by time, speaker, and text |
-| `transcription.md` | Read and archive the transcript in Markdown editors, notes, or repositories |
-| `transcription.json` | Keep the original recognition result for local re-export |
-
-Document titles use the recording's filename stem followed by `录音转写` (recording transcript). Speaker labels use the model's identifiers; they do not identify people by name.
+Use Word to read and edit, Excel to review and filter segments, and Markdown for notes and archives. All three retain timestamps and include speaker identifiers when diarization is enabled.
 
 <!-- SCREENSHOT: outputs
-Screenshot slot 3: insert actual exported documents, optionally showing Word, Excel, and Markdown side by side.
+Insert actual Word, Excel, and Markdown output screenshots.
 Suggested file: doc/images/03-transcription-outputs.png
-Suggested caption: The same transcript in three formats, retaining timestamps and speaker information.
-Use a sample authorized for public sharing. Adding a screenshot does not establish transcription accuracy or page-by-page layout acceptance.
+Caption: One recording, three document formats. Use a sample approved for public sharing.
 -->
 
-The default structure is shown below. Task IDs are generated by the application:
+Re-export runs locally and updates the same files. Save a separate copy first if you want to keep manual edits. File requirements, storage details, and troubleshooting are in the [user guide](doc/HELP.md).
 
-```text
-outputs/
-└── task-id/
-    ├── json/
-    │   └── transcription.json
-    └── documents/
-        ├── transcription.docx
-        ├── transcription.xlsx
-        └── transcription.md
-```
+## Powered by Model Studio
 
-To regenerate documents, keep the project folder and original JSON, and ask Codex: “Re-export all three document formats for task `<task-id>`.” The documents are saved in the task's `documents` folder, replacing files with the same names without recognizing the recording again. Save a separate copy of any documents you have edited first. A JSON file alone is not enough to restore the full task.
+[Alibaba Cloud Model Studio](https://help.aliyun.com/zh/model-studio/what-is-model-studio) provides cloud speech recognition. Its [official BL CLI](https://github.com/modelstudioai/cli) handles login, upload, and recognition calls. asr-agent adds the local configuration page and document exports.
 
-## FAQ
+The current model is `qwen-audio-3.0-asr-flash-filetrans`, in the Beijing region.
 
-**Is audio uploaded to the cloud as soon as I add it?**
+[Console](https://bailian.console.aliyun.com/) · [Model Studio docs](https://help.aliyun.com/zh/model-studio/) · [BL CLI website](https://bailian.console.aliyun.com/cli) · [BL CLI source](https://github.com/modelstudioai/cli)
 
-Adding a file and saving settings happen locally. The recording and enabled hotwords and context are sent to Model Studio in Beijing after you authorize transcription. Use recordings you are permitted to upload, and keep keys, recordings, and transcripts out of public repositories.
+## Contributing
 
-**Can it record live audio, process batches, or generate summaries?**
+Report problems and suggest improvements through [Issues](https://github.com/hx101700/asr-agent/issues). See the [documentation index](doc/README.md) and [UML views](doc/UML.md) for development references.
 
-The current version processes one existing audio file at a time. Live recording, batch processing, translation, and automatic summaries are outside its current scope.
-
-**What happens if transcription fails?**
-
-Codex explains the known failure and reports any saved files. It does not automatically submit recognition again. If only document export failed, inspect the retained result before deciding whether to re-export. See [status and error guidance (Chinese)](doc/ERRORS.md).
-
-**Do I have to install it with terminal commands?**
-
-You can use the Codex prompt above. For manual installation and opening the settings page, run these commands in the project folder:
-
-```powershell
-python -S -X utf8 scripts/asr.py bootstrap
-.venv\Scripts\python.exe -X utf8 scripts/asr.py serve
-```
-
-The [detailed guide (Chinese)](doc/HELP.md) also covers login, transcription, and local re-export commands.
-
-## Services and upstream projects
-
-[Alibaba Cloud Model Studio (Bailian)](https://help.aliyun.com/zh/model-studio/what-is-model-studio) provides model services and tools for building AI applications. This project uses its cloud speech recognition service with your Model Studio account or API key.
-
-[BL CLI](https://github.com/modelstudioai/cli) is Model Studio's official command-line tool. It handles login, audio upload, recognition submission, and result retrieval here. asr-agent adds the local page, enhancement inputs, and document exports.
-
-| Official resource | Purpose |
-| --- | --- |
-| [Model Studio console](https://bailian.console.aliyun.com/) | Manage your account, model access, and API keys |
-| [Model Studio documentation (Chinese)](https://help.aliyun.com/zh/model-studio/) | Read model, API, and usage requirements |
-| [BL CLI website](https://bailian.console.aliyun.com/cli) | Explore the official CLI and its usage |
-| [BL CLI on GitHub](https://github.com/modelstudioai/cli) | Browse source code, releases, and upstream issues |
-
-The project installer sets up the required CLI version. Follow this guide to use it with asr-agent.
-
-## Documentation and contributions
-
-The detailed documents below are currently in Chinese:
-
-- [User guide](doc/HELP.md): installation, configuration, file limits, and troubleshooting.
-- [Official references](doc/REFERENCES.md): the model, parameters, and input requirements.
-- [Development guide](doc/DEVELOPMENT.md) and [UML views](doc/UML.md): implementation and source locations.
-- [Verification scope](doc/ACCEPTANCE.md) and [known issues](doc/ISSUES.md): tested scenarios and current limitations.
-
-Report problems through [Issues](https://github.com/hx101700/asr-agent/issues). Include how you used the tool, environment versions, and the error message, with keys, recording content, and other sensitive information removed.
-
-This project is licensed under [Apache-2.0](LICENSE).
+[Apache-2.0](LICENSE)
