@@ -19,5 +19,6 @@
 | 2026-10-02 | 完成发行前全量回归及新空目录联网安装；在新包环境验证本机合约与实际Edge页面，补齐运行时/安装等待说明，核对并发布doc/uml中的9份UML源稿与图像，开发文档继续与用户ZIP分离 |
 | 2026-10-02 | 清理本轮验收安装及合成数据，以0f76157提交发行源码并成功推送origin/dev；最终ZIP摘要与验证边界记录在STATUS和ACCEPTANCE |
 | 2026-10-02 | 参考公开Agent仓库的介绍与上手结构，重写首页及发行README，补齐用户操作、Codex话术、输出示例和常见问题；9项打包检查通过，新ZIP仅README内容变化 |
+| 2026-10-02 | 在GitHub Releases发布v0.1.0-preview.1，标签指向dec81eb；上传精简ZIP并通过公开下载逐字节核对，仓库首页接入发行附件入口 |
 
 当前范围见[STATUS.md](STATUS.md)，复测方式见[ACCEPTANCE.md](ACCEPTANCE.md)。

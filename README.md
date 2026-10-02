@@ -6,7 +6,7 @@ asr-agent 是一个面向 Windows 用户的录音转写工具，适合处理会�
 
 语音识别由阿里云百炼的 `qwen-audio-3.0-asr-flash-filetrans` 提供，使用北京地域。当前为 Windows 预览版，每次处理一个文件。
 
-[开始使用](#开始使用) · [输出文件](#输出文件) · [常见问题](#常见问题) · [详细使用说明](doc/HELP.md)
+[下载安装包](https://github.com/hx101700/asr-agent/releases/download/v0.1.0-preview.1/asr-agent.zip) · [开始使用](#开始使用) · [输出文件](#输出文件) · [常见问题](#常见问题) · [详细使用说明](doc/HELP.md)
 
 ## 主要功能
 
@@ -29,7 +29,9 @@ asr-agent 是一个面向 Windows 用户的录音转写工具，适合处理会�
 | 百炼账号 | 具备该模型调用权限的阿里云账号，或北京地域的百炼 API Key |
 | 网络 | 首次安装需下载依赖；转写时需连接阿里云百炼 |
 
-[下载当前 dev 分支源码](https://github.com/hx101700/asr-agent/archive/refs/heads/dev.zip)，解压后用 Codex 打开 `asr-agent-dev` 文件夹。如果拿到的是单独提供的 `asr-agent.zip`，则打开其中的 `asr-agent` 文件夹。仓库源码包含开发文档，单独的发行包只保留使用所需文件。
+从 [Releases](https://github.com/hx101700/asr-agent/releases) 的 Assets 下载 **asr-agent.zip**，解压后用 Codex 打开其中的 `asr-agent` 文件夹。这是只包含使用所需文件的精简安装包。
+
+需要完整源码与开发文档时，可以[下载 dev 分支源码](https://github.com/hx101700/asr-agent/archive/refs/heads/dev.zip)，解压后打开 `asr-agent-dev` 文件夹。Releases 中的 Source code 归档则对应所选发布版本的完整源码。
 
 ### 2. 让 Codex 安装并打开页面
 

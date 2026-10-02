@@ -30,6 +30,7 @@
 - 实际Edge页面验证通过：合成文件添加、联合增强、Key密码显示与清空、多声道提示、预览保存、刷新恢复、转写信息停靠及三种视口无横向溢出。
 - UML已按源码核对并检查渲染图；发行清单、CRC、源码逐字节一致性及包内/开发文档链接通过。
 - 当前唯一发行包为dist/asr-agent.zip，44个文件、114583字节。SHA-256：`d9b1914e79f6dd7cd601ea2d02d51b894b7be658d4ff2f2c6f69fd6ccdbb83d5`。新包相较前包仅README内容改变，旧ZIP已替换。
+- 已发布GitHub预览版[v0.1.0-preview.1](https://github.com/hx101700/asr-agent/releases/tag/v0.1.0-preview.1)，标签对应`dec81ebd30c500223cd6d247975fff439c02ec9f`。[安装包附件](https://github.com/hx101700/asr-agent/releases/download/v0.1.0-preview.1/asr-agent.zip)已从公开链接下载核对，与本地ZIP逐字节一致；仓库README已加入下载入口。
 - README更新后9项打包测试、文档链接与目录锚点、ZIP的CRC和源码一致性检查通过；本次没有重复安装或执行识别。
 - 运行代码与`0f76157f39099413a146532fa3ff7f2c2ff17909`一致。后续README及交付记录修改通过[dev分支](https://github.com/hx101700/asr-agent/tree/dev)的Git历史追溯，当前包以本节摘要核对。
 - 根README、AGENTS和.gitignore来自release模板。包内doc仅HELP、ERRORS、REFERENCES；开发文档、测试、UML图、运行时、依赖包、凭据、数据和成品均不发布。
