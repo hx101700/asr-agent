@@ -25,7 +25,7 @@ Vue 页面与 Python 类型改动已完成既有回归。本次对照官方 Skil
 
 GitHub 仓库已重命名为 [hx101700/memoflow](https://github.com/hx101700/memoflow)，默认分支为 `dev`，本地 origin 已同步。项目版本保持 `0.1.0`；仅通过验收并发布到 `master` 时才变更项目版本，开发提交沿用当前版本。
 
-正在把当前开发代码和文档同步到 `dev`，并更新现有 `v0.1.0` 开发预览及 ZIP。此前的远端标签指向 `c0e84d169d4f9a8a5a67d89145bae680a86379e6`；更新完成后补记公开下载核对结果。`master` 保持 `6c8371135d92b9f9d3bd52ca9ee246747f0c7f5e`，本次不合并。
+当前实现及文档提交 `ce2f8569137edd6cb73316a091fe33765452df4d` 已推送到 `dev`。现有 [v0.1.0](https://github.com/hx101700/memoflow/releases/tag/v0.1.0) 已更新为开发预览，旧附件已替换，[公开下载的 ZIP](https://github.com/hx101700/memoflow/releases/download/v0.1.0/asr-transcription.zip) 与本地包逐字节一致。未新增版本号；`master` 保持 `6c8371135d92b9f9d3bd52ca9ee246747f0c7f5e`，本次未合并。
 
 ## 接续
 
