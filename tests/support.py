@@ -1,23 +1,43 @@
+"""提供隔离的 Skill 资源与用户工作区测试环境。"""
+
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
 
-from asr_agent.tools.environment import Project
+from asr_transcription.utils.environment import Runtime
 
 ROOT = Path(__file__).resolve().parents[1]
+SKILL_ROOT = ROOT / "skills/asr-transcription"
+CONTRACT_WORKSPACE = ROOT / ".runtime/skill-contract-workspace"
+CONTRACT_BL_ENTRY = CONTRACT_WORKSPACE / ".asr-transcription/.tools/bailian/node_modules/bailian-cli/dist/bailian.mjs"
 
 
-class ProjectTestCase(unittest.TestCase):
+def contract_runtime() -> Runtime:
+    """取得专用本机合约工作区的运行环境。"""
+    return Runtime(CONTRACT_WORKSPACE, SKILL_ROOT)
+
+
+class RuntimeTestCase(unittest.TestCase):
     def setUp(self):
-        """为测试创建工作区内的独立临时项目。"""
+        """创建本例独立工作区和可修改的最小 Skill 资源。"""
         temporary_root = ROOT / ".runtime/test-temp"
         temporary_root.mkdir(parents=True, exist_ok=True)
         self.temporary = tempfile.TemporaryDirectory(dir=temporary_root, prefix="case-")
-        self.project = Project(Path(self.temporary.name))
+        self.temporary_root = Path(self.temporary.name)
+        workspace = self.temporary_root / "workspace"
+        workspace.mkdir()
+        skill_root = self.temporary_root / "skill"
+        for relative in ("scripts/requirements.txt", "scripts/bailian/package.json",
+                         "scripts/bailian/package-lock.json", "assets/env.example"):
+            destination = skill_root / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(SKILL_ROOT / relative, destination)
+        self.runtime = Runtime(workspace, skill_root)
+        self.runtime.root.mkdir()
 
     def tearDown(self):
-        # 所有测试临时目录都在工作区；清理前复核最终绝对路径。
-        """核对清理范围并删除本次测试临时项目。"""
-        if not self.project.root.resolve().is_relative_to(ROOT.resolve()):
+        """核对临时根范围并清理本例资源与工作区。"""
+        if not self.temporary_root.resolve().is_relative_to(ROOT.resolve()):
             raise AssertionError("测试临时目录越过工作区边界")
         self.temporary.cleanup()

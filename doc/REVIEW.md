@@ -1,83 +1,50 @@
-# 设计审查
+# 代码审查
 
-本文记录当前实现的职责划分、必要取舍和维护关注点。它不替代测试结果，也不将本机验证视为云端或人工验收。验证证据见[验收记录](ACCEPTANCE.md)，未解决事项见[当前问题与限制](ISSUES.md)。
+日期：2026-10-03。范围为本仓库维护的Skill源码、依赖声明、开发脚本、相关测试、使用文档及UML。采用全文阅读、沿调用者追踪数据和写入位置、合成复现与回归验证；检索仅用于修改后的引用核对。
 
-## 审查范围
+## 阅读覆盖
 
-审查围绕用户的完整任务：安装项目、配置一份录音、明确授权上传、理解执行结果、取得三种文档，并在需要时重新导出。代码证据包括 CLI 与 HTTP 入口、application、tools、前端、项目 Skill 和固定发行清单。
+代码路径相对于`skills/asr-transcription/`。25个Python文件中的130个命名函数/方法均纳入职责与调用链检查。
 
-当前实现采用轻量用例分层和前端 MVP 式职责划分。设计重点是明确副作用发生的位置、保存可解释的执行事实，并直接复用 BL 公开能力。类主要用于具有生命周期的会话与窗口；无状态能力使用模块函数。
+| 范围 | 完整阅读的文件 |
+| --- | --- |
+| 入口与共享定义 | scripts/asr.py；asr_transcription下的__init__.py、__main__.py、models.py、error_catalog.json |
+| 应用用例 | application下的__init__、bootstrap、diagnostics、inputs、rules、session、transcription、delivery |
+| 本机能力 | utils下的__init__、environment、auth、bailian、files、job_files、results、media、hotwords、documents、directory_picker、_directory_dialog |
+| 网页 | web.py；static下的index.html、app.css、app.mjs、model.mjs、view.mjs、api.mjs |
+| 技能与依赖 | SKILL.md、agents/openai.yaml、assets/env.example、references全部；scripts/requirements.txt、bailian/package.json和package-lock.json全部锁项 |
+| 开发与交付 | scripts/build_zip.py、probe_bl.py；README/AGENTS双语、doc全部Markdown、9份UML源稿与图、Release说明；运行、权限、媒体、文档、HTTP、前端和打包相关测试 |
 
-## 责任划分
+第三方BL及Python依赖按锁定版本使用。本审查核对其公开接口、安装边界和实际调用，不把对项目源码的审查称为第三方全部代码审计。
 
-| 设计 | 当前实现与理由 | 维护边界 |
-| --- | --- | --- |
-| 入口分派 | [CLI](../src/asr_agent/__main__.py) 与 [HTTP](../src/asr_agent/web.py) 处理协议和回执 | 多步骤业务放在 application；单一工具操作可以直接分派 |
-| 用例分离 | [Session](../src/asr_agent/application/session.py)、[transcription](../src/asr_agent/application/transcription.py)、[delivery](../src/asr_agent/application/delivery.py) 分别管理配置、执行和导出生命周期 | 保持各自状态的所有者清楚，避免多个模块同时改变同一业务状态 |
-| 外部能力集中 | [bailian](../src/asr_agent/tools/bailian.py) 包装公开 CLI；[results](../src/asr_agent/tools/results.py) 集中解析官方转写结果 JSON | 参数与返回结构变化在调用边界处理，继续复用 BL 的鉴权、上传、轮询和下载 |
-| 规则与数据分离 | [rules](../src/asr_agent/application/rules.py) 表达无 I/O 规则，[models](../src/asr_agent/models.py) 保存共享不可变数据 | 只把多个模块共享的稳定概念放入 models |
-| 前端职责分离 | [model](../src/asr_agent/static/model.mjs) 管状态与权限，view 管 DOM，app 管事件编排，api 管传输 | 普通表单留 DOM；Key 不进入 model；操作权限由状态派生 |
-| 简单导出策略 | [delivery](../src/asr_agent/application/delivery.py) 使用固定 writer 列表调用三格式 | 格式生成与替换位于 tools/documents，编排和部分成功处理位于 delivery |
+## 职责判断
 
-分层约束有明确范围：`tools` 包含项目文件协议，并非纯通用工具集合；入口也允许直接调用单一工具。[结构测试](../tests/test_architecture.py) 检查已约定的导入方向和旧模块清理，不替代职责审查。
+保留一个录音转写Skill。它是一个明确用户任务，Codex负责流程选择与授权；utils/bailian.py是官方CLI适配模块，映射参数、准备子进程、解释错误。BL负责鉴权、临时上传、提交、轮询和结果下载。本机JSON解析与文档排版由本项目完成。
 
-## 关键取舍
+现在没有第二项独立BL业务用例需要跨Skill交接认证或工作目录。出现真实的新用例时，再根据共同消费者提取共享调用代码；不为未知能力增加通用Agent、动态工具注册或新的云客户端。
 
-### 区分配置保存与上传授权
+utils是Python包内的能力分组。application协调步骤，utils执行具体操作；没有反向导入用例。通用安装/诊断进程与BL进程在凭据、输出和生命周期上不同，保持各自入口有实际依据。
 
-网页确认保存一个可核对的配置快照，`execution_authorized` 保持 `false`。转写命令必须显式携带上传授权。配置回执从原 `serve` 进程交给 Codex，避免按“最新任务”猜测用户选择。
+## 写入与执行边界
 
-代价是使用者需要保留明确的 `job_id`。目前没有列出历史任务的入口；该限制记录在 ISSUES。
+| 场景 | 复现与处理 |
+| --- | --- |
+| 私有运行目录与Skill重叠 | 可用普通目录布局复现prepare在资源区写文件；Runtime现在在构造及解析运行根时拒绝两者任意方向重叠，常规项目内Skill布局仍可用 |
+| 原生选择Skill为输出目录 | 先前原生选择可触发资源区写探针；现在选择探测前、预览和最终JSON/文档创建前复用check_output_path拒绝，保留用户选择其它目录的能力 |
+| 工作目录同名Python模块 | json.py/sysconfig.py可被检查或安装子进程加载；版本检查、依赖检查、ensurepip和pip使用-I，真实子进程回归确认这些工作目录文件不执行 |
+| 凭据与上传 | Key只读工作目录私有.env；console独立使用BL配置；网页保存与云端执行授权分开，失败不自动重试 |
+| 文件与原文 | 上传由会话ID引用；预览/确认/执行的摘要用途各不重复；导出失败保留已有目标，记录失败保留当次已知事实 |
 
-### 按实际阶段检查输入
+这些是本工具入口的路径和进程约束，不代替Windows文件系统ACL；本地管理员仍拥有操作系统授予的权限。调用时若操作系统拒绝写入，程序报告实际失败，不修改系统权限。
 
-预览读取媒体信息并建立 SHA 基线，确认只检查路径和 size/mtime，执行前比对实际音频大小与 SHA。热词 Excel 在预览时解析，后续使用配置中的词典。Key 在网页显示和执行时分别读取。
+## 变量与接口
 
-这些检查各自服务不同的使用时点。修改时应先说明检查的消费者，避免重新加入确认阶段的完整 SHA、执行阶段的 Excel 读取或预览阶段的凭据绑定。实现见 [inputs](../src/asr_agent/application/inputs.py)、[Session.confirm](../src/asr_agent/application/session.py) 和 [prepare_input](../src/asr_agent/application/transcription.py)。
+- Runtime.workspace是用户工作目录，skill_root是程序资源；root是私有运行目录，output_root是默认结果位置。
+- audio_tracks/channel_id描述音轨，channels描述音轨内声道；单声道转换使用已确认AudioInfo，没有混用。
+- config是已确认输入，execution是执行记录，delivery是文档交付。job-status读取记录，不能表示云端实时状态或进程仍存活。
+- export_documents(runtime, config, transcript)自行派生任务目录，避免调用者同时传入可能不一致的运行上下文与任务根。
+- result_path(config)负责解析和读取位置；实际写入位置在prepare_result/prepare_documents检查，不增加重复写权限层。
 
-### 一次执行占用
+## 验证
 
-`execution` 目录从本地准备开始占用。进程结束后保留占用，防止结果未知时再次提交。该约束包含缺 Key、转换失败等尚未启动 BL 的情形。
-
-这是当前产品取舍，不是云端幂等保证。若未来允许修复后继续，应先定义“确定未启动”的证据和显式操作语义，再修改占用规则。当前代码没有自动重试或恢复执行入口。
-
-### 分开记录外部结果与本地交付
-
-`JSON_READY` 表示原始 JSON 已通过结构检查；导出记录的 `COMPLETE` 才表示三种文档完成。文档直接写入任务的 `documents` 目录，显式重导读取同一结果 JSON 并替换同名成品，不再识别音频。每个任务只维护一份导出状态，不管理导出历史。
-
-各格式完成生成及自身检查后才替换目标文件，失败保留已有目标及其他成功文件。用户需要保留的手工修改应另存副本；导出按命令顺序完成，当前没有并发导出需求。
-
-外部进程完成与本地记录保存不能组成一个原子操作。`_save_status` 在记录写入失败时为回执附加 `record_error`：未启动 BL 的情形保持 `not_started`；已经取得 JSON 的情形保留路径、摘要和 `result_received`。磁盘记录可能滞后，当前仍缺少记录恢复入口。
-
-### 保持有限的并发控制
-
-会话短锁保护上传登记与发布；接收文件字节在锁外进行。目录窗口在独立子进程中运行，取消请求使用选择器自己的同步机制。前端用输入版本识别迟到预览，保存结果未知时暂停重复提交。
-
-这些机制服务当前浏览器并发请求和原生窗口生命周期。普通表单、文件和本地任务仍使用直接的数据结构与函数调用。
-
-## 维护检查点
-
-| 修改范围 | 首先核对 | 对应检查 |
-| --- | --- | --- |
-| 模型参数或输入限制 | 官方资料、固定 BL 版本、规则和参数映射 | 参数边界测试及本机 BL 合约测试；必要时执行已授权云端验证 |
-| 执行或错误处理 | 副作用发生顺序、`cloud_outcome`、`phase`、记录失败语义 | 故障注入与一次执行回归 |
-| 网页交互 | model 权限、迟到响应、焦点和原生窗口 | 前端测试与实际浏览器交互 |
-| 文档导出 | 原文、时间戳、格式限制、部分交付 | 内容回读测试与 Office 实际阅读检查 |
-| 安装或发行 | 依赖锁、文件清单、中英文模板、相对链接 | 新目录安装及包边界检查 |
-| 调用关系或状态协议 | application 与 tools 的责任分配 | 相关测试、DEVELOPMENT 和 UML 同步 |
-
-维护时优先让失败位置和返回语义明确。新增层次、依赖或校验前，应能指出当前消费者和具体失败机制；已有工具可以直接满足要求时继续复用。
-
-## 仍需关注的产品能力
-
-当前主要不足是安装过程缺少阶段反馈、任务编号丢失后缺少查询入口、结果与记录分离后的恢复能力，以及尚未完成的独立用户旅程和实际文档视觉验收。具体影响、可用处理方式与代码位置集中维护在 [ISSUES.md](ISSUES.md)。
-
-识别质量与流程正确性分别评估。结构检查和文档回读可以证明约定范围内的内容传递，不能证明词语识别或说话人划分准确。精度增强效果需要带人工参考稿的已授权录音进行评估。
-
-## 代码阅读入口
-
-1. 阅读 [使用指南](HELP.md) 与[项目 Skill](../.agents/skills/asr-agent/SKILL.md)，确认人、网页、Codex 和 BL 各自的职责。
-2. 对照 [UML](UML.md) 跟踪 Session 的上传、预览与确认，区分 `upload_id`、`validation_id` 和 `job_id`。
-3. 跟踪 `transcription` 与 `bailian` 的调用顺序，判断每个失败点已经发生的本地和外部副作用。
-4. 阅读 `results`、`delivery` 和 `documents`，区分 JSON 有效、文档交付、内容保真和识别准确率。
-5. 查看对应测试和[构建器](../scripts/build_zip.py)，确认修改范围与发行范围一致。
+针对性复现、安装、完整回归与发行核对的实际结果集中记录在[ACCEPTANCE](ACCEPTANCE.md)。未覆盖的真实云端、原生桌面和Office人工场景见[ISSUES](ISSUES.md)。

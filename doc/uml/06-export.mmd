@@ -3,13 +3,14 @@ actor U as 用户
 participant C as Codex＋Skill
 participant T as transcription（函数模块）
 participant J as job_files（函数模块）
+participant E as Runtime对象
 participant R as results（函数模块）
 participant D as delivery（函数模块）
 participant W as documents（函数模块）
 participant F as 本机成品
 alt 用户明确要求重新导出
     U->>C: 提供确切job_id并要求重新导出
-    C->>T: export --job ID
+    C->>T: --workspace 用户目录 export --job ID
     T->>J: read_config()核对配置协议与摘要
     J-->>T: 确认配置或配置错误
     alt 配置有效
@@ -20,11 +21,14 @@ alt 用户明确要求重新导出
             T->>R: load_transcript(path)
             R-->>T: Transcript＋实际SHA，或解析错误
             alt JSON有效且摘要一致
-                T->>T: _deliver(project, config, transcript, report)
-                T->>D: export_documents(job_root, config, transcript)
+                T->>T: _deliver(runtime, config, transcript, report)
+                T->>D: export_documents(runtime, config, transcript)
+                D->>J: job_directory(runtime, config['job_id'])
                 D->>J: prepare_delivery()创建或复用delivery目录
                 D->>J: save_record(EXPORTING)
-                D->>J: prepare_documents(config)创建或复用固定documents目录
+                D->>J: prepare_documents(runtime, config)
+                J->>E: check_output_path(documents目录)
+                J->>F: 创建或复用固定documents目录
                 loop 三格式各执行一次
                     D->>W: publish_document(writer, transcript, final_path)
                     W->>F: 写partial文件，完成后替换同名成品<br/>Excel和Word回读；Markdown编码写入
@@ -47,7 +51,7 @@ alt 用户明确要求重新导出
     end
 else 用户查看本地任务状态
     U->>C: 查询确切job_id
-    C->>T: job-status --job ID
+    C->>T: --workspace 用户目录 job-status --job ID
     T->>J: read_execution()
     alt execution尚未建立
         T->>J: read_config()核对确认配置
@@ -63,5 +67,5 @@ else 用户查看本地任务状态
 end
 Note over T,F: 自动交付与显式export复用同一export_documents()<br/>重导更新固定documents中的三个同名文件；失败格式保留已有成品<br/>读取范围为确认配置、执行记录和原JSON
 Note over C,J: 状态来自本机磁盘，既不查询云端，也不证明进程仍存活<br/>job-status读取固定delivery/status.json，不重新核验成品文件
-Note over T,J: 当次JSON成功回执不能替代磁盘JSON_READY记录和摘要<br/>授权与配置检查通过后，已有execution的同job返回本地记录<br/>记录恢复入口尚未提供
-Note over C,F: src/asr_agent/application/transcription.py::export_job、job_status、_deliver<br/>tools/job_files.py::read_execution、read_delivery、prepare_delivery、prepare_documents<br/>application/delivery.py::export_documents；tools/documents.py::publish_document
+Note over T,J: export要求磁盘JSON_READY及摘要<br/>当次回执不能替代已保存记录<br/>重复执行返回已有本地记录<br/>记录恢复入口尚未提供
+Note over C,F: scripts/asr_transcription/application/transcription.py::export_job、job_status、_deliver<br/>utils/job_files.py::read_execution、read_delivery、prepare_delivery、prepare_documents<br/>application/delivery.py::export_documents；utils/documents.py::publish_document

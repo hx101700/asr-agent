@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createPresenter } from "../src/asr_agent/static/app.mjs";
-import { createApi } from "../src/asr_agent/static/api.mjs";
-import { createModel, availability, configuration, receiveSaveError } from "../src/asr_agent/static/model.mjs";
+import { createPresenter } from "../skills/asr-transcription/scripts/asr_transcription/static/app.mjs";
+import { createApi } from "../skills/asr-transcription/scripts/asr_transcription/static/api.mjs";
+import { createModel, availability, configuration, receiveSaveError } from "../skills/asr-transcription/scripts/asr_transcription/static/model.mjs";
 
 const limits = { audio_bytes: 2_000_000_000, hotwords_bytes: 5_000_000, context_chars: 400, speaker_min: 2, speaker_max: 100 };
-const description = { model: "fixed-model", region: "华北2（北京）", limits, audio_suffixes: [".wav"], languages: [["zh", "中文"]], output_defaults: { json: "outputs", document: "outputs" } };
+const description = { model: "fixed-model", region: "华北2（北京）", limits, audio_suffixes: [".wav"], languages: [["zh", "中文"]], output_defaults: { json: "default", document: "default" } };
 const audio = { name: "sample.wav", size: 64000 };
 // 生成指定编号的合成预览回执。
 const validation = (id = "validation-1") => ({ validation_id: id, summary: {} });
@@ -187,7 +187,7 @@ for (const [kind, field] of [["hotwords", "hotwords_upload_id"], ["context", "co
   });
 }
 
-test("目录取消保留预览；选定使预览失效，恢复默认提交 outputs", async () => {
+test("目录取消保留预览；选定使预览失效，恢复默认提交 default", async () => {
   const page = harness({ "/api/select-directory": () => ({ cancelled: true }) });
   await preview(page);
   const first = page.model.preview;
@@ -200,7 +200,7 @@ test("目录取消保留预览；选定使预览失效，恢复默认提交 outp
   assert.equal(page.calls.at(-1).payload.json_directory, "D:\\Example\\chosen");
   page.actions.resetDirectory("json");
   await page.actions.validate();
-  assert.equal(page.calls.at(-1).payload.json_directory, "outputs");
+  assert.equal(page.calls.at(-1).payload.json_directory, "default");
 });
 
 test("API Key 只交给 View，关闭模式清空，迟到结果不能恢复凭据", async () => {
@@ -284,7 +284,7 @@ test("等待目录窗口可以编辑和上传；取消使用当前 ID，返回�
   assert.equal(page.calls.at(-1).payload.picker_id, opened.payload.picker_id);
   pending.resolve({ cancelled: true });
   await selecting;
-  assert.equal(page.model.directories.json, "outputs");
+  assert.equal(page.model.directories.json, "default");
   assert.equal(page.view.current.available.chooseDirectory, true);
   await page.actions.validate();
   assert.equal(page.calls.at(-1).payload.speaker_count, 4);

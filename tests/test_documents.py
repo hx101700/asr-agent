@@ -12,9 +12,9 @@ from docx.document import Document as WordDocument
 from openpyxl import load_workbook
 from openpyxl.workbook import Workbook
 
-from asr_agent.tools.documents import DocumentError, write_docx, write_markdown, write_xlsx
-from asr_agent.models import Sentence, Transcript
-from tests.support import ProjectTestCase
+from asr_transcription.utils.documents import DocumentError, write_docx, write_markdown, write_xlsx
+from asr_transcription.models import Sentence, Transcript
+from tests.support import RuntimeTestCase
 
 
 def sample(*texts):
@@ -28,10 +28,10 @@ def sample(*texts):
     ), audio_tracks=2, json_bytes=100, sha256="a" * 64)
 
 
-class DocumentTests(ProjectTestCase):
+class DocumentTests(RuntimeTestCase):
     def output(self, extension):
         """取得指定格式的测试输出路径。"""
-        return self.project.path(f"transcription.{extension}")
+        return self.runtime.path(f"transcription.{extension}")
 
     def write(self, writer, extension, transcript=None):
         """用指定写入器导出样本并返回文件位置。"""
@@ -216,5 +216,5 @@ class DocumentTests(ProjectTestCase):
         """验证三格式在目录缺失时安全报错。"""
         for writer in (write_xlsx, write_docx, write_markdown):
             with self.subTest(writer=writer.__name__), self.assertRaises(DocumentError):
-                writer(sample(), self.project.path("missing/output.bin"),
+                writer(sample(), self.runtime.path("missing/output.bin"),
                        source_name="test.wav", job_id="a" * 32)

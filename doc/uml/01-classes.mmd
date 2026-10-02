@@ -1,15 +1,20 @@
 classDiagram
 direction LR
-class Project {
+class Runtime {
   <<frozen dataclass>>
-  +Path root
+  +Path workspace
+  +Path skill_root
+  +root Path
+  +output_root Path
   +path(relative) Path
+  +resource(relative) Path
+  +check_output_path(path)
   +bl_directory Path
   +bl_entry Path
   +prepare()
 }
 class Session {
-  +Project project
+  +Runtime runtime
   +dict uploads
   +dict output_directories
   +dict_or_None draft
@@ -39,8 +44,8 @@ class DirectoryPicker {
   +cancel(request_id)
   +close()
 }
-Session --> Project : 持有外部传入的项目上下文
+Session --> Runtime : 持有外部传入的工作目录与资源边界
 Session "1" *-- "1" DirectoryPicker : 会话创建并关闭
-note for Session "src/asr_agent/application/session.py<br/>短锁登记与发布上传；字节接收在锁外<br/>validate与confirm持锁处理当前快照<br/>draft / receipt初始为None；配置与回执采用dict"
-note for Project "src/asr_agent/tools/environment.py<br/>项目目录界定安装与运行资源的存放范围<br/>与Session是普通关联，Project可独立存在"
-note for DirectoryPicker "src/asr_agent/tools/directory_picker.py<br/>独立取消信号；choose_directory函数启动窗口子进程<br/>进程是函数局部对象；Session登记返回的精确路径"
+note for Runtime "scripts/asr_transcription/utils/environment.py<br/>resource读取Skill；path定位工作目录/.asr-transcription<br/>运行目录与Skill互不包含；check_output_path保护Skill<br/>output_root为工作目录/transcriptions"
+note for Session "scripts/asr_transcription/application/session.py<br/>上传短锁登记与发布，文件字节接收在锁外<br/>validate与confirm处理当前快照；draft和receipt采用dict"
+note for DirectoryPicker "scripts/asr_transcription/utils/directory_picker.py<br/>choose_directory函数管理窗口子进程<br/>独立取消信号；Session登记所选精确路径"

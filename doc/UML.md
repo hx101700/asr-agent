@@ -1,14 +1,14 @@
-# UML设计视图
+# UML 设计视图
 
-核对日期：2026-10-02。图中名称、调用关系和状态对应当前源码。类图描述实际对象；时序图中的函数模块用生命线表示调用参与者，不表示代码中存在同名服务类。状态图描述回执中的状态字符串。
+核对日期：2026-10-03。图中以 `scripts/` 开头的代码位置相对于 `skills/asr-transcription/`；`application/`、`utils/` 等简写相对于其中的 `scripts/asr_transcription/`。`Runtime` 区分只读 Skill 资源与用户工作目录；时序图中的函数模块使用生命线表示调用参与者，状态图描述回执中的状态字符串。
 
-图稿使用Mermaid 11.12.0渲染；PNG供直接阅读，`.mmd`为可编辑源稿。修改相关调用顺序、文件协议或状态语义时，同步源稿并重新渲染。本页及图稿属于开发文档，不进入用户发行ZIP。
+图稿使用 Mermaid 11.12.0 渲染；PNG 供直接阅读，`.mmd` 为可编辑源稿。修改调用顺序、资源边界、文件协议或状态语义时同步源稿与渲染图。本页和图稿属于开发文档，不进入 Skill ZIP。
 
 | 视图 | 图像 | 可编辑源稿 |
 | --- | --- | --- |
 | 01A 对象职责与依赖 | [查看](uml/01-classes.png) | [源码](uml/01-classes.mmd) |
 | 01B 共享数据与进程契约 | [查看](uml/01b-data.png) | [源码](uml/01b-data.mmd) |
-| 02 安装 | [查看](uml/02-install.png) | [源码](uml/02-install.mmd) |
+| 02 准备工作目录 | [查看](uml/02-install.png) | [源码](uml/02-install.mmd) |
 | 03 本机配置 | [查看](uml/03-configure.png) | [源码](uml/03-configure.mmd) |
 | 04 凭据来源与登录 | [查看](uml/04-auth.png) | [源码](uml/04-auth.mmd) |
 | 05 转写与交付 | [查看](uml/05-transcribe.png) | [源码](uml/05-transcribe.mmd) |
@@ -24,9 +24,9 @@
 
 ![共享数据与进程契约](uml/01b-data.png)
 
-## 02 安装
+## 02 准备工作目录
 
-![安装时序图](uml/02-install.png)
+![Skill 与工作目录环境准备时序图](uml/02-install.png)
 
 ## 03 本机配置
 

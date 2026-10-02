@@ -7,10 +7,10 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
-from asr_agent.application.session import Session
-from asr_agent.application.rules import ValidationError
-from asr_agent.application.inputs import validate_audio
-from tests.support import ProjectTestCase
+from asr_transcription.application.session import Session
+from asr_transcription.application.rules import ValidationError
+from asr_transcription.application.inputs import validate_audio
+from tests.support import RuntimeTestCase
 
 
 class PausedInput(io.BytesIO):
@@ -28,11 +28,11 @@ class PausedInput(io.BytesIO):
         return super().read(size)
 
 
-class SessionConcurrencyTests(ProjectTestCase):
+class SessionConcurrencyTests(RuntimeTestCase):
     def setUp(self):
         """准备会话、合成音频及初始配置。"""
         super().setUp()
-        self.session = Session(self.project)
+        self.session = Session(self.runtime)
         content = io.BytesIO()
         with wave.open(content, "wb") as audio:
             audio.setnchannels(1)
@@ -45,7 +45,7 @@ class SessionConcurrencyTests(ProjectTestCase):
             "auth_mode": "console", "audio_upload_id": uploaded["upload_id"],
             "diarization_enabled": True, "enhancement_mode": "none",
             "hotwords_upload_id": "", "context": "",
-            "json_directory": "outputs", "document_directory": "outputs",
+            "json_directory": "default", "document_directory": "default",
         }
 
     def tearDown(self):
@@ -67,7 +67,7 @@ class SessionConcurrencyTests(ProjectTestCase):
                 raise AssertionError("目录选择未收到取消")
             return None
 
-        with patch("asr_agent.tools.directory_picker.choose_directory", side_effect=wait_for_cancel), \
+        with patch("asr_transcription.utils.directory_picker.choose_directory", side_effect=wait_for_cancel), \
              ThreadPoolExecutor(max_workers=3) as pool:
             selecting = pool.submit(self.session.select_directory, "json", "during-upload")
             try:
@@ -139,7 +139,7 @@ class SessionConcurrencyTests(ProjectTestCase):
                         action.result(timeout=1)
                 self.assertIsNone(self.session.draft)
                 self.assertIsNone(self.session.receipt)
-                self.assertFalse(self.project.path(".state/jobs").exists())
+                self.assertFalse(self.runtime.path(".state/jobs").exists())
             finally:
                 source.release.set()
             uploading.result(timeout=2)
@@ -225,8 +225,8 @@ class SessionConcurrencyTests(ProjectTestCase):
                 raise AssertionError("测试未释放音频校验")
             return validate_audio(*args)
 
-        with patch("asr_agent.tools.directory_picker.choose_directory", side_effect=wait_for_cancel), \
-             patch("asr_agent.application.session.validate_audio", side_effect=paused_validation), \
+        with patch("asr_transcription.utils.directory_picker.choose_directory", side_effect=wait_for_cancel), \
+             patch("asr_transcription.application.session.validate_audio", side_effect=paused_validation), \
              ThreadPoolExecutor(max_workers=3) as pool:
             selecting = pool.submit(self.session.select_directory, "json", "during-validation")
             try:

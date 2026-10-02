@@ -8,16 +8,16 @@ from unittest.mock import patch
 
 import av
 
-from asr_agent.tools.media import MediaError, convert_to_mono, probe_audio
-from tests.support import ProjectTestCase
+from asr_transcription.utils.media import MediaError, convert_to_mono, probe_audio
+from tests.support import RuntimeTestCase
 
 
-class MediaContractTests(ProjectTestCase):
+class MediaContractTests(RuntimeTestCase):
     def setUp(self):
         """生成合成媒体并准备声道转换测试。"""
         super().setUp()
-        self.source = self.project.path("双声道 test.wav")
-        self.output = self.project.path("单声道 output.flac")
+        self.source = self.runtime.path("双声道 test.wav")
+        self.output = self.runtime.path("单声道 output.flac")
         frames = b"".join(struct.pack("<hh", 8000 if i < 8000 else 0, 0 if i < 8000 else 8000)
                           for i in range(16000))
         with wave.open(str(self.source), "wb") as audio:
@@ -62,7 +62,7 @@ class MediaContractTests(ProjectTestCase):
 
     def test_conversion_only_probes_the_new_output(self):
         """验证转换复用源信息并探测新副本。"""
-        with patch("asr_agent.tools.media.probe_audio", wraps=probe_audio) as probe:
+        with patch("asr_transcription.utils.media.probe_audio", wraps=probe_audio) as probe:
             convert_to_mono(self.source, self.output, self.source_info)
         probe.assert_called_once_with(self.output)
 
@@ -78,7 +78,7 @@ class MediaContractTests(ProjectTestCase):
                 os.utime(self.source, ns=(current.st_atime_ns, current.st_mtime_ns + 1_000_000_000))
             return container
 
-        with patch("asr_agent.tools.media.av.open", side_effect=open_then_touch):
+        with patch("asr_transcription.utils.media.av.open", side_effect=open_then_touch):
             with self.assertRaisesRegex(MediaError, "源文件改变"):
                 convert_to_mono(self.source, self.output, self.source_info)
         self.assertTrue(self.source.is_file())
@@ -100,7 +100,7 @@ class MediaContractTests(ProjectTestCase):
 
     def test_mp3_can_be_decoded_and_converted(self):
         """验证MP3可以解码并合并为单声道。"""
-        compressed = self.project.path("synthetic.mp3")
+        compressed = self.runtime.path("synthetic.mp3")
         with av.open(str(self.source)) as original, av.open(str(compressed), "w") as output:
             stream = output.add_stream("libmp3lame", rate=16000)
             stream.layout = "stereo"
@@ -117,7 +117,7 @@ class MediaContractTests(ProjectTestCase):
 
     def test_standard_six_channel_layout_converts_to_mono(self):
         """验证标准六声道布局可转换为单声道。"""
-        surround = self.project.path("surround.flac")
+        surround = self.runtime.path("surround.flac")
         frame = av.AudioFrame(format="s16", layout="5.1", samples=1600)
         frame.sample_rate = 16000
         frame.planes[0].update(struct.pack("<6h", 1000, 1000, 1000, 0, 1000, 1000) * 1600)

@@ -10,21 +10,19 @@ from unittest.mock import patch
 
 from openpyxl import Workbook
 
-from asr_agent.tools.environment import Project
-from asr_agent.application.rules import ValidationError
-from asr_agent.web import create_server
-from asr_agent.application.session import Session
-from tests.support import ProjectTestCase
+from asr_transcription.application.rules import ValidationError
+from asr_transcription.utils.environment import Runtime
+from asr_transcription.web import create_server
+from asr_transcription.application.session import Session
+from tests.support import RuntimeTestCase
 
 
-class OptionsFixture(ProjectTestCase):
+class OptionsFixture(RuntimeTestCase):
     def setUp(self):
         """准备项目及模拟用户选择的外部保存目录。"""
         super().setUp()
         # 用工作区内同一临时根的兄弟目录模拟用户选中项目外的保存位置。
-        temporary_root = self.project.root
-        self.project = Project(temporary_root / "agent")
-        self.project.root.mkdir()
+        temporary_root = self.temporary_root
         self.selected = temporary_root / "selected"
         self.selected.mkdir()
         self.other = temporary_root / "other"
@@ -44,12 +42,12 @@ class OptionsFixture(ProjectTestCase):
             "auth_mode": "console", "audio_upload_id": uploaded["upload_id"],
             "diarization_enabled": True, "enhancement_mode": "none",
             "hotwords_upload_id": "", "context": "",
-            "json_directory": "outputs", "document_directory": "outputs",
+            "json_directory": "default", "document_directory": "default",
         }
 
     def select(self, session, kind, destination):
         """模拟原生目录选择并返回登记结果。"""
-        with patch("asr_agent.tools.directory_picker.choose_directory", return_value=destination) as picker:
+        with patch("asr_transcription.utils.directory_picker.choose_directory", return_value=destination) as picker:
             result = session.select_directory(kind)
         picker.assert_called_once()
         return result
@@ -59,7 +57,7 @@ class DirectoryOptionTests(OptionsFixture):
     def setUp(self):
         """准备目录选项测试会话。"""
         super().setUp()
-        self.session = Session(self.project)
+        self.session = Session(self.runtime)
         self.payload = self.payload_for(self.session)
 
     def test_selected_external_directory_is_saved_without_producing_outputs(self):
@@ -79,7 +77,7 @@ class DirectoryOptionTests(OptionsFixture):
         self.assertFalse(config["execution_authorized"])
         self.assertFalse(receipt["execution_started"])
         self.assertEqual(list(self.selected.iterdir()), [])
-        self.assertFalse(self.project.path("outputs").exists())
+        self.assertFalse(self.runtime.output_root.exists())
 
     def test_browser_cannot_register_external_directory_by_submitting_path(self):
         """验证外部保存位置必须来自原生目录登记。"""
@@ -87,6 +85,34 @@ class DirectoryOptionTests(OptionsFixture):
             self.session.validate({**self.payload, "json_directory": str(self.selected)})
         self.assertEqual(self.session.output_directories, {})
         self.assertEqual(list(self.selected.iterdir()), [])
+
+    def test_skill_directories_are_rejected_before_write_probe(self):
+        """验证原生选择Skill根或子目录时在写探针前拒绝。"""
+        for kind in ("json", "document"):
+            for selected in (self.runtime.skill_root, self.runtime.skill_root / "scripts"):
+                with self.subTest(kind=kind, selected=selected), \
+                     patch("asr_transcription.utils.directory_picker.choose_directory", return_value=selected), \
+                     patch("asr_transcription.application.session.tempfile.TemporaryFile") as probe:
+                    with self.assertRaisesRegex(ValidationError, "Skill安装目录") as caught:
+                        self.session.select_directory(kind)
+                    self.assertEqual(caught.exception.field, f"{kind}_directory")
+                    probe.assert_not_called()
+        self.assertEqual(self.session.output_directories, {})
+
+    def test_preview_rejects_skill_as_default_output_directory(self):
+        """验证默认保存目录与Skill重合时给出可修改的字段错误。"""
+        skill = self.runtime.output_root
+        skill.mkdir()
+        session = Session(Runtime(self.runtime.workspace, skill))
+        try:
+            payload = self.payload_for(session)
+            with self.assertRaisesRegex(ValidationError, "Skill安装目录") as caught:
+                session.validate(payload)
+            self.assertEqual(caught.exception.field, "json_directory")
+            self.assertEqual(list(skill.iterdir()), [])
+            self.assertIsNone(session.draft)
+        finally:
+            session.cleanup()
 
     def test_directory_approval_is_bound_to_kind_and_exact_directory(self):
         """验证目录授权绑定用途与精确位置。"""
@@ -111,7 +137,7 @@ class DirectoryOptionTests(OptionsFixture):
 
     def test_directory_write_probe_runs_only_when_user_selects_directory(self):
         """验证目录选择检查一次可写性并供预览确认复用。"""
-        with patch("asr_agent.application.session.tempfile.TemporaryFile", wraps=tempfile.TemporaryFile) as probe:
+        with patch("asr_transcription.application.session.tempfile.TemporaryFile", wraps=tempfile.TemporaryFile) as probe:
             self.select(self.session, "json", self.selected)
             preview = self.session.validate({**self.payload, "json_directory": str(self.selected)})
             self.session.confirm(preview["validation_id"])
@@ -126,7 +152,7 @@ class DirectoryOptionTests(OptionsFixture):
         self.assertEqual(self.session.output_directories["json"], self.other)
         with self.assertRaises(ValidationError):
             self.session.confirm(preview["validation_id"])
-        self.assertFalse(self.project.path(".state/jobs").exists())
+        self.assertFalse(self.runtime.path(".state/jobs").exists())
 
     def test_cancel_waiting_picker_keeps_previous_preview_and_releases_lock(self):
         """验证取消等待中的窗口保留预览并释放状态。"""
@@ -141,7 +167,7 @@ class DirectoryOptionTests(OptionsFixture):
             self.assertTrue(cancel_event.wait(timeout=3))
             return self.selected  # 即使同时收到结果，也不能把已取消的选择登记下来。
 
-        with patch("asr_agent.tools.directory_picker.choose_directory", side_effect=blocked_picker):
+        with patch("asr_transcription.utils.directory_picker.choose_directory", side_effect=blocked_picker):
             with ThreadPoolExecutor(max_workers=1) as pool:
                 selected = pool.submit(self.session.select_directory, "json", "picker-current")
                 self.assertTrue(started.wait(timeout=3))
@@ -156,7 +182,7 @@ class DirectoryOptionTests(OptionsFixture):
     def test_cancel_arriving_before_open_prevents_window_but_not_next_request(self):
         """验证提前取消作用于对应请求且后续选择正常。"""
         self.session.cancel_directory("early-cancel")
-        with patch("asr_agent.tools.directory_picker.choose_directory", return_value=self.selected) as picker:
+        with patch("asr_transcription.utils.directory_picker.choose_directory", return_value=self.selected) as picker:
             self.assertTrue(self.session.select_directory("json", "early-cancel")["cancelled"])
             picker.assert_not_called()
             self.assertFalse(self.session.select_directory("json", "next-request")["cancelled"])
@@ -196,7 +222,7 @@ class ProtectedOptionsEndpointTests(OptionsFixture):
     def setUp(self):
         """启动目录选项HTTP测试服务。"""
         super().setUp()
-        self.server = create_server(self.project)
+        self.server = create_server(self.runtime)
         self.payload = self.payload_for(self.server.session)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -228,7 +254,7 @@ class ProtectedOptionsEndpointTests(OptionsFixture):
 
     def test_directory_route_uses_native_selection_and_ignores_browser_path(self):
         """验证目录接口使用原生选择且忽略客户端路径。"""
-        with patch("asr_agent.tools.directory_picker.choose_directory", return_value=self.selected) as picker:
+        with patch("asr_transcription.utils.directory_picker.choose_directory", return_value=self.selected) as picker:
             status, _, body = self.request("POST", "/api/select-directory", {
                 "kind": "document", "path": str(self.other),
             })
@@ -241,8 +267,8 @@ class ProtectedOptionsEndpointTests(OptionsFixture):
 
     def test_new_routes_require_token_and_correct_origin_before_any_action(self):
         """验证新增接口在操作前检查令牌和来源。"""
-        with patch("asr_agent.tools.directory_picker.choose_directory") as picker, \
-             patch("asr_agent.application.session.read_api_key") as read_key:
+        with patch("asr_transcription.utils.directory_picker.choose_directory") as picker, \
+             patch("asr_transcription.application.session.read_api_key") as read_key:
             # 鉴权在读取正文前完成；无正文请求可稳定检查HTTP拒绝和零副作用。
             for route in ("/api/select-directory", "/api/api-key", "/api/cancel-directory"):
                 with self.subTest(route=route):
@@ -254,7 +280,7 @@ class ProtectedOptionsEndpointTests(OptionsFixture):
     def test_key_is_returned_only_by_dedicated_post_and_never_saved(self):
         """验证专用POST显示Key并保持配置与凭据分离。"""
         secret = "synthetic-display-key"
-        self.project.path(".env").write_text("DASHSCOPE_API_KEY=" + secret, encoding="utf-8")
+        self.runtime.path(".env").write_text("DASHSCOPE_API_KEY=" + secret, encoding="utf-8")
         status, headers, body = self.request("POST", "/api/api-key", {})
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(body)["value"], secret)

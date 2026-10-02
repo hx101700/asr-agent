@@ -10,17 +10,17 @@ from unittest.mock import patch
 
 from openpyxl import Workbook, load_workbook
 
-from asr_agent.application.rules import ValidationError
-from asr_agent.web import create_server
-from asr_agent.application.session import Session, output_directory
-from tests.support import ProjectTestCase
+from asr_transcription.application.rules import ValidationError
+from asr_transcription.web import create_server
+from asr_transcription.application.session import Session, output_directory
+from tests.support import RuntimeTestCase
 
 
-class WebFixture(ProjectTestCase):
+class WebFixture(RuntimeTestCase):
     def setUp(self):
         """准备可供会话上传的合成音频。"""
         super().setUp()
-        self.audio = self.project.path("data/audio/录音.wav")
+        self.audio = self.runtime.path("data/audio/录音.wav")
         self.audio.parent.mkdir(parents=True)
         with wave.open(str(self.audio), "wb") as audio:
             audio.setnchannels(2)
@@ -33,15 +33,15 @@ class WebFixture(ProjectTestCase):
         uploaded = session.upload("audio", self.audio.name, io.BytesIO(content), len(content))
         return {"auth_mode": "console", "audio_upload_id": uploaded["upload_id"],
                         "diarization_enabled": True, "enhancement_mode": "none",
-                        "hotwords_upload_id": "", "context": "", "json_directory": "outputs",
-                        "document_directory": "outputs"}
+                        "hotwords_upload_id": "", "context": "", "json_directory": "default",
+                        "document_directory": "default"}
 
 
 class SessionTests(WebFixture):
     def setUp(self):
         """准备会话及已上传音频的默认配置。"""
         super().setUp()
-        self.session = Session(self.project)
+        self.session = Session(self.runtime)
         self.payload = self.payload_for(self.session)
 
     def test_preview_performs_no_conversion_or_job_write(self):
@@ -49,8 +49,8 @@ class SessionTests(WebFixture):
         result = self.session.validate(self.payload)
         self.assertEqual(result["summary"]["audio"]["channels"], 2)
         self.assertTrue(any("单声道" in warning for warning in result["summary"]["warnings"]))
-        self.assertFalse(self.project.path(".state/jobs").exists())
-        self.assertFalse(self.project.path("outputs").exists())
+        self.assertFalse(self.runtime.path(".state/jobs").exists())
+        self.assertFalse(self.runtime.output_root.exists())
 
     def test_confirm_is_idempotent_even_with_concurrent_requests(self):
         """验证并发确认共用同一配置回执。"""
@@ -58,7 +58,7 @@ class SessionTests(WebFixture):
         with ThreadPoolExecutor(max_workers=2) as pool:
             receipts = list(pool.map(self.session.confirm, [preview["validation_id"]] * 2))
         self.assertEqual(receipts[0], receipts[1])
-        self.assertEqual(len(list(self.project.path(".state/jobs").iterdir())), 1)
+        self.assertEqual(len(list(self.runtime.path(".state/jobs").iterdir())), 1)
         with open(receipts[0]["config_path"], encoding="utf-8") as file:
             config = json.load(file)
         self.assertFalse(config["execution_authorized"])
@@ -80,19 +80,19 @@ class SessionTests(WebFixture):
         uploaded.write_bytes(uploaded.read_bytes() + b"changed")
         with self.assertRaises(ValidationError):
             self.session.confirm(preview["validation_id"])
-        self.assertFalse(self.project.path(".state/jobs").exists())
+        self.assertFalse(self.runtime.path(".state/jobs").exists())
 
     def test_confirmation_uses_metadata_without_reading_audio_again(self):
         """验证确认通过文件元信息复用预览快照。"""
         preview = self.session.validate(self.payload)
-        with patch("asr_agent.application.inputs.file_fingerprint", side_effect=AssertionError("must not hash again")), \
-             patch("asr_agent.application.inputs.probe_audio", side_effect=AssertionError("must not probe again")):
+        with patch("asr_transcription.application.inputs.file_fingerprint", side_effect=AssertionError("must not hash again")), \
+             patch("asr_transcription.application.inputs.probe_audio", side_effect=AssertionError("must not probe again")):
             self.assertTrue(self.session.confirm(preview["validation_id"])["ok"])
 
     def test_api_key_is_not_written_to_config(self):
         """验证确认配置与凭据保持分离。"""
         secret = "synthetic-local-key"
-        self.project.path(".env").write_text("DASHSCOPE_API_KEY=" + secret, encoding="utf-8")
+        self.runtime.path(".env").write_text("DASHSCOPE_API_KEY=" + secret, encoding="utf-8")
         preview = self.session.validate({**self.payload, "auth_mode": "api_key"})
         receipt = self.session.confirm(preview["validation_id"])
         with open(receipt["config_path"], encoding="utf-8") as file:
@@ -102,23 +102,23 @@ class SessionTests(WebFixture):
 
     def test_api_key_change_does_not_invalidate_configuration(self):
         """验证Key改变后配置仍能正常确认。"""
-        path = self.project.path(".env")
+        path = self.runtime.path(".env")
         path.write_text("DASHSCOPE_API_KEY=synthetic-key", encoding="utf-8")
         preview = self.session.validate({**self.payload, "auth_mode": "api_key"})
         path.write_text("DASHSCOPE_API_KEY=another-synthetic-key", encoding="utf-8")
-        with patch("asr_agent.application.session.read_api_key", side_effect=AssertionError("must not read credentials")):
+        with patch("asr_transcription.application.session.read_api_key", side_effect=AssertionError("must not read credentials")):
             self.assertTrue(self.session.confirm(preview["validation_id"])["ok"])
 
     def test_description_and_configuration_do_not_read_dotenv(self):
         """验证页面说明与配置流程独立于运行凭据。"""
-        with patch("asr_agent.application.session.read_api_key", side_effect=AssertionError("must not read credentials")):
+        with patch("asr_transcription.application.session.read_api_key", side_effect=AssertionError("must not read credentials")):
             self.assertNotIn("auth", self.session.description())
             preview = self.session.validate({**self.payload, "auth_mode": "api_key"})
             self.assertTrue(self.session.confirm(preview["validation_id"])["ok"])
 
     def test_confirmation_uses_hotwords_snapshot_after_excel_is_removed(self):
         """验证Excel删除后确认仍使用已解析热词快照。"""
-        path = self.project.path("data/热词.xlsx")
+        path = self.runtime.path("data/热词.xlsx")
         workbook = Workbook()
         sheet = workbook.active
         sheet.title = "热词"
@@ -135,16 +135,16 @@ class SessionTests(WebFixture):
         self.assertEqual(preview["summary"]["enhancement"]["context_chars"], len(payload["context"]))
         copy = Path(self.session.uploaded(uploaded["upload_id"], "hotwords")["path"])
         copy.unlink()
-        with patch("asr_agent.application.session.load_hotwords", side_effect=AssertionError("must not parse Excel again")):
+        with patch("asr_transcription.application.session.load_hotwords", side_effect=AssertionError("must not parse Excel again")):
             receipt = self.session.confirm(preview["validation_id"])
         config = json.loads(Path(receipt["config_path"]).read_text(encoding="utf-8"))
         self.assertEqual(config["enhancement"]["hotwords"]["vocabulary"], {"术语": 50})
 
-    def test_outputs_cannot_target_source_or_outside_project(self):
+    def test_browser_rejects_unapproved_output_paths(self):
         """验证客户端提交源码或其他路径时被拒绝。"""
-        for path in ("data/audio", "../outside", "outputs/meeting", "outputs/../.git", "outputs/.private"):
+        for path in ("data/audio", "../outside", "transcriptions/meeting", "transcriptions/../.git", "transcriptions/.private"):
             with self.subTest(path=path), self.assertRaises(ValidationError):
-                output_directory(self.project, path, "json_directory")
+                output_directory(self.runtime, path, "json_directory")
 
     def test_unknown_fields_and_multiple_audio_values_are_rejected(self):
         """验证未知字段和多音频输入被拒绝。"""
@@ -180,14 +180,14 @@ class SessionTests(WebFixture):
     def test_upload_id_cannot_be_used_by_another_session(self):
         """验证跨会话上传编号被拒绝。"""
         with self.assertRaises(ValidationError):
-            Session(self.project).validate(self.payload)
+            Session(self.runtime).validate(self.payload)
 
 
 class WebServerTests(WebFixture):
     def setUp(self):
         """启动本机HTTP测试服务并准备会话令牌。"""
         super().setUp()
-        self.server = create_server(self.project)
+        self.server = create_server(self.runtime)
         self.payload = self.payload_for(self.server.session)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -237,7 +237,7 @@ class WebServerTests(WebFixture):
     def test_second_server_cannot_reuse_live_port(self):
         """验证已占用端口拒绝第二个服务绑定。"""
         with self.assertRaises(OSError):
-            create_server(self.project, self.server.server_port)
+            create_server(self.runtime, self.server.server_port)
 
     def test_cookie_restores_receipt_without_browser_storage(self):
         """验证Cookie会话恢复已保存回执。"""
@@ -257,7 +257,7 @@ class WebServerTests(WebFixture):
         """验证确认输出可供Codex读取的脱敏回执。"""
         secret = "synthetic-secret-key"
         context = "只用于测试的内部会议术语"
-        self.project.path(".env").write_text("DASHSCOPE_API_KEY=" + secret, encoding="utf-8")
+        self.runtime.path(".env").write_text("DASHSCOPE_API_KEY=" + secret, encoding="utf-8")
         payload = {**self.payload, "auth_mode": "api_key", "enhancement_mode": "context", "context": context}
         preview = json.loads(self.request("POST", "/api/validate", payload)[2])
 
@@ -297,7 +297,7 @@ class WebServerTests(WebFixture):
                                             "X-File-Name": quote("../escape.wav")})
         self.assertEqual(status, 422)
         self.assertIn("所选文件名或格式不符合要求", json.loads(body)["error"])
-        self.assertFalse(self.project.path("escape.wav").exists())
+        self.assertFalse(self.runtime.path("escape.wav").exists())
 
     def test_api_key_error_does_not_return_contents(self):
         """验证Key读取失败返回脱敏错误。"""

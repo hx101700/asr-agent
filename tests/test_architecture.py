@@ -1,28 +1,30 @@
-"""验证分层依赖方向和模块迁移结果。"""
+"""验证运行包的模块布局和单向依赖。"""
 
 import ast
 import unittest
 
-from tests.support import ROOT
+from tests.support import SKILL_ROOT
 
 
 class ArchitectureTests(unittest.TestCase):
-    def test_tools_do_not_depend_on_application_or_http(self):
+    def test_utils_do_not_depend_on_application_or_http(self):
         """验证工具层遵守单向依赖约定。"""
-        for path in (ROOT / "src/asr_agent/tools").glob("*.py"):
+        source = SKILL_ROOT / "scripts/asr_transcription/utils"
+        self.assertTrue(source.is_dir())
+        for path in source.glob("*.py"):
             tree = ast.parse(path.read_text(encoding="utf-8"))
             for node in ast.walk(tree):
                 if isinstance(node, ast.ImportFrom):
                     module = node.module or ""
                     self.assertFalse("application" in module.split(".") or "web" in module.split("."), str(path))
                 elif isinstance(node, ast.Import):
-                    self.assertTrue(all(not alias.name.startswith(("asr_agent.application", "asr_agent.web"))
+                    self.assertTrue(all(not alias.name.startswith(("asr_transcription.application", "asr_transcription.web"))
                                         for alias in node.names), str(path))
 
-    def test_old_flat_modules_are_not_kept_as_forwarding_entries(self):
-        """验证迁移后的旧根模块已清除。"""
-        root = ROOT / "src/asr_agent"
-        for name in ("environment", "auth", "bailian", "media", "results", "documents",
-                     "directory_picker", "_directory_dialog", "bootstrap", "probe",
-                     "session", "transcription", "delivery", "validation"):
-            self.assertFalse((root / f"{name}.py").exists(), name)
+    def test_package_root_contains_only_entry_models_and_http(self):
+        """验证包根聚焦入口、共享数据与HTTP，具体能力位于各自目录。"""
+        root = SKILL_ROOT / "scripts/asr_transcription"
+        self.assertEqual({path.name for path in root.glob("*.py")},
+                         {"__init__.py", "__main__.py", "models.py", "web.py"})
+        for name in ("application", "utils", "static"):
+            self.assertTrue((root / name).is_dir(), name)

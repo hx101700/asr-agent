@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="no-referrer">
+    <title>录音转写</title>
+    <link rel="stylesheet" href="/app.css">
+    <script type="module" src="/app.mjs"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#config-fields">跳到转写设置</a>
+    <header class="page-header">
+      <div class="header-inner">
+        <div class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>录音转写<span class="brand-divider"></span><span class="brand-caption">阿里云百炼</span></div>
+        <span class="stage-badge"><span class="status-dot" aria-hidden="true"></span>预览版</span>
+      </div>
+    </header>
+    <div class="page-shell">
+      <main>
+        <div class="intro">
+          <div><h1>音频转文字</h1><p class="intro-description">为会议、访谈或课程录音设置转写选项。</p></div>
+          <span class="region-tag">华北 2 · 北京</span>
+        </div>
+        <ol class="workflow" aria-label="设置进度">
+          <li id="step-config" class="is-current" aria-current="step"><span class="workflow-number" aria-hidden="true">1</span><span>转写设置</span></li>
+          <li id="step-review"><span class="workflow-number" aria-hidden="true">2</span><span>核对信息</span></li>
+          <li id="step-saved"><span class="workflow-number" aria-hidden="true">3</span><span>保存设置</span></li>
+        </ol>
+        <div class="stage-note"><span class="info-icon" aria-hidden="true">i</span><p><strong>使用说明</strong>保存设置后，返回 Codex 确认上传并开始转写。完成后保存原始结果，并生成 Excel、Word 和 Markdown 文件。</p></div>
+        <div id="page-status" class="notice" role="status" aria-live="polite" hidden></div>
+        <div id="error-panel" class="notice notice-error" role="alert" tabindex="-1" hidden>
+          <strong id="error-message"></strong>
+          <ul id="error-details" hidden></ul>
+        </div>
+        <form id="config-form" novalidate>
+          <div class="workspace">
+            <fieldset id="config-fields" class="form-column" tabindex="-1" disabled>
+              <legend class="visually-hidden">转写设置</legend>
+              <section class="card" aria-labelledby="audio-heading">
+                <div class="section-heading"><span class="step-number">01</span><h2 id="audio-heading" tabindex="-1">添加音频</h2><span class="section-aside">每次 1 个文件</span></div>
+                <div id="audio-dropzone" class="file-dropzone">
+                  <input id="audio-file" class="file-input" type="file" aria-labelledby="audio-picker-title" aria-describedby="audio-file-status audio-limits">
+                  <label for="audio-file" class="upload-target">
+                    <svg class="upload-icon" viewBox="0 0 40 40" fill="none" aria-hidden="true"><path d="M8 24v8h24v-8M20 27V7m-8 8 8-8 8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <strong id="audio-picker-title"><span id="audio-action">选择音频文件</span><span class="upload-or">，或拖拽至此处</span></strong>
+                    <span>支持 MP3、WAV、M4A、FLAC 等格式</span>
+                  </label>
+                  <progress id="audio-progress" class="upload-progress" aria-label="正在添加音频" hidden></progress>
+                  <p id="audio-file-status" class="file-status" role="status">尚未选择文件</p>
+                </div>
+                <div id="audio-error" class="field-error" role="alert" hidden></div>
+                <details class="format-help"><summary>支持格式与文件限制</summary><p id="audio-limits" class="helper"></p></details>
+              </section>
+
+              <section class="card" aria-labelledby="settings-heading">
+                <div class="section-heading"><span class="step-number">02</span><h2 id="settings-heading" tabindex="-1">转写设置</h2></div>
+                <div class="setting-grid">
+                  <div class="field-target"><label for="language-hint">音频语言</label><select id="language-hint"><option value="">自动识别</option></select><div id="language-error" class="field-error" role="alert" hidden></div></div>
+                  <div id="speaker-fields" class="field-target"><label for="speaker-count">发言人数 <span class="optional-label">选填</span></label><input id="speaker-count" type="number" step="1" placeholder="自动判断" aria-describedby="speaker-help"><p id="speaker-help" class="helper"></p><div id="speaker-error" class="field-error" role="alert" hidden></div></div>
+                </div>
+                <label class="check-row"><input id="diarization-enabled" type="checkbox" checked aria-describedby="diarization-help"><span><strong>区分发言人</strong></span></label>
+                <p id="diarization-help" class="helper">多声道音频将合并为单声道副本，保留原文件。</p>
+              </section>
+
+              <section class="card" aria-labelledby="enhancement-heading">
+                <div class="section-heading"><span class="step-number">03</span><h2 id="enhancement-heading" tabindex="-1">精度增强</h2><span class="section-aside">可同时使用</span></div>
+                <div class="enhancement-option">
+                  <label class="option-toggle"><input id="hotwords-enabled" type="checkbox" aria-controls="hotwords-fields"><span><strong>添加热词</strong><span>人名、产品名称、专业术语</span></span></label>
+                  <div id="hotwords-fields" class="enhancement-fields" hidden>
+                    <div class="label-action"><label for="hotwords-file">热词表</label><button id="download-template" type="button" class="text-button">下载模板</button></div>
+                    <div id="hotwords-dropzone" class="file-dropzone compact-upload">
+                      <input id="hotwords-file" class="file-input" type="file" accept=".xlsx" aria-labelledby="hotwords-action" aria-describedby="hotwords-file-status hotwords-help">
+                      <label for="hotwords-file" class="upload-target"><strong id="hotwords-action">选择 Excel 文件</strong><span id="hotwords-file-limit">或拖拽至此处 · .xlsx</span></label>
+                      <progress id="hotwords-progress" class="upload-progress" aria-label="正在添加热词文件" hidden></progress>
+                      <p id="hotwords-file-status" class="file-status" role="status">尚未选择文件</p>
+                    </div>
+                    <div id="hotwords-error" class="field-error" role="alert" hidden></div>
+                    <p id="hotwords-help" class="helper">按模板填写词语和权重。</p>
+                  </div>
+                </div>
+                <div class="enhancement-option">
+                  <label class="option-toggle"><input id="context-enabled" type="checkbox" aria-controls="context-fields"><span><strong>添加上下文</strong><span>与录音相关的术语、对话或参考资料</span></span></label>
+                  <div id="context-fields" class="enhancement-fields field-target" hidden>
+                    <label for="context">参考文本</label>
+                    <textarea id="context" rows="4" placeholder="例如：本次技术评审讨论 Kubernetes、容器编排、灰度发布和服务回滚方案。" aria-describedby="context-help context-count"></textarea>
+                    <div class="textarea-footer"><p id="context-help" class="helper">包含录音中可能出现的具体词语。</p><span id="context-count" class="character-count" role="status">0</span></div>
+                    <div id="context-error" class="field-error" role="alert" hidden></div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="card" aria-labelledby="output-heading">
+                <div class="section-heading"><span class="step-number">04</span><h2 id="output-heading" tabindex="-1">保存位置</h2></div>
+                <div class="field-target"><div class="label-action"><label for="json-directory">原始结果（JSON）</label><button id="json-reset" type="button" class="text-button" hidden>恢复默认</button></div><div class="directory-row"><input id="json-directory" type="text" readonly placeholder="transcriptions" aria-label="JSON保存文件夹"><button id="json-browse" type="button" class="button button-secondary">选择文件夹</button></div><div id="json-error" class="field-error" role="alert" hidden></div></div>
+                <div class="field-target output-fields"><div class="label-action"><label for="document-directory">转写文档</label><button id="document-reset" type="button" class="text-button" hidden>恢复默认</button></div><div class="directory-row"><input id="document-directory" type="text" readonly placeholder="transcriptions" aria-label="文档保存文件夹"><button id="document-browse" type="button" class="button button-secondary">选择文件夹</button></div><div id="document-error" class="field-error" role="alert" hidden></div></div>
+                <div class="export-note"><span>文档格式</span><span class="format-tag">Excel</span><span class="format-tag">Word</span><span class="format-tag">Markdown</span><span>保留时间戳</span></div>
+                <div id="directory-wait" class="directory-wait" role="status" hidden><span>请在系统窗口中选择文件夹。未看到窗口时可取消等待。</span><button id="cancel-directory" type="button" class="text-button">取消等待</button></div>
+              </section>
+              <section id="auth-fields" class="card field-target" aria-label="API Key设置">
+                <label class="check-row"><input id="use-api-key" type="checkbox" aria-controls="api-key-fields" title="不启用时使用百炼控制台登录"><span><strong>使用指定 API Key</strong></span></label>
+                <div id="api-key-fields" class="enhancement-fields" hidden><label for="api-key-value">DASHSCOPE_API_KEY</label><div class="directory-row"><input id="api-key-value" type="password" readonly autocomplete="off" spellcheck="false" placeholder="正在读取…"><button id="api-key-toggle" type="button" class="button button-secondary" disabled>显示</button></div></div>
+                <div id="auth-error" class="field-error" role="alert" hidden></div>
+              </section>
+            </fieldset>
+
+            <aside class="review-column" aria-labelledby="review-heading">
+              <section id="review-card" class="card review-card" tabindex="-1">
+                <div class="review-heading"><h2 id="review-heading">转写信息</h2><span id="review-state" class="subtle-badge" role="status">待检查</span></div>
+                <div id="review-scroll" class="review-scroll" tabindex="0" role="region" aria-label="转写信息详情">
+                  <div id="review-draft"><dl id="draft-details" class="review-details"></dl><p class="helper">检查后显示时长、声道等音频信息。</p></div>
+                  <div id="review-content" hidden><dl id="review-details" class="review-details"></dl><div id="review-warnings" class="notice notice-warning" hidden></div></div>
+                  <details class="model-block"><summary>模型与地域</summary><strong id="model-name">qwen-audio-3.0-asr-flash-filetrans</strong><span id="region-name" class="helper">华北 2（北京）</span></details>
+                </div>
+                <nav class="review-shortcuts" aria-label="快速定位设置">
+                  <button type="button" class="text-button" data-section-target="audio-heading">01 添加音频</button>
+                  <button type="button" class="text-button" data-section-target="settings-heading">02 转写设置</button>
+                  <button type="button" class="text-button" data-section-target="enhancement-heading">03 精度增强</button>
+                  <button type="button" class="text-button" data-section-target="output-heading">04 保存位置</button>
+                </nav>
+              </section>
+              <section id="receipt-panel" class="card receipt-card" tabindex="-1" hidden><span class="success-icon" aria-hidden="true">✓</span><h2 id="receipt-heading">转写设置已保存</h2><p>您可以关闭此页面，返回 Codex 确认上传并执行转写。本次保存操作没有将音频发送至阿里云。</p><dl id="receipt-details" class="review-details"></dl></section>
+            </aside>
+          </div>
+          <div id="action-bar" class="action-bar">
+            <div class="action-inner"><div class="action-copy"><strong id="action-title">下一步：核对转写信息</strong><p id="confirmation-help">检查文件规格、增强选项和保存位置。</p></div><div class="action-buttons"><button id="show-review" type="button" class="button button-secondary compact-review-button" disabled>查看转写信息</button><button id="edit-button" type="button" class="button button-secondary" hidden>返回修改</button><button id="validate-button" type="submit" class="button button-primary" disabled>检查并预览</button><button id="confirm-button" type="button" class="button button-primary" disabled hidden>保存设置</button></div></div>
+          </div>
+        </form>
+      </main>
+      <footer><span>录音转写</span></footer>
+    </div>
+  </body>
+</html>

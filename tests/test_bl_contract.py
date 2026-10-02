@@ -12,19 +12,18 @@ from unittest.mock import patch
 
 from openpyxl import Workbook
 
-from asr_agent import MODEL
-from asr_agent.tools.auth import bailian_environment
-from asr_agent.tools.environment import Project
-from asr_agent.tools.bailian import bl_command
+from asr_transcription import MODEL
+from asr_transcription.utils.auth import bailian_environment
+from asr_transcription.utils.bailian import bl_command
 from scripts.probe_bl import SYNTHETIC_AUDIO_URL
-from asr_agent.tools.bailian import PreparedCommand, run_recognition
-from asr_agent.application.session import Session
-from asr_agent.application.transcription import job_status, transcribe
-from tests.support import ROOT, ProjectTestCase
+from asr_transcription.utils.bailian import PreparedCommand, run_recognition
+from asr_transcription.application.session import Session
+from asr_transcription.application.transcription import job_status, transcribe
+from tests.support import RuntimeTestCase, CONTRACT_BL_ENTRY, contract_runtime
 
 
-@unittest.skipUnless(Project(ROOT).bl_entry.is_file(), "需要先安装项目内BL才能运行合约测试")
-class BailianContractTests(ProjectTestCase):
+@unittest.skipUnless(CONTRACT_BL_ENTRY.is_file(), "需要在专用测试工作区安装 BL 才能运行合约测试")
+class BailianContractTests(RuntimeTestCase):
     def setUp(self):
         """启动本机模拟服务并准备CLI合约场景。"""
         super().setUp()
@@ -92,11 +91,11 @@ class BailianContractTests(ProjectTestCase):
     def invoke(self, mode="success"):
         """以指定模拟场景调用真实BL并返回结果文件。"""
         self.mode = mode
-        self.project.prepare()
-        self.project.path(".env").write_text(
-            "DASHSCOPE_API_KEY=asr-agent-synthetic-test-key\n", encoding="utf-8")
-        env = bailian_environment(self.project, "api_key")
-        output = self.project.path("result.json")
+        self.runtime.prepare()
+        self.runtime.path(".env").write_text(
+            "DASHSCOPE_API_KEY=asr-transcription-synthetic-test-key\n", encoding="utf-8")
+        env = bailian_environment(self.runtime, "api_key")
+        output = self.runtime.path("result.json")
         arguments = [
             "speech", "recognize", "--model", MODEL, "--url", SYNTHETIC_AUDIO_URL,
             "--base-url", self.base_url, "--diarization", "--out", str(output),
@@ -104,7 +103,7 @@ class BailianContractTests(ProjectTestCase):
         ]
         # 这里运行真实CLI；Python HTTP代码仅为测试fixture，不属于产品运行路径。
         result = subprocess.run(
-            bl_command(Project(ROOT), arguments), cwd=self.project.root, env=env,
+            bl_command(contract_runtime(), arguments), cwd=self.runtime.root, env=env,
             stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding="utf-8",
             timeout=30, shell=False, creationflags=subprocess.CREATE_NO_WINDOW,
         )
@@ -121,7 +120,7 @@ class BailianContractTests(ProjectTestCase):
         submitted = self.calls[0][2]
         self.assertEqual(submitted["model"], MODEL)
         self.assertTrue(submitted["parameters"]["diarization_enabled"])
-        self.assertEqual(self.authorization, "Bearer " + "asr-agent-synthetic-test-key")
+        self.assertEqual(self.authorization, "Bearer " + "asr-transcription-synthetic-test-key")
 
     def test_submit_401_is_not_retried(self):
         """验证提交401错误返回失败且请求次数为一。"""
@@ -178,7 +177,7 @@ class BailianContractTests(ProjectTestCase):
     def invoke_saved_job(self, mode, *, context="本机合约验证", vocabulary=None):
         """保存合成任务并通过本机服务执行真实CLI。"""
         self.mode = mode
-        self.project.path(".env").write_text("DASHSCOPE_API_KEY=asr-agent-synthetic-test-key\n", encoding="utf-8")
+        self.runtime.path(".env").write_text("DASHSCOPE_API_KEY=asr-transcription-synthetic-test-key\n", encoding="utf-8")
         content = io.BytesIO()
         with wave.open(content, "wb") as audio:
             audio.setnchannels(1)
@@ -186,7 +185,7 @@ class BailianContractTests(ProjectTestCase):
             audio.setframerate(16000)
             audio.writeframes(b"\0\0" * 16000)
         data = content.getvalue()
-        session = Session(self.project)
+        session = Session(self.runtime)
         self.addCleanup(session.cleanup)
         upload = session.upload("audio", "合成样本.wav", io.BytesIO(data), len(data))
         hotwords_id = ""
@@ -206,30 +205,30 @@ class BailianContractTests(ProjectTestCase):
             "diarization_enabled": True, "language_hint": "zh", "speaker_count": 3,
             "enhancement_mode": "both" if vocabulary is not None else "context",
             "context": context, "hotwords_upload_id": hotwords_id,
-            "json_directory": "outputs", "document_directory": "outputs",
+            "json_directory": "default", "document_directory": "default",
         })
         job_id = session.confirm(preview["validation_id"])["job_id"]
 
-        def local_recognition(project, command, private):
+        def local_recognition(runtime, command, private):
             # 仅fixture改端点和输入URL；产品入口不开放端点覆盖，也不使用真实音频URL。
             """将测试命令的音频URL和端点指向本机替身。"""
             arguments = list(command.argv)
             for flag, value in (("--url", SYNTHETIC_AUDIO_URL), ("--base-url", self.base_url),
                                 ("--timeout", "1"), ("--poll-interval", "0.1")):
                 arguments[arguments.index(flag) + 1] = value
-            run_recognition(project, PreparedCommand(tuple(arguments), command.env), private)
+            run_recognition(runtime, PreparedCommand(tuple(arguments), command.env), private)
 
-        def installed_command(project, arguments):
+        def installed_command(runtime, arguments):
             """使用开发环境中已安装的BL构造测试命令。"""
-            return bl_command(Project(ROOT), arguments)
+            return bl_command(contract_runtime(), arguments)
 
-        with patch("asr_agent.tools.bailian.bl_command", side_effect=installed_command), \
-                patch("asr_agent.application.transcription.run_recognition", side_effect=local_recognition):
-            report = transcribe(self.project, job_id, authorize_upload=True)
+        with patch("asr_transcription.utils.bailian.bl_command", side_effect=installed_command), \
+                patch("asr_transcription.application.transcription.run_recognition", side_effect=local_recognition):
+            report = transcribe(self.runtime, job_id, authorize_upload=True)
             calls = len(self.calls)
-            repeated = transcribe(self.project, job_id, authorize_upload=True)
+            repeated = transcribe(self.runtime, job_id, authorize_upload=True)
         self.assertEqual(len(self.calls), calls)
-        self.assertEqual(repeated, job_status(self.project, job_id))
+        self.assertEqual(repeated, job_status(self.runtime, job_id))
         return report
 
     def test_enhancement_text_survives_excel_snapshot_and_windows_cli(self):
@@ -288,5 +287,5 @@ class BailianContractTests(ProjectTestCase):
         self.assertEqual(report["status"], "STOPPED")
         self.assertEqual(report["error"]["http_status"], 401)
         self.assertEqual(report["error"]["code"], "TestFailure")
-        self.assertNotIn("asr-agent-synthetic-test-key", json.dumps(report))
+        self.assertNotIn("asr-transcription-synthetic-test-key", json.dumps(report))
         self.assertEqual(len(self.calls), 1)

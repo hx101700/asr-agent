@@ -1,29 +1,24 @@
 # 当前状态
 
-更新：2026-10-02。
+更新：2026-10-03。
 
-## 产品与实现
+## 产品
 
-- Windows 10/11 x64；北京地域；固定模型`qwen-audio-3.0-asr-flash-filetrans`；每次处理一个已有音频。
-- 本机网页配置，Codex按授权调用BL；热词与上下文可并用，输出原JSON及Excel、Word、Markdown。
-- 导出使用任务的固定documents目录；重导更新同名成品，失败保留已有目标。交付记录位于delivery/status.json。
-- README与AGENTS提供中英文，网页及导出标签仍为中文。仓库README为转写页面和精度增强保留两处真实截图位置。
+asr-transcription是单录音转写Skill，支持网页配置、热词与上下文、说话人区分，固定通过BL2.1.0调用北京地域qwen-audio-3.0-asr-flash-filetrans，交付原始JSON、Word、Excel和Markdown供用户校对。会议总结属于后续阶段。
 
-## 当前工作
+## 实现
 
-用户发行包与开发工程已分离：ZIP直接包含项目入口文件，解压目录即项目根目录；安装指令放发行AGENTS与HELP，Skill只负责转写与重新导出。开发探针移到scripts/probe_bl.py，不进入用户命令入口或ZIP。
-
-当前只保留[首版v0.1.0](https://github.com/hx101700/asr-agent/releases/tag/v0.1.0)。发行边界修正已推送dev，新附件已更新并完成公开下载验证。发行源码通过v0.1.0标签定位。
+- Skill源位于skills/asr-transcription，代码按入口→application→utils组织。BL保持公开CLI适配模块，不另设BL Skill。
+- 用户工作目录显式传入--workspace；程序资源、私有运行目录与输出位置有明确边界。
+- 运行根与Skill重叠、原生选择/默认及最终输出写入Skill均被拒绝；Python检查和安装进程使用-I隔离工作目录模块。
+- 源码、配置、文档和9份UML已逐文件阅读，审查依据见[REVIEW](REVIEW.md)。
 
 ## 验证与发布
 
-- 当前252项Python回归通过，包含开发探针入口边界与扁平ZIP解压后的入口、导入和文档链接检查，详细范围见[ACCEPTANCE](ACCEPTANCE.md)。
-- ASR与导出流程保持既有实现；本次改变开发命令边界、指令分工和ZIP布局。转写UML已同步删除开发探针附注并重新渲染。
-- 发行清单固定为46个文件，开发文档和截图不进入用户ZIP。
-- 包`dist/asr-agent.zip`为114495字节，SHA-256：`9eaeebc7a429abe277a67ea6ecaa53b04da21ab53538e622b7edda621949906d`。文件清单、CRC、源码一致性、扁平入口与相对链接核对通过。
-- 公开下载与本地包逐字节一致，latest指向唯一首版，附件只有一项；包内没有开发脚本、验收文档、测试、运行环境、凭据和用户数据。
-- 新Codex完整使用、真实云端、原生窗口和Office视觉仍待验收，见[ISSUES](ISSUES.md)。
+完整回归及独立环境验收已完成：解压源码267项Python检查无跳过通过，前端24项通过；新工作目录联网准备成功。候选ZIP共42个文件、107802字节，SHA-256：`ab9835fd40c52ea0fe7461ae3dbe233208b5e459d7217b4969cd49ad253f7643`，清单、CRC、源码及包边界核对通过。具体范围见[ACCEPTANCE](ACCEPTANCE.md)。
+
+按用户要求替换现有v0.1.0并推送dev，master保留原状态。尚未执行本轮远端更新，发布完成后记录源码提交、附件摘要与公开下载结果。
 
 ## 接续
 
-下一步补充用户提供的真实截图，按[ACCEPTANCE](ACCEPTANCE.md)完成新Codex对话的完整使用与人工验收。开始前核对Git工作区和当前发行包；本次文档修订未改变运行逻辑。
+先核对Git与本文件，沿[DEVELOPMENT](DEVELOPMENT.md)了解职责与协议；实际限制见[ISSUES](ISSUES.md)。使用入口为Skill内SKILL.md；开发脚本、测试和UML不进入用户ZIP。

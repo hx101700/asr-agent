@@ -1,18 +1,22 @@
-[中文](https://github.com/hx101700/asr-agent/releases/tag/v0.1.0) | English
+[中文](https://github.com/hx101700/asr-agent/blob/v0.1.0/release/NOTES.md) | English
 
-The first version of asr-agent is here. Give the installation package to Codex, configure your recording on the local page, and get Word, Excel, and Markdown documents when transcription finishes.
+asr-transcription v0.1.0 provides a recording transcription Skill. Once installed, ask Codex to transcribe a recording, configure it on a local page, and receive Word, Excel, and Markdown documents to review and correct.
 
-### Added
+### Features
 
-- **Web configuration**: add one recording, adjust language, speaker diarization, and estimated speaker count, and choose save locations.
-- **Hotwords and context**: import hotwords from Excel and add reference text. Both enhancements can be used together.
-- **Model Studio authentication**: authorize access on the official login page or use an API key from the project's `.env`.
-- **Document generation**: save three document formats with timestamps and the original JSON, with local re-export from a retained task.
+- Add one recording and adjust language, speaker identification, and save locations.
+- Import Excel hotwords and enter context. Both enhancement options can be used together.
+- Authorize through the Model Studio console or use your API Key. The official BL CLI performs recognition.
+- Keep the original JSON and all three documents, with local re-export for existing tasks.
+
+### Installation and file storage
+
+Install the Skill independently and keep recording tasks, credentials, and dependencies in your chosen workspace. Save locations stay outside the Skill's program directory, so you can manage the tools and transcript files separately.
 
 ### Get started
 
-Download [asr-agent.zip](https://github.com/hx101700/asr-agent/releases/download/v0.1.0/asr-agent.zip) and send it to Codex with the [installation prompt in the README](https://github.com/hx101700/asr-agent/blob/v0.1.0/README.en.md#agent-installation-recommended). Once installed, say “Transcribe this recording for me” and follow the authentication and page prompts.
+Download [asr-transcription.zip](https://github.com/hx101700/asr-agent/releases/download/v0.1.0/asr-transcription.zip) and send it to Codex and ask it to install the Skill and read its `SKILL.md`. Choose a separate workspace. Codex prepares the environment and opens the configuration page, then guides authentication for the method you choose.
 
-Currently supports **Windows 10/11 x64**, using `qwen-audio-3.0-asr-flash-filetrans` in Beijing. Speech recognition is provided by [Alibaba Cloud Model Studio](https://help.aliyun.com/zh/model-studio/what-is-model-studio) through its official [BL CLI](https://github.com/modelstudioai/cli) and may incur charges.
+Windows 10/11 x64, Python 3.12 x64, and Node.js 18.17+ with npm are required. Recognition uses `qwen-audio-3.0-asr-flash-filetrans` in Beijing and may incur charges. Stage one delivers transcripts for review; meeting summaries belong to a later stage.
 
-Please report problems through [Issues](https://github.com/hx101700/asr-agent/issues).
+See the [project README](https://github.com/hx101700/asr-agent/blob/v0.1.0/README.en.md) for instructions. Report problems through [Issues](https://github.com/hx101700/asr-agent/issues).

@@ -5,20 +5,21 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+SKILL_ROOT = Path(__file__).resolve().parents[1] / "skills/asr-transcription"
+sys.path.insert(0, str(SKILL_ROOT / "scripts"))
 
-from asr_agent import BAILIAN_VERSION, MODEL
-from asr_agent.tools.bailian import bl_command
-from asr_agent.tools.environment import Project, SetupError, run_process
+from asr_transcription import BAILIAN_VERSION, MODEL
+from asr_transcription.utils.bailian import bl_command
+from asr_transcription.utils.environment import Runtime, SetupError, run_process
 
-SYNTHETIC_AUDIO_URL = "https://example.invalid/asr-agent-probe.wav"
+SYNTHETIC_AUDIO_URL = "https://example.invalid/asr-transcription-probe.wav"
 
 
-def probe(project: Project) -> dict:
+def probe(runtime: Runtime) -> dict:
     """核对BL公开帮助及请求参数映射，保存合约检查报告。"""
-    project.prepare()
+    runtime.prepare()
     # 探针与将来的真实登录配置分开；不读取或复用任何既存凭据。
-    config = project.path(".state/bailian-probe")
+    config = runtime.path(".state/bailian-check")
     config.mkdir(parents=True, exist_ok=True)
     if any((config / name).exists() for name in ("config.json", "credentials.json")):
         raise SetupError("探针配置目录含配置/凭据文件，停止探针；未读取或覆盖。")
@@ -30,7 +31,7 @@ def probe(project: Project) -> dict:
         ("speech_help", ["speech", "--help"]),
     ]
     for name, arguments in checks:
-        result = run_process(project, bl_command(project, arguments), probe_mode=True)
+        result = run_process(runtime, bl_command(runtime, arguments), isolated_config=True)
         if result.returncode:
             raise SetupError(f"BL探针失败：{name}，退出码{result.returncode}，未重试。")
         if name == "version" and result.stdout.strip() != f"bl {BAILIAN_VERSION}":
@@ -46,7 +47,7 @@ def probe(project: Project) -> dict:
         "--context=本地合约探针", "--vocabulary", '{"测试术语":4}',
         "--dry-run", "--output", "json",
     ]
-    result = run_process(project, bl_command(project, arguments), probe_mode=True)
+    result = run_process(runtime, bl_command(runtime, arguments), isolated_config=True)
     if result.returncode:
         raise SetupError(f"BL请求构造探针失败，退出码{result.returncode}，未重试。")
     try:
@@ -73,7 +74,7 @@ def probe(project: Project) -> dict:
         "observations": observations,
         "request_preview": payload,
     }
-    path = project.path(".state/bl-probe.json")
+    path = runtime.path(".state/bl-probe.json")
     path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return {"status": "passed", "report": str(path), "scope": report["scope"]}
 
@@ -84,9 +85,10 @@ def main(argv: list[str] | None = None) -> int:
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description="开发专用BL合约探针，固定使用虚构音频URL。")
-    parser.parse_args(argv)
+    parser.add_argument("--workspace", type=Path, required=True, help="专用本机测试工作区")
+    args = parser.parse_args(argv)
     try:
-        report = probe(Project(Path(__file__).resolve().parents[1]))
+        report = probe(Runtime(args.workspace, SKILL_ROOT))
     except (SetupError, OSError, ValueError, KeyError) as error:
         print(json.dumps({"status": "failed", "message": str(error)}, ensure_ascii=False))
         return 1

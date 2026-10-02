@@ -7,9 +7,9 @@ import subprocess
 import sys
 from unittest.mock import patch
 
-from asr_agent.tools.bailian import BailianFailure, PreparedCommand, _communicate_login, _open_console_fallback, _run_bl
-from asr_agent.tools.environment import SetupError, child_environment
-from tests.support import ProjectTestCase
+from asr_transcription.utils.bailian import BailianFailure, PreparedCommand, _communicate_login, _open_console_fallback, _run_bl
+from asr_transcription.utils.environment import SetupError, child_environment
+from tests.support import RuntimeTestCase
 
 
 STATE = "0123456789abcdef0123456789abcdef"
@@ -17,20 +17,20 @@ LOGIN_URL = ("https://bailian.console.aliyun.com/console-login?"
              f"notice=127.0.0.1:12345?state={STATE}&needapikey=true")
 
 
-class ConsoleLoginTests(ProjectTestCase):
+class ConsoleLoginTests(RuntimeTestCase):
     def setUp(self):
         """准备隔离登录环境并替换浏览器打开入口。"""
         super().setUp()
-        self.project.prepare()
-        browser_patch = patch("asr_agent.tools.bailian.os.startfile")
+        self.runtime.prepare()
+        browser_patch = patch("asr_transcription.utils.bailian.os.startfile")
         self.open_browser = browser_patch.start()
         self.addCleanup(browser_patch.stop)
 
     def start_process(self, script: str, *arguments: str):
         """启动合成登录子进程并登记清理回调。"""
         process = subprocess.Popen(
-            [sys.executable, "-c", script, *arguments], cwd=self.project.root,
-            env=child_environment(self.project), stdin=subprocess.DEVNULL,
+            [sys.executable, "-c", script, *arguments], cwd=self.runtime.root,
+            env=child_environment(self.runtime), stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             text=True, encoding="utf-8", errors="replace", shell=False,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
@@ -99,7 +99,7 @@ class ConsoleLoginTests(ProjectTestCase):
 
     def test_duplicate_fallback_lines_open_once(self):
         """验证重复备用链接对应一次页面打开。"""
-        marker = self.project.path("opened.txt")
+        marker = self.runtime.path("opened.txt")
         script = (
             "import pathlib,sys,time\n"
             "print(sys.argv[1],flush=True); print(sys.argv[1],flush=True)\n"
@@ -113,7 +113,7 @@ class ConsoleLoginTests(ProjectTestCase):
 
     def test_link_is_opened_while_process_waits_for_callback(self):
         """验证登录进程等待回调时及时打开链接。"""
-        marker = self.project.path("opened.txt")
+        marker = self.runtime.path("opened.txt")
         script = (
             "import pathlib,sys,time\n"
             "marker=pathlib.Path(sys.argv[2])\n"
@@ -139,7 +139,7 @@ class ConsoleLoginTests(ProjectTestCase):
     def test_large_stderr_is_drained_before_process_can_print_url(self):
         """验证大量标准错误及时排空并读取备用链接。"""
         size = 1024 * 1024
-        marker = self.project.path("opened.txt")
+        marker = self.runtime.path("opened.txt")
         script = (
             "import pathlib,sys,time\n"
             "sys.stderr.write('x'*int(sys.argv[2])); sys.stderr.flush()\n"
@@ -186,9 +186,9 @@ class ConsoleLoginTests(ProjectTestCase):
         """验证登录超时转换为失败并完成一次进程清理。"""
         process = self.start_process("import time; time.sleep(30)")
         command = PreparedCommand(("synthetic-bl", "auth", "login", "--console"), {})
-        with patch("asr_agent.tools.bailian.subprocess.Popen", return_value=process) as start:
+        with patch("asr_transcription.utils.bailian.subprocess.Popen", return_value=process) as start:
             with self.assertRaises(BailianFailure) as caught:
-                _run_bl(self.project, command, [], timeout=0.05, console_login=True)
+                _run_bl(self.runtime, command, [], timeout=0.05, console_login=True)
         self.assertTrue(caught.exception.started)
         self.assertEqual(caught.exception.report["code"], "LOCAL_WAIT_INTERRUPTED")
         start.assert_called_once()
