@@ -1,37 +1,130 @@
 # asr-agent
 
-在Codex中通过本机网页配置单个音频，再调用阿里云百炼CLI完成非实时转写，保存原始JSON及Excel、Word、Markdown。
+**在 Codex 中，将录音转成带时间戳的 Word、Excel 和 Markdown。**
 
-模型固定为`qwen-audio-3.0-asr-flash-filetrans`，地域固定北京。支持即时热词与上下文同时使用；默认区分发言人，必要时生成单声道FLAC副本。
+asr-agent 是一个面向 Windows 用户的录音转写工具，适合处理会议、访谈、课程等已经录制好的音频。在 Codex 中提出转写需求，在本机网页选择文件和设置，完成后就能获得可阅读、编辑和归档的转写文档。
 
-## 使用
+语音识别由阿里云百炼的 `qwen-audio-3.0-asr-flash-filetrans` 提供，使用北京地域。当前为 Windows 预览版，每次处理一个文件。
 
-适用于Windows 10/11 x64。用户发行ZIP不带运行时或依赖包。本机需有Windows x64 CPython 3.12（含venv、ensurepip、tkinter）、Node.js 18.17.0或更高版本及配套npm；安装时通过阿里云PyPI镜像获取全部Python依赖，通过npm获取BL依赖。安装器在项目内创建环境，不修改系统PATH或全局包。
+[开始使用](#开始使用) · [输出文件](#输出文件) · [常见问题](#常见问题) · [详细使用说明](doc/HELP.md)
 
-下载发行ZIP后解压，使用Codex打开其中的`asr-agent`目录。项目Skill位于`.agents/skills/asr-agent/SKILL.md`；在该目录提出“帮我转写录音”即可按Skill调用以下现有入口。开发仓库运行`python -S -X utf8 scripts/build_zip.py`生成`dist/asr-agent.zip`，发行清单及模板维护见[开发说明](doc/DEVELOPMENT.md)。
+## 主要功能
+
+- **一次转写，三种文档**：同时生成 Word、Excel 和 Markdown，并保留原始识别 JSON。
+- **时间戳与发言人**：按段保留时间信息，默认区分发言人，也可关闭或填写参考人数。
+- **热词与上下文**：通过 Excel 导入人名、产品名和专业术语，也可填写参考文本；两者可以同时使用。
+- **可视化设置**：选择或拖入音频，预览时长、声道与转写选项，通过系统弹窗选择保存位置。
+- **本地重新导出**：保留完整任务与原始结果后，可重新生成三种文档，无需再次识别录音。
+
+## 开始使用
+
+### 1. 准备环境并获取项目
+
+| 准备项 | 要求 |
+| --- | --- |
+| 操作系统 | Windows 10 / 11，64 位 |
+| Codex | 已安装并可正常使用的桌面端 |
+| Python | CPython 3.12，Windows x64，包含 venv、ensurepip 和 tkinter |
+| Node.js | 18.17.0 或更高版本，包含 npm |
+| 百炼账号 | 具备该模型调用权限的阿里云账号，或北京地域的百炼 API Key |
+| 网络 | 首次安装需下载依赖；转写时需连接阿里云百炼 |
+
+[下载当前 dev 分支源码](https://github.com/hx101700/asr-agent/archive/refs/heads/dev.zip)，解压后用 Codex 打开 `asr-agent-dev` 文件夹。如果拿到的是单独提供的 `asr-agent.zip`，则打开其中的 `asr-agent` 文件夹。仓库源码包含开发文档，单独的发行包只保留使用所需文件。
+
+### 2. 让 Codex 安装并打开页面
+
+在这个项目的 Codex 对话中输入：
+
+> 请安装 asr-agent，并打开录音转写页面。
+
+Codex 会安装项目依赖和阿里云百炼 CLI，然后打开本机网页。首次安装需要等待下载完成；环境保存在项目文件夹内。后续使用时，在同一项目中说“帮我转写录音”即可。
+
+### 3. 选择账号使用方式
+
+| 方式 | 你需要做什么 |
+| --- | --- |
+| 控制台登录 | 保持网页中的“使用指定 API Key”未勾选。首次使用时，按 Codex 提示在阿里云官方页面完成登录授权。 |
+| 指定 API Key | 将项目中的 `.env.example` 复制为 `.env`，在 `DASHSCOPE_API_KEY=` 后填写自己的 Key，然后在网页勾选“使用指定 API Key”。 |
+
+API Key 由网页从本机文件读取，请勿把密钥发送到聊天中。识别使用你自己的阿里云服务，可能产生模型调用费用。
+
+### 4. 添加录音并核对设置
+
+1. **添加音频**：选择或拖入一个文件，支持 MP3、WAV、M4A、FLAC 等格式。
+2. **设置转写选项**：选择音频语言，按需调整发言人区分和参考人数。
+3. **添加精度增强**：需要热词时下载网页模板并填写 Excel；需要上下文时填写与录音相关的参考文本。
+4. **选择保存位置**：原始 JSON 和转写文档可以分别选择文件夹，默认保存在项目的 `outputs` 中。
+5. 点击 **“检查并预览”**，核对信息后点击 **“保存设置”**。
+
+热词适合填写“陈雨”“星河项目”等具体名称；上下文可以写“本次访谈讨论星河项目，由陈雨介绍实施计划”。多声道录音开启发言人区分时，页面会提示生成单声道副本，原文件保留。
+
+### 5. 返回 Codex 开始转写
+
+保存设置后，返回 Codex 确认本次上传，例如：
+
+> 同意将这次录音及所选热词、上下文发送到阿里云百炼北京进行转写，请开始。
+
+Codex 会执行转写，并在完成后告诉你文件保存在哪里。网页可以关闭，转写期间请保持电脑和执行进程运行。
+
+## 输出文件
+
+| 文件 | 适合用途 |
+| --- | --- |
+| `transcription.docx` | 按段阅读、修改和整理，包含时间标签与说话人信息 |
+| `transcription.xlsx` | 按时间、说话人及正文查看或筛选转写内容 |
+| `transcription.md` | 在 Markdown 编辑器、笔记或代码仓库中阅读与归档 |
+| `transcription.json` | 保留原始识别结果，供本地重新导出使用 |
+
+三种文档的标题为“录音文件名 录音转写”。说话人使用模型返回的编号，不会自动识别人名。
+
+默认目录结构如下，任务编号和导出编号由程序生成：
+
+```text
+outputs/
+└── 任务编号/
+    ├── json/
+    │   └── transcription.json
+    └── documents/
+        └── 导出编号/
+            ├── transcription.docx
+            ├── transcription.xlsx
+            └── transcription.md
+```
+
+需要重新生成文档时，保留项目文件夹和原始 JSON，并告诉 Codex：“请为任务 `<任务编号>` 重新导出三种文档。”新文件会保存在新的导出目录，上一轮文件保留。仅有一份 JSON 文件不足以恢复完整任务。
+
+## 常见问题
+
+**添加文件后，录音就上传到云端了吗？**
+
+添加文件和保存设置都在本机完成。确认开始转写后，录音和启用的热词、上下文才会发送到阿里云百炼北京。请使用有权上传的录音；密钥、录音和转写内容请勿提交到公开仓库。
+
+**能实时录音、批量转写或自动生成摘要吗？**
+
+当前处理已录制好的单个音频，每次一个文件。实时录音、批处理、翻译和自动摘要不在当前功能范围内。
+
+**转写失败后怎么办？**
+
+Codex 会说明已知失败原因和已保存的文件，不会自动再次提交识别。若仅文档导出失败，可以先查看保留的结果，再按提示决定是否重新导出。详细处理见[状态与错误说明](doc/ERRORS.md)。
+
+**需要自己敲命令安装吗？**
+
+可以直接使用上面的 Codex 话术。希望手动操作时，在项目目录执行：
 
 ```powershell
 python -S -X utf8 scripts/asr.py bootstrap
-.venv\Scripts\python.exe scripts/asr.py serve
+.venv\Scripts\python.exe -X utf8 scripts/asr.py serve
 ```
 
-网页只添加本机文件、检查并保存配置。确认上传范围后，由Codex运行：
+这两条命令安装环境并打开设置页面。登录、执行转写和本地重导的完整命令见[使用说明](doc/HELP.md)。
 
-```powershell
-.venv\Scripts\python.exe scripts/asr.py transcribe --job <设置编号> --authorize-upload
-.venv\Scripts\python.exe scripts/asr.py job-status --job <设置编号>
-```
+## 文档与参与开发
 
-保留确认配置、已保存的JSON_READY执行记录和结果JSON的已有任务，可用`export --job <设置编号>`本地重导。控制台首次登录使用`login`；指定API Key模式读取项目`.env`，无需login。
+- [使用说明](doc/HELP.md)：详细安装、配置、文件限制和故障处理。
+- [官方能力依据](doc/REFERENCES.md)：模型、参数及输入要求。
+- [开发说明](doc/DEVELOPMENT.md)与[UML设计视图](doc/UML.md)：了解实现和代码位置。
+- [验证范围](doc/ACCEPTANCE.md)与[已知问题](doc/ISSUES.md)：查看已验证场景及当前限制。
 
-## 文档与范围
+欢迎通过 [Issues](https://github.com/hx101700/asr-agent/issues)反馈问题。请附上使用方式、环境版本和错误提示，并移除密钥、录音内容及其他敏感信息。
 
-- [使用说明](doc/HELP.md)：安装、配置、保存位置、失败处理。
-- [当前状态](doc/STATUS.md)：已完成、验证范围与下一步。
-- [开发说明](doc/DEVELOPMENT.md)：实际模块职责、数据与执行边界。
-- [UML设计视图](doc/UML.md)：对象关系、调用时序和状态，附可编辑源稿。
-- [文档索引](doc/README.md)：官方依据、错误解释及验证方法。
-
-用户发行ZIP只包含运行代码、项目Skill、依赖锁和必要使用文档。测试、构建脚本、开发状态及验证方法保留在本仓库；根目录说明由`release/`中的用户模板提供。全部依赖在安装时下载并按锁校验；复测步骤和未覆盖范围见[验证方法](doc/ACCEPTANCE.md)。
-
-`.env`、`data/`、`.state/`、`.runtime/`、`.venv/`、`.tools/`、`outputs/`不进入Git。用户选择其他输出位置时自行管理其隐私和版本控制范围。
+本项目采用 [Apache-2.0](LICENSE) 许可证。
