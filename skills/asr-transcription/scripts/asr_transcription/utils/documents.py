@@ -7,16 +7,22 @@ import string
 import unicodedata
 from datetime import timedelta
 from pathlib import Path
+from typing import Protocol, cast
 from zipfile import BadZipFile
 
 from docx import Document
+from docx.styles.style import ParagraphStyle
+from docx.text.paragraph import Paragraph
 from docx.enum.style import WD_STYLE_TYPE
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
 from openpyxl import Workbook, load_workbook
+from openpyxl.cell.cell import Cell
 from openpyxl.styles import Alignment, Border, Font, Side
+from openpyxl.worksheet.properties import PageSetupProperties
+from openpyxl.worksheet.worksheet import Worksheet
 
 from .. import MODEL
 from ..models import Sentence, Transcript
@@ -33,6 +39,14 @@ class DocumentError(ValueError):
     """表示可向用户展示的文档格式或写入错误。"""
 
 
+class DocumentWriter(Protocol):
+    """约定三种文档生成函数共用的输入参数。"""
+
+    def __call__(self, transcript: Transcript, path: Path, *, source_name: str, job_id: str) -> None:
+        """将转写内容与任务标签写入指定格式文件。"""
+        ...
+
+
 def timestamp(milliseconds: int) -> str:
     """将毫秒转换为累计小时的时分秒文本。"""
     seconds, millis = divmod(milliseconds, 1000)
@@ -41,7 +55,7 @@ def timestamp(milliseconds: int) -> str:
     return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{millis:03d}"
 
 
-def publish_document(writer, transcript: Transcript, final_path: Path, *,
+def publish_document(writer: DocumentWriter, transcript: Transcript, final_path: Path, *,
                      source_name: str, job_id: str) -> int:
     """先生成临时文件，再替换同名成品并返回文件大小。"""
     temporary = final_path.with_name("transcription.partial" + final_path.suffix)
@@ -80,7 +94,7 @@ def _xml_text(text: str, format_name: str) -> None:
         raise DocumentError(f"{format_name}无法保存结果中的控制字符；原始JSON及其他格式不受影响。")
 
 
-def _cell_value(cell, value) -> None:
+def _cell_value(cell: Cell, value: str | int | timedelta) -> None:
     """写入Excel单元格，检查文本存储上限并固定字符串类型。"""
     if isinstance(value, str):
         _xml_text(value, "Excel")
@@ -93,7 +107,7 @@ def _cell_value(cell, value) -> None:
         cell.value = value
 
 
-def _xlsx_values(sentence: Sentence) -> tuple:
+def _xlsx_values(sentence: Sentence) -> tuple[int, str, timedelta, timedelta, str, str]:
     """生成与Excel表头顺序一致的段落字段。"""
     return (sentence.index, _track(sentence), timedelta(milliseconds=sentence.begin_ms),
             timedelta(milliseconds=sentence.end_ms), _speaker(sentence), sentence.text)
@@ -115,25 +129,26 @@ def write_xlsx(transcript: Transcript, path: Path, *, source_name: str, job_id: 
         raise DocumentError("转写段落超过Excel工作表行数上限，本次未截断内容。")
     workbook = Workbook()
     try:
-        sheet = workbook.active
+        # 新建工作簿包含一个普通工作表。
+        sheet = cast(Worksheet, workbook.active)
         sheet.title = SHEET
         sheet.sheet_view.showGridLines = False
         sheet.sheet_view.zoomScale = 85
         widths = (8, 22, 18, 18, 18, 88)
-        for column, width in zip("ABCDEF", widths):
-            sheet.column_dimensions[column].width = width
+        for column_letter, width in zip("ABCDEF", widths):
+            sheet.column_dimensions[column_letter].width = width
         metadata = (_title(source_name), f"模型：{MODEL}    任务：{job_id}")
         workbook.properties.title = metadata[0]
         for row, value in enumerate(metadata, 1):
             sheet.merge_cells(start_row=row, start_column=1, end_row=row, end_column=6)
-            cell = sheet.cell(row, 1)
+            cell = cast(Cell, sheet.cell(row, 1))
             _cell_value(cell, value)
             cell.font = Font(name=FONT_NAME, size=16 if row == 1 else 10,
                              bold=row == 1, color="000000")
             cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=False)
             sheet.row_dimensions[row].height = 38 if row == 1 else 30
         for column, value in enumerate(HEADERS, 1):
-            cell = sheet.cell(FIRST_ROW - 1, column)
+            cell = cast(Cell, sheet.cell(FIRST_ROW - 1, column))
             _cell_value(cell, value)
             cell.font = Font(name=FONT_NAME, size=11, bold=True, color="000000")
             cell.border = Border(bottom=Side(style="thin", color="000000"))
@@ -142,10 +157,10 @@ def write_xlsx(transcript: Transcript, path: Path, *, source_name: str, job_id: 
         body_font = Font(name=FONT_NAME, size=11, color="000000")
         bottom = Border(bottom=Side(style="hair", color="000000"))
         for row, sentence in enumerate(transcript.sentences, FIRST_ROW):
-            values = _xlsx_values(sentence)
-            for column, value in enumerate(values, 1):
-                cell = sheet.cell(row, column)
-                _cell_value(cell, value)
+            values: tuple[str | int | timedelta, ...] = _xlsx_values(sentence)
+            for column, body_value in enumerate(values, 1):
+                cell = cast(Cell, sheet.cell(row, column))
+                _cell_value(cell, body_value)
                 cell.font = body_font
                 cell.border = bottom
                 cell.alignment = Alignment(horizontal="left" if column == 6 else "center",
@@ -162,7 +177,7 @@ def write_xlsx(transcript: Transcript, path: Path, *, source_name: str, job_id: 
         sheet.page_setup.paperSize = sheet.PAPERSIZE_A4
         sheet.page_setup.fitToWidth = 1
         sheet.page_setup.fitToHeight = 0
-        sheet.sheet_properties.pageSetUpPr.fitToPage = True
+        cast(PageSetupProperties, sheet.sheet_properties.pageSetUpPr).fitToPage = True
         workbook.save(path)
     except OSError as exc:
         raise DocumentError("Excel写入失败，请检查保存位置和文件占用；未自动重试。") from exc
@@ -173,15 +188,15 @@ def write_xlsx(transcript: Transcript, path: Path, *, source_name: str, job_id: 
         with path.open("rb") as stream:
             verified = load_workbook(stream, read_only=True, data_only=False)
             try:
-                sheet = verified[SHEET]
-                if (sheet.max_row != len(transcript.sentences) + FIRST_ROW - 1
-                        or sheet.max_column != 6 or sheet["A1"].value != metadata[0]
-                        or sheet["A2"].value != metadata[1]):
+                restored_sheet = verified[SHEET]
+                if (restored_sheet.max_row != len(transcript.sentences) + FIRST_ROW - 1
+                        or restored_sheet.max_column != 6 or restored_sheet["A1"].value != metadata[0]
+                        or restored_sheet["A2"].value != metadata[1]):
                     raise DocumentError("Excel回读的段落数或元信息不一致，未报告完成。")
-                rows = sheet.iter_rows(min_row=FIRST_ROW, max_col=6)
+                rows = restored_sheet.iter_rows(min_row=FIRST_ROW, max_col=6)
                 for cells, sentence in zip(rows, transcript.sentences, strict=True):
-                    values = tuple(cell.value if cell.value is not None else "" for cell in cells)
-                    if (values != _xlsx_values(sentence)
+                    restored_values = tuple(cell.value if cell.value is not None else "" for cell in cells)
+                    if (restored_values != _xlsx_values(sentence)
                             or any(cell.data_type == "f" for cell in cells)):
                         raise DocumentError("Excel回读的正文、时间或标签不一致，未报告完成。")
             finally:
@@ -192,7 +207,7 @@ def write_xlsx(transcript: Transcript, path: Path, *, source_name: str, job_id: 
         raise DocumentError("Excel无法重新打开核验，未报告完成。") from exc
 
 
-def _word_text(paragraph, text: str) -> None:
+def _word_text(paragraph: Paragraph, text: str) -> None:
     """写入Word正文，并保留python-docx默认会转换的回车字符。"""
     _xml_text(text, "Word")
     # python-docx把CR转换成LF。独立写入CR文本节点，以便回读时仍保留原始字符。
@@ -204,7 +219,7 @@ def _word_text(paragraph, text: str) -> None:
         paragraph.add_run(part)
 
 
-def _word_style(style, *, size: float, bold: bool = False) -> None:
+def _word_style(style: ParagraphStyle, *, size: float, bold: bool = False) -> None:
     """统一Word字体与字号，清除模板主题对字体选择的覆盖。"""
     style.font.name = FONT_NAME
     style.font.size = Pt(size)
@@ -227,23 +242,26 @@ def write_docx(transcript: Transcript, path: Path, *, source_name: str, job_id: 
         section.page_width, section.page_height = Inches(8.5), Inches(11)
         section.top_margin = section.bottom_margin = Inches(0.8)
         section.left_margin = section.right_margin = Inches(0.85)
-        _word_style(document.styles["Normal"], size=10)
-        body_format = document.styles["Normal"].paragraph_format
+        normal_style = cast(ParagraphStyle, document.styles["Normal"])
+        title_style = cast(ParagraphStyle, document.styles["Title"])
+        footer_style = cast(ParagraphStyle, document.styles["Footer"])
+        _word_style(normal_style, size=10)
+        body_format = normal_style.paragraph_format
         body_format.line_spacing = 1.25
         body_format.space_after = Pt(6)
         body_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
         body_format.keep_together = False
         body_format.widow_control = True
-        _word_style(document.styles["Title"], size=20, bold=True)
-        document.styles["Title"].paragraph_format.space_after = Pt(12)
-        document.styles["Title"].paragraph_format.keep_with_next = True
-        metadata_style = document.styles.add_style("Transcript Metadata", WD_STYLE_TYPE.PARAGRAPH)
-        metadata_style.base_style = document.styles["Normal"]
+        _word_style(title_style, size=20, bold=True)
+        title_style.paragraph_format.space_after = Pt(12)
+        title_style.paragraph_format.keep_with_next = True
+        metadata_style = cast(ParagraphStyle, document.styles.add_style("Transcript Metadata", WD_STYLE_TYPE.PARAGRAPH))
+        metadata_style.base_style = normal_style
         _word_style(metadata_style, size=10)
         metadata_style.paragraph_format.space_after = Pt(4)
         metadata_style.paragraph_format.keep_with_next = True
-        marker_style = document.styles.add_style("Transcript Marker", WD_STYLE_TYPE.PARAGRAPH)
-        marker_style.base_style = document.styles["Normal"]
+        marker_style = cast(ParagraphStyle, document.styles.add_style("Transcript Marker", WD_STYLE_TYPE.PARAGRAPH))
+        marker_style.base_style = normal_style
         _word_style(marker_style, size=10, bold=True)
         marker_style.paragraph_format.keep_with_next = True
         marker_style.paragraph_format.space_before = Pt(6)
@@ -257,7 +275,7 @@ def write_docx(transcript: Transcript, path: Path, *, source_name: str, job_id: 
             _word_text(document.add_paragraph(), sentence.text)
             expected.extend((label, sentence.text))
         footer = section.footer.paragraphs[0]
-        _word_style(document.styles["Footer"], size=10)
+        _word_style(footer_style, size=10)
         footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
         footer.add_run("第 ")
         page = OxmlElement("w:fldSimple")
@@ -266,7 +284,7 @@ def write_docx(transcript: Transcript, path: Path, *, source_name: str, job_id: 
         footer.add_run(" 页")
         document.core_properties.title = expected[0]
         document.core_properties.author = "asr-transcription"
-        document.save(path)
+        document.save(str(path))
         with path.open("rb") as stream:
             restored = Document(stream)
             if [paragraph.text for paragraph in restored.paragraphs] != expected:

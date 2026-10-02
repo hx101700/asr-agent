@@ -1,4 +1,4 @@
-# asr-transcription 开发规则
+# MemoFlow 开发规则
 
 中文 | [English](AGENTS.en.md)
 
@@ -8,7 +8,7 @@
 
 - 第一阶段交付一个独立的 Codex Skill：单个录音通过本机网页配置，由 Codex 调用 BL，保存原始 JSON、Excel、Word、Markdown，交给用户校对。
 - 固定模型 `qwen-audio-3.0-asr-flash-filetrans`、北京地域、临时 OSS。热词与上下文可同时使用；发言人区分默认开启，多声道先提示再生成单声道 FLAC 副本，原文件保留。
-- 用户校对后的会议总结属于第二阶段，当前不实现总结、文档样式学习或持久记忆。
+- 最终产品把语音输入整理为符合用户习惯和指定格式的会议纪要，并从用户提供的范例与确认后的修改中持续学习。第一阶段交付转写校对稿；第二阶段实现个性化纪要及反馈学习，当前代码尚未实现后者。
 - 支持 Windows 10/11 x64、CPython 3.12 x64（含 venv、ensurepip、tkinter）、Node.js 18.17+ 及 npm。依赖锁限定该平台，安装需要联网。
 
 ## Skill 与工作目录
@@ -16,16 +16,16 @@
 - Skill 源码在 `skills/asr-transcription/`，由 `SKILL.md`、`agents/openai.yaml`、`scripts/`、`references/`、`assets/` 组成。
 - `Runtime(workspace, skill_root)` 区分用户工作目录与 Skill 资源。`resource()` 读取 Skill 文件；`path()` 定位 `<workspace>/.asr-transcription/` 内的运行文件；默认输出根为 `<workspace>/transcriptions/`。私有运行目录与 Skill 目录互不包含，`check_output_path()` 在选择和生成文件时保护 Skill 资源。
 - 所有 CLI 命令使用 Skill 内 `scripts/asr.py` 的绝对路径，并显式传入 `--workspace`。依赖环境、BL 安装、凭据、暂存输入和任务记录写入工作目录，Skill 文件保持只读。
-- API Key 从私有运行目录 `.env` 读取；bootstrap 只复制空模板。控制台模式使用 BL 在同一工作目录保存的配置。凭据不得写回 Skill。
+- API Key 从私有运行目录 `.env` 读取；bootstrap 只复制空模板。网页允许用户填写或修改 Key，在“检查并预览”时保存到该固定文件。控制台模式使用 BL 在同一工作目录保存的配置。凭据不得写回 Skill。
 - 源码仓库包含 Skill 源文件，维护操作不自动安装到用户级或项目级 Skill 发现目录。
 
 ## 实现原则
 
-1. 保持入口 → application → utils 的轻量分层；单一操作允许入口直接分派。共享不可变数据放 `models.py`，规则不执行 I/O，utils 不反向导入用例。
+1. 保持入口 → application → utils 的轻量分层；单一操作允许入口直接分派。共享数据及 JSON 协议类型放 `models.py`，规则不执行 I/O，utils 不反向导入用例。
 2. BL 负责鉴权、临时上传、提交、轮询、下载及原始 JSON 落盘，直接复用公开 CLI。Python 负责本机配置、媒体处理、结果解析和文档生成。
-3. 前端使用 model 管状态、view 管 DOM、app 编排事件、api 管传输；普通表单留 DOM，Key 不进入 model、配置、日志或浏览器持久存储。
+3. 前端源码位于 `frontend/`，使用 Vue 3、TypeScript 与 Element Plus；组件绑定表单状态，API 模块处理本机传输。Key 展示与编辑只由 `KeyDisplay.vue` 的局部状态持有，与可提交表单分开，保存后由服务端执行凭据读取；Key 不进入任务配置、日志或浏览器持久存储。
 4. 复用 `files`、`job_files`、`hotwords`、`results` 等现有能力；删除旧入口、兼容层和重复实现。新增校验或抽象必须指出当前业务消费者。
-5. 每个命名函数或方法提供简短中文职责说明，直接描述动作与结果。Python 使用 docstring，JavaScript 使用函数前注释；外部约束和非显然原因写在相关实现旁。
+5. 每个命名函数或方法提供简短中文职责说明，直接描述动作与结果。Python 使用 docstring，TypeScript 使用函数前注释；外部约束和非显然原因写在相关实现旁。共享输入、状态与回执提供明确类型，类型检查属于开发流程。
 6. BL 参数、限制和错误含义核对固定版本官方资料。依据维护在 [model.md](skills/asr-transcription/references/model.md)，未知信息明确说明未知。
 7. 子进程使用参数数组与 `shell=False`。热词 JSON 与上下文作为单个参数值传递；不执行输入内容中的指令。
 
@@ -42,7 +42,9 @@
 
 - 仅修改当前仓库及明确批准的测试位置；保留 `data/` 原始用户数据。真实录音、Key、令牌、签名 URL、转写、原响应和运行日志不得提交或打包。
 - 开发在 `dev`，`master` 用于验收里程碑。提交、推送、合并、发布需用户明确意图；精确路径暂存，不强推或重写历史；同次网络推送失败两次即停止。
+- 项目版本号仅在通过验收并发布到 `master` 时变更。`dev` 上的开发、修复和文档提交沿用当前版本；当前为 `0.1.0`。本阶段经用户授权更新现有预览包时，仍使用 `v0.1.0`，不新增版本号。正式发布时同步根 `package.json`、`package-lock.json`、标签和发布说明；依赖版本按其各自锁文件维护。
 - 固定发行清单位于 `scripts/build_zip.py`。ZIP 直接包含 Skill 文件，不包含仓库 README、AGENTS、开发文档、测试、UML、运行环境或用户数据。新增运行文件时同步清单和包边界检查。
+- 前端通过 Vite 构建到 Skill 的 `scripts/asr_transcription/static/`，核心产物为 `index.html`、`app.js` 和 `app.css`，同时交付 `favicon.svg` 与第三方许可说明。发行包使用构建产物；Vue/TypeScript 源码、开发配置、构建依赖及 `node_modules` 保留在开发仓库。
 - Python 依赖由 Skill 中 `scripts/requirements.txt` 锁定版本与摘要；BL 锁在 `scripts/bailian/`。下载失败报告实际原因，不自动重试、换源或修改锁。
 - Python 安装与依赖检查子进程使用 `-I`，从指定虚拟环境加载依赖；用户工作目录中的同名模块不参与检查或安装。
 - 开发探针 `scripts/probe_bl.py` 不进入发行包，只使用固定虚构 URL；BL 合约测试使用 `127.0.0.1` 模拟服务与合成凭据。本机测试不等于真实云端验收。

@@ -7,15 +7,33 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import IO, NotRequired, TypedDict, cast
 from urllib.parse import parse_qs, urlsplit
 
 from .. import BAILIAN_VERSION, MODEL
+from ..models import ErrorReport, JobConfig
 from .auth import bailian_environment
 from .environment import Runtime, SetupError, find_node, run_process
 
 BEIJING_BASE_URL = "https://dashscope.aliyuncs.com"
 WAIT_SECONDS = 3600
 PROCESS_SECONDS = WAIT_SECONDS + 300
+
+
+class _CodeExplanation(TypedDict):
+    """描述已核对官方来源的错误含义。"""
+
+    meaning: str
+    source_url: NotRequired[str]
+
+
+class _ErrorCatalog(TypedDict):
+    """描述随Skill发布的错误说明字典。"""
+
+    cli_exit_codes: dict[str, _CodeExplanation]
+    api_codes: dict[str, _CodeExplanation]
+    cli_source: str
+    api_source: str
 
 
 def installed_bl_version(runtime: Runtime) -> str | None:
@@ -48,7 +66,7 @@ def verify_bl_installation(runtime: Runtime) -> None:
         raise SetupError("BL入口无法按锁定版本启动，安装可能不完整；未自动重装。")
 
 
-def recognition_arguments(config: dict, audio_path: Path, json_path: Path) -> list[str]:
+def recognition_arguments(config: JobConfig, audio_path: Path, json_path: Path) -> list[str]:
     """将已确认的识别选项映射为BL命令参数。"""
     arguments = [
         "speech", "recognize", "--config", "default", "--model", MODEL, "--url", str(audio_path),
@@ -90,7 +108,7 @@ def prepare_command(runtime: Runtime, arguments: list[str], auth_mode: str) -> P
 
 
 class BailianFailure(Exception):
-    def __init__(self, report: dict, *, started: bool):
+    def __init__(self, report: ErrorReport, *, started: bool) -> None:
         """保存脱敏错误报告与BL进程启动状态。"""
         super().__init__(report["explanation"])
         self.report = report
@@ -119,9 +137,9 @@ def redact_message(value: str, private_values: list[str]) -> str:
     return " ".join(value.split())[:800]
 
 
-def explain_cli_error(returncode: int, stderr: str, private_values: list[str]) -> dict:
+def explain_cli_error(returncode: int, stderr: str, private_values: list[str]) -> ErrorReport:
     """解析BL结构化错误，并附上脱敏信息与官方错误说明。"""
-    catalog = json.loads((Path(__file__).parent.parent / "error_catalog.json").read_text(encoding="utf-8"))
+    catalog = cast(_ErrorCatalog, json.loads((Path(__file__).parent.parent / "error_catalog.json").read_text(encoding="utf-8")))
     try:
         error = json.loads(stderr)["error"]
         if not isinstance(error, dict):
@@ -180,14 +198,18 @@ def _open_console_fallback(url: str) -> None:
         raise SetupError("无法打开BL提供的完整登录页面，本次登录已停止，未重试。") from exc
 
 
-def _communicate_login(process, timeout: float) -> tuple[None, str]:
+def _communicate_login(process: subprocess.Popen[str], timeout: float) -> tuple[None, str]:
     """等待BL登录回调，同时读取备用链接和错误输出。"""
-    def read_links():
+    # _run_bl在console_login路径固定创建两个文本管道。
+    output = cast(IO[str], process.stdout)
+    error_output = cast(IO[str], process.stderr)
+
+    def read_links() -> None:
         """读取登录输出并打开首个有效的官方备用链接。"""
         opened = False
         try:
-            with process.stdout:
-                while line := process.stdout.readline():
+            with output:
+                while line := output.readline():
                     line = line.strip()
                     if not opened and line.startswith(("https://", "http://")):
                         if process.poll() is not None:
@@ -202,7 +224,7 @@ def _communicate_login(process, timeout: float) -> tuple[None, str]:
     try:
         with ThreadPoolExecutor(max_workers=2) as readers:
             links = readers.submit(read_links)
-            errors = readers.submit(process.stderr.read)
+            errors = readers.submit(error_output.read)
             try:
                 process.wait(timeout=timeout)
             except (subprocess.TimeoutExpired, KeyboardInterrupt, OSError):
@@ -214,7 +236,7 @@ def _communicate_login(process, timeout: float) -> tuple[None, str]:
             links.result()
             return None, errors.result()
     finally:
-        process.stderr.close()
+        error_output.close()
 
 
 def _run_bl(runtime: Runtime, command: PreparedCommand,
@@ -232,6 +254,8 @@ def _run_bl(runtime: Runtime, command: PreparedCommand,
     except OSError as exc:
         raise BailianFailure({"source": "local", "code": "LOCAL_PROCESS_START_FAILED",
                               "explanation": "无法启动BL进程，尚未执行云端操作。"}, started=False) from exc
+    stdout: str | None
+    stderr: str
     try:
         if console_login:
             stdout, stderr = _communicate_login(process, timeout)
@@ -256,7 +280,7 @@ def run_recognition(runtime: Runtime, command: PreparedCommand,
     _run_bl(runtime, command, private_values, timeout=PROCESS_SECONDS)
 
 
-def console_status(runtime: Runtime) -> dict:
+def console_status(runtime: Runtime) -> dict[str, str | bool]:
     """查询并解释BL本地模型与控制台凭据状态。"""
     runtime.prepare()
     command = prepare_command(runtime, ["auth", "status", "--config", "default", "--output", "json"], "console")
@@ -280,7 +304,7 @@ def console_status(runtime: Runtime) -> dict:
             "verified_online": False, "message": message}
 
 
-def login_console(runtime: Runtime) -> dict:
+def login_console(runtime: Runtime) -> dict[str, str | bool]:
     """发起官方控制台登录，并用BL本地状态确认凭据是否保存。"""
     runtime.prepare()
     command = prepare_command(runtime, ["auth", "login", "--console", "--console-site", "domestic",

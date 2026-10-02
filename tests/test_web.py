@@ -10,7 +10,9 @@ from unittest.mock import patch
 
 from openpyxl import Workbook, load_workbook
 
+from asr_transcription.models import AudioInfo
 from asr_transcription.application.rules import ValidationError
+from asr_transcription.application.transcription import job_status
 from asr_transcription.web import create_server
 from asr_transcription.application.session import Session, output_directory
 from tests.support import RuntimeTestCase
@@ -217,14 +219,19 @@ class WebServerTests(WebFixture):
         connection.close()
         return result
 
-    def test_static_page_has_readonly_key_display_and_does_not_expose_files(self):
-        """验证页面提供只读Key控件并限制文件访问入口。"""
+    def test_static_page_serves_local_bundle_and_does_not_expose_files(self) -> None:
+        """验证Vue入口使用本地构建资源，并限制文件访问入口。"""
         status, headers, body = self.request("GET", "/", token=False)
         self.assertEqual(status, 200)
-        self.assertIn(b'id="api-key-value" type="password" readonly', body)
-        self.assertNotIn(b'name="api_key"', body)
+        self.assertIn(b'<div id="app"></div>', body)
+        self.assertIn(b'src="/app.js"', body)
+        self.assertIn(b'href="/app.css"', body)
+        for asset in ("/app.js", "/app.css", "/favicon.svg"):
+            with self.subTest(asset=asset):
+                self.assertEqual(self.request("GET", asset, token=False)[0], 200)
         self.assertIn("frame-ancestors 'none'", headers["Content-Security-Policy"])
         self.assertEqual(self.request("GET", "/.env")[0], 404)
+        self.assertEqual(self.request("GET", "/app.mjs")[0], 404)
 
     def test_token_host_and_origin_are_enforced(self):
         """验证令牌、主机与来源限制。"""
@@ -273,6 +280,21 @@ class WebServerTests(WebFixture):
         self.assertNotIn(secret, printed.call_args.args[0])
         self.assertNotIn(context, printed.call_args.args[0])
 
+    def test_saved_page_can_recover_receipt_when_stdout_is_closed(self) -> None:
+        """验证终端回执丢失后，可用同一网页的确切编号核对已保存任务。"""
+        preview = json.loads(self.request("POST", "/api/validate", self.payload)[2])
+        with patch("builtins.print", side_effect=OSError("closed output channel")):
+            status, _, body = self.request("POST", "/api/confirm", {"validation_id": preview["validation_id"]})
+        self.assertEqual(status, 200)
+        receipt = json.loads(body)
+        description = json.loads(self.request("GET", "/api/session")[2])
+        self.assertEqual(description["confirmed"], receipt)
+        self.assertEqual(description["confirmed"]["auth_mode"], "console")
+        state = job_status(self.runtime, receipt["job_id"])
+        self.assertEqual(state["status"], "CONFIGURED")
+        self.assertFalse(state["execution_authorized"])
+        self.assertFalse(receipt["execution_started"])
+
     def test_direct_upload_and_template(self):
         """验证直接上传与热词模板下载。"""
         status, _, body = self.request("POST", "/api/upload-audio", body=self.audio.read_bytes(),
@@ -299,9 +321,157 @@ class WebServerTests(WebFixture):
         self.assertIn("所选文件名或格式不符合要求", json.loads(body)["error"])
         self.assertFalse(self.runtime.path("escape.wav").exists())
 
-    def test_api_key_error_does_not_return_contents(self):
-        """验证Key读取失败返回脱敏错误。"""
+    def test_missing_api_key_returns_empty_editable_value(self):
+        """验证未配置Key时页面可直接填写凭据。"""
         status, _, body = self.request("POST", "/api/api-key", {})
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body), {"ok": True, "value": ""})
+        self.assertEqual(self.request("POST", "/api/auth-status", {"auth_mode": "api_key"})[0], 404)
+
+    def test_api_key_save_requires_local_origin_and_session_token(self):
+        """验证未授权或跨来源请求无法修改工作区Key。"""
+        for options in ({"token": False}, {"headers": {"Origin": "https://evil.example"}}):
+            with self.subTest(options=options):
+                status, _, body = self.request("POST", "/api/save-api-key", {"value": "synthetic-secret"}, **options)
+                self.assertEqual(status, 403)
+                self.assertNotIn(b"synthetic-secret", body)
+                self.assertFalse(self.runtime.path(".env").exists())
+
+    def test_api_key_save_uses_fixed_workspace_path_without_response_echo(self):
+        """验证Key保存固定在工作区.env且回执、预览、配置不包含密钥。"""
+        secret = "new-synthetic-secret"
+        with patch("builtins.print") as printed:
+            status, _, body = self.request("POST", "/api/save-api-key", {
+                "value": secret, "path": str(self.runtime.skill_root / ".env"),
+            })
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body), {"ok": True})
+        self.assertFalse(printed.called)
+        self.assertFalse((self.runtime.skill_root / ".env").exists())
+        self.assertFalse((self.runtime.workspace / ".env").exists())
+        self.assertIn(secret, self.runtime.path(".env").read_text(encoding="utf-8"))
+        preview = json.loads(self.request("POST", "/api/validate", {**self.payload, "auth_mode": "api_key"})[2])
+        receipt = json.loads(self.request("POST", "/api/confirm", {"validation_id": preview["validation_id"]})[2])
+        self.assertNotIn(secret, json.dumps(preview))
+        self.assertNotIn(secret, Path(receipt["config_path"]).read_text(encoding="utf-8"))
+
+    def test_api_key_save_rejects_invalid_input_without_overwriting_existing_key(self):
+        """验证Key输入错误定位到表单，原有凭据保持有效。"""
+        self.runtime.path(".env").write_text("DASHSCOPE_API_KEY=previous-synthetic\n", encoding="utf-8")
+        status, _, body = self.request("POST", "/api/save-api-key", {"value": "invalid synthetic"})
         self.assertEqual(status, 422)
         self.assertEqual(json.loads(body)["field"], "auth_mode")
-        self.assertEqual(self.request("POST", "/api/auth-status", {"auth_mode": "api_key"})[0], 404)
+        self.assertNotIn(b"invalid synthetic", body)
+        self.assertIn("previous-synthetic", self.runtime.path(".env").read_text(encoding="utf-8"))
+
+    def test_confirmed_session_cannot_change_api_key(self):
+        """验证已经确认的页面不能再修改工作区凭据。"""
+        preview = json.loads(self.request("POST", "/api/validate", self.payload)[2])
+        self.request("POST", "/api/confirm", {"validation_id": preview["validation_id"]})
+        self.assertEqual(self.request("POST", "/api/save-api-key", {"value": "synthetic-key"})[0], 422)
+        self.assertFalse(self.runtime.path(".env").exists())
+
+    def test_request_language_applies_to_errors_and_resets_for_chinese(self) -> None:
+        """验证请求语言覆盖协议与字段错误，并保持默认中文。"""
+        english = {"Accept-Language": "en-US"}
+        status, _, body = self.request("GET", "/api/session", token=False, headers=english)
+        self.assertEqual(status, 403)
+        self.assertIn("Reopen the local page from Codex", json.loads(body)["error"])
+        invalid = {**self.payload, "audio_upload_id": "missing"}
+        status, _, body = self.request("POST", "/api/validate", invalid, headers=english)
+        self.assertEqual(status, 422)
+        self.assertEqual(json.loads(body)["error"], "Choose an audio file.")
+        for headers in (None, {"Accept-Language": "fr"}):
+            with self.subTest(headers=headers):
+                status, _, body = self.request("POST", "/api/validate", invalid, headers=headers)
+                self.assertEqual(json.loads(body)["error"], "请选择音频文件。")
+
+    def test_concurrent_http_languages_are_independent(self) -> None:
+        """验证并发HTTP请求使用各自的提示语言。"""
+        invalid = {**self.payload, "audio_upload_id": "missing"}
+
+        def error_in(language: str) -> str:
+            """读取指定页面语言下的字段错误。"""
+            body = self.request("POST", "/api/validate", invalid,
+                                headers={"Accept-Language": language})[2]
+            return str(json.loads(body)["error"])
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            english = pool.submit(error_in, "en")
+            chinese = pool.submit(error_in, "zh-CN")
+            self.assertEqual(english.result(timeout=5), "Choose an audio file.")
+            self.assertEqual(chinese.result(timeout=5), "请选择音频文件。")
+
+    def test_english_context_error_preserves_dynamic_limits(self) -> None:
+        """验证上下文超限提示先翻译模板再填入实际数量。"""
+        payload = {**self.payload, "enhancement_mode": "context", "context": "词" * 401}
+        status, _, body = self.request("POST", "/api/validate", payload,
+                                      headers={"Accept-Language": "en"})
+        self.assertEqual(status, 422)
+        error = json.loads(body)
+        self.assertEqual(error["field"], "context")
+        self.assertIn("401 characters", error["error"])
+        self.assertIn("400 characters or fewer", error["error"])
+        self.assertNotIn("词", error["error"])
+
+    def test_english_preview_translates_audio_warnings_and_keeps_filename(self) -> None:
+        """验证音频警告随页面语言显示，保留用户文件名。"""
+        info = AudioInfo(2, 16000, 7201, self.audio.stat().st_size, "wav", 2)
+        with patch("asr_transcription.application.inputs.probe_audio", return_value=info):
+            status, _, body = self.request("POST", "/api/validate", self.payload,
+                                          headers={"Accept-Language": "en"})
+        self.assertEqual(status, 200)
+        summary = json.loads(body)["summary"]
+        self.assertEqual(summary["audio"]["name"], self.audio.name)
+        self.assertEqual(len(summary["warnings"]), 3)
+        self.assertIn("mono FLAC copy", summary["warnings"][0])
+        self.assertIn("longer than 2 hours", summary["warnings"][1])
+        self.assertIn("2 audio tracks", summary["warnings"][2])
+
+    def test_english_hotword_row_error_identifies_template_header(self) -> None:
+        """验证工作簿和行级错误都使用英文并保留行号。"""
+        workbook = Workbook()
+        workbook.active.append(["wrong", "header"])
+        content = io.BytesIO()
+        workbook.save(content)
+        workbook.close()
+        uploaded = json.loads(self.request("POST", "/api/upload-hotwords", body=content.getvalue(),
+                              headers={"Content-Type": "application/octet-stream",
+                                       "X-File-Name": quote("热词.xlsx"), "Accept-Language": "en"})[2])
+        payload = {**self.payload, "enhancement_mode": "hotwords", "hotwords_upload_id": uploaded["upload_id"]}
+        status, _, body = self.request("POST", "/api/validate", payload,
+                                      headers={"Accept-Language": "en"})
+        self.assertEqual(status, 422)
+        error = json.loads(body)
+        self.assertEqual(error["field"], "hotwords_path")
+        self.assertIn("The first row must contain text and weight", error["error"])
+        self.assertEqual(error["details"][0], {
+            "row": 1, "field": "header", "message": "Use the column headers from the template.",
+        })
+
+    def test_english_api_key_errors_guide_page_input_without_echoing_key(self) -> None:
+        """验证Key空值可填写，保存校验英文提示保持凭据脱敏。"""
+        english = {"Accept-Language": "en"}
+        status, _, body = self.request("POST", "/api/api-key", {}, headers=english)
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body), {"ok": True, "value": ""})
+        status, _, body = self.request("POST", "/api/save-api-key", {"value": ""}, headers=english)
+        self.assertEqual(status, 422)
+        self.assertEqual(json.loads(body)["error"], "Enter your API key.")
+        secret = "synthetic secret-key"
+        status, _, body = self.request("POST", "/api/save-api-key", {"value": secret}, headers=english)
+        self.assertEqual(status, 422)
+        self.assertIn("spaces or line breaks", json.loads(body)["error"])
+        self.assertNotIn(secret, body.decode("utf-8"))
+
+    def test_english_template_keeps_schema_and_translates_example(self) -> None:
+        """验证英文模板沿用现有热词结构并使用英文示例。"""
+        status, _, body = self.request("GET", "/api/hotwords-template", headers={"Accept-Language": "en"})
+        self.assertEqual(status, 200)
+        workbook = load_workbook(io.BytesIO(body))
+        try:
+            sheet = workbook["热词"]
+            self.assertEqual([sheet["A1"].value, sheet["B1"].value], ["text", "weight"])
+            self.assertEqual(sheet["A2"].value, "Example term")
+        finally:
+            workbook.close()

@@ -4,7 +4,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ..models import AudioInfo, Transcript
+from ..models import AudioInfo, AudioRecord, DeliveryReport, ExecutionReport, JobConfig, Transcript
 from ..utils.bailian import BailianFailure, PreparedCommand, prepare_command, recognition_arguments, run_recognition
 from ..utils.environment import Runtime, SetupError
 from ..utils.files import FileError, file_fingerprint
@@ -18,7 +18,7 @@ from .delivery import export_documents
 from .rules import ValidationError, check_audio_limits
 
 
-def _save_status(directory: Path, report: dict) -> bool:
+def _save_status(directory: Path, report: ExecutionReport) -> bool:
     """保存执行记录，返回写入结果并将失败原因附入回执。"""
     report["updated_at"] = datetime.now(timezone.utc).isoformat()
     try:
@@ -33,7 +33,7 @@ def _save_status(directory: Path, report: dict) -> bool:
     return True
 
 
-def job_status(runtime: Runtime, job_id: str) -> dict:
+def job_status(runtime: Runtime, job_id: str) -> ExecutionReport:
     """查询任务的本地状态与最近一次交付结果。"""
     root = job_directory(runtime, job_id)
     report = read_execution(root)
@@ -53,14 +53,14 @@ def job_status(runtime: Runtime, job_id: str) -> dict:
     return report
 
 
-def _attach_delivery(report: dict, delivery: dict) -> dict:
+def _attach_delivery(report: ExecutionReport, delivery: DeliveryReport) -> ExecutionReport:
     """合并导出回执并更新文档就绪状态。"""
-    report.update(delivery=delivery, documents_ready=delivery["status"] == "COMPLETE",
-                  message=delivery["message"])
+    report.update({"delivery": delivery, "documents_ready": delivery["status"] == "COMPLETE",
+                   "message": delivery["message"]})
     return report
 
 
-def _deliver(runtime: Runtime, config: dict, transcript: Transcript, report: dict) -> dict:
+def _deliver(runtime: Runtime, config: JobConfig, transcript: Transcript, report: ExecutionReport) -> ExecutionReport:
     """生成任务文档，将交付结果合并到执行回执。"""
     try:
         delivery = export_documents(runtime, config, transcript)
@@ -71,7 +71,7 @@ def _deliver(runtime: Runtime, config: dict, transcript: Transcript, report: dic
     return _attach_delivery(report, delivery)
 
 
-def export_job(runtime: Runtime, job_id: str) -> dict:
+def export_job(runtime: Runtime, job_id: str) -> ExecutionReport:
     """核对已保存的转写结果并更新任务文档。"""
     config = read_config(runtime, job_id)
     report = read_execution(job_directory(runtime, job_id))
@@ -87,7 +87,7 @@ def export_job(runtime: Runtime, job_id: str) -> dict:
     return _deliver(runtime, config, transcript, report)
 
 
-def _check_input(runtime: Runtime, record: dict) -> Path:
+def _check_input(runtime: Runtime, record: AudioRecord) -> Path:
     """核对会话音频副本的路径、大小和内容摘要，返回实际读取路径。"""
     path = Path(record["path"])
     base = runtime.path(".state/web-uploads")
@@ -101,7 +101,7 @@ def _check_input(runtime: Runtime, record: dict) -> Path:
     return path
 
 
-def prepare_input(runtime: Runtime, config: dict, execution: Path) -> tuple[PreparedCommand, list[str], Path]:
+def prepare_input(runtime: Runtime, config: JobConfig, execution: Path) -> tuple[PreparedCommand, list[str], Path]:
     """核对音频、准备识别命令与结果目录，并按需转换声道。"""
     audio_record = config["audio"]
     source = _check_input(runtime, audio_record)
@@ -125,7 +125,7 @@ def prepare_input(runtime: Runtime, config: dict, execution: Path) -> tuple[Prep
     return command, private, destination
 
 
-def transcribe(runtime: Runtime, job_id: str, *, authorize_upload: bool = False) -> dict:
+def transcribe(runtime: Runtime, job_id: str, *, authorize_upload: bool = False) -> ExecutionReport:
     """按确认快照执行一次BL识别及本地导出，返回已知结果与失败阶段。"""
     if not authorize_upload:
         raise SetupError("保存设置不等于授权上传。需用户明确同意后，使用--authorize-upload执行本次任务。")
@@ -135,12 +135,12 @@ def transcribe(runtime: Runtime, job_id: str, *, authorize_upload: bool = False)
         execution = reserve_execution(runtime, job_id)
     except FileExistsError:
         return job_status(runtime, job_id)
-    report = {"job_id": job_id, "status": "PREPARING", "execution_authorized": True,
+    report: ExecutionReport = {"job_id": job_id, "status": "PREPARING", "execution_authorized": True,
               "authorization_source": "explicit_cli_flag", "cloud_outcome": "not_started",
               "started_at": datetime.now(timezone.utc).isoformat(),
               "executor_pid": os.getpid(), "documents_ready": False}
     if not _save_status(execution, report):
-        report.update(status="STOPPED", message="执行记录未保存，BL尚未启动，音频未上传；未自动重试。")
+        report.update({"status": "STOPPED", "message": "执行记录未保存，BL尚未启动，音频未上传；未自动重试。"})
         return report
     phase = "prepare_input"
     try:
@@ -148,24 +148,24 @@ def transcribe(runtime: Runtime, job_id: str, *, authorize_upload: bool = False)
         command, private, destination = prepare_input(runtime, config, execution)
         report["json_path"] = str(destination)
         # 先记录保守的RUNNING，防止进程启动后崩溃却留下“尚未上传”的记录。
-        report.update(status="RUNNING", cloud_outcome="unknown", message="BL正在执行上传、识别、等待及结果保存。")
+        report.update({"status": "RUNNING", "cloud_outcome": "unknown", "message": "BL正在执行上传、识别、等待及结果保存。"})
         if not _save_status(execution, report):
-            report.update(status="STOPPED", cloud_outcome="not_started",
-                          message="执行记录未保存，BL尚未启动，音频未上传；未自动重试。")
+            report.update({"status": "STOPPED", "cloud_outcome": "not_started",
+                           "message": "执行记录未保存，BL尚未启动，音频未上传；未自动重试。"})
             return report
         phase = "run_bl"
         run_recognition(runtime, command, private)
         phase = "read_result"
         transcript = load_transcript(destination)
         result = transcript.summary()
-        report.update(status="JSON_READY", cloud_outcome="result_received", result=result,
-                      message="BL已结束，转写JSON已保存并通过结构检查；等待本地导出。")
+        report.update({"status": "JSON_READY", "cloud_outcome": "result_received", "result": result,
+                       "message": "BL已结束，转写JSON已保存并通过结构检查；等待本地导出。"})
     except BailianFailure as exc:
         outcome = "unknown" if report["status"] == "RUNNING" and exc.started else "not_started"
         message = ("BL执行已停止，云端结果未知；未自动重试，也未取消云端任务。" if outcome == "unknown"
                    else "BL识别尚未启动，音频未上传；未自动重试。")
-        report.update(status="STOPPED", cloud_outcome=outcome,
-                      error={**exc.report, "phase": phase}, message=message)
+        report.update({"status": "STOPPED", "cloud_outcome": outcome,
+                       "error": {**exc.report, "phase": phase}, "message": message})
     except (Exception, KeyboardInterrupt) as exc:
         # 自有异常只含可公开说明；第三方或程序异常可能带正文，只报告类型和阶段。
         if isinstance(exc, (SetupError, ValidationError, MediaError, FileError)):
@@ -176,9 +176,9 @@ def transcribe(runtime: Runtime, job_id: str, *, authorize_upload: bool = False)
             message = "本地文件操作失败，请检查文件是否存在、目录权限、磁盘空间及文件占用。"
         else:
             message = f"转写程序发生异常，类型：{type(exc).__name__}；未自动重试，请联系开发者检查。"
-        report.update(status="STOPPED", message=message,
-                      error={"source": "local", "code": "LOCAL_EXECUTION_STOPPED", "phase": phase,
-                             "error_type": type(exc).__name__, "explanation": message})
+        report.update({"status": "STOPPED", "message": message,
+                       "error": {"source": "local", "code": "LOCAL_EXECUTION_STOPPED", "phase": phase,
+                                 "error_type": type(exc).__name__, "explanation": message}})
     if not _save_status(execution, report):
         if report["status"] == "JSON_READY":
             report["message"] = "转写JSON已保存并通过检查，但执行记录未保存；本次未生成文档，请保留本回执及JSON，勿重新识别。"

@@ -1,19 +1,21 @@
-# asr-transcription
+# MemoFlow
 
 [中文](README.md) | English
 
-Transcribe recordings in Codex and get Word, Excel, and Markdown documents to review. asr-transcription is a standalone Codex Skill that uses the official [BL CLI](https://github.com/modelstudioai/cli) to access [Alibaba Cloud Model Studio](https://help.aliyun.com/zh/model-studio/what-is-model-studio), with a local web page for transcription settings.
+MemoFlow aims to turn recordings into meeting minutes that follow your preferences and requested format, learning from the examples, requirements, and corrections you confirm.
+
+Stage one is currently available as the `asr-transcription` Skill: transcribe one recording in Codex and receive Word, Excel, and Markdown documents to review. It uses the official [BL CLI](https://github.com/modelstudioai/cli) to access [Alibaba Cloud Model Studio](https://help.aliyun.com/zh/model-studio/what-is-model-studio), with a local web page for transcription settings.
 
 ## Features
 
-- **Recording transcription**: Process one audio file, with timestamps and optional speaker identification.
+- **Recording transcription**: Process one audio file, with timestamps and optional speaker diarization.
 - **Accuracy enhancement**: Import hotwords from Excel and add context text. Both can be used together.
-- **Visual settings**: Add a recording, adjust options, and choose save locations in your browser.
+- **Visual settings**: Add a recording, adjust options, and choose save locations in your browser, with Chinese and English interfaces and light or dark themes.
 - **Document generation**: Create Word, Excel, and Markdown together, keep the original JSON, and export documents again locally.
 
 ## Install the Skill
 
-Download `asr-transcription.zip` from [Releases](https://github.com/hx101700/asr-agent/releases/latest).
+Download the stage-one development preview, `asr-transcription.zip`, from [Releases](https://github.com/hx101700/memoflow/releases).
 
 First, [register an Alibaba Cloud account](https://help.aliyun.com/zh/account/step-1-register-an-alibaba-cloud-account) and follow the [official setup guide](https://help.aliyun.com/zh/model-studio/first-api-call-to-qwen) to complete account verification and activate Model Studio.
 
@@ -33,10 +35,10 @@ After installation, tell Codex:
 Please transcribe this recording.
 ```
 
-Codex uses the Skill to open the local transcription page. Add a recording, adjust the language and speaker settings, and choose where to save the files. For Model Studio authentication, choose:
+Codex uses the Skill to open the local transcription page. Add a recording, adjust the audio language and speaker diarization settings, and choose where to save the files. Use the controls at the top right to switch between Chinese and English, or select System, Light, or Dark appearance. For Model Studio authentication, choose:
 
 - **Console login (recommended)**: Authorize access on the official Alibaba Cloud page. BL manages the credentials.
-- **API Key**: Use your own Beijing-region Model Studio Key. Follow the instructions to put it in `.asr-transcription/.env` under your workspace, then select “Use specified API Key” on the transcription page.
+- **API Key**: Select “Use a standard API Key” on the transcription page, then enter or update your Model Studio Key for China (Beijing). It is saved in the current workspace when you check and preview the settings.
 
 <!-- SCREENSHOT: overview
 Insert a real transcription-page screenshot showing audio selection, settings, and save locations.
@@ -54,11 +56,11 @@ Caption: Provide hotwords and context for recognition. Use public terms and publ
 
 Review and save the settings. Codex guides authentication for your chosen method. Once you confirm transcription, Codex calls BL, generates the three documents, and reports their locations for your review and correction. Transcription sends the recording and enabled enhancement content to Model Studio and may incur charges.
 
-The current stage covers transcription and document delivery. Meeting summaries based on corrected text and document examples are planned for a later stage.
+**Stage two (planned)** will create meeting minutes from reviewed transcripts, document examples, and formatting requirements, then use corrections you confirm to improve later results. Preference storage and feedback adoption will be designed in that stage. The current Skill delivers transcripts for review.
 
 ## Contributing
 
-[Issues](https://github.com/hx101700/asr-agent/issues), feature suggestions, and pull requests are welcome. See the [development documentation](doc/README.md) for code structure, conventions, and verification.
+[Issues](https://github.com/hx101700/memoflow/issues), feature suggestions, and pull requests are welcome. See the [development documentation](doc/README.md) for code structure, conventions, and verification.
 
 ## Related links
 
@@ -67,6 +69,6 @@ The current stage covers transcription and document delivery. Meeting summaries 
 | Alibaba Cloud Model Studio | [Console](https://bailian.console.aliyun.com/) · [Documentation](https://help.aliyun.com/zh/model-studio/) |
 | BL CLI | [Official site](https://bailian.console.aliyun.com/cli) · [GitHub](https://github.com/modelstudioai/cli) |
 | Accuracy enhancement | [Hotwords and context](https://help.aliyun.com/zh/model-studio/improve-asr-accuracy) |
-| asr-transcription | [Usage guide](skills/asr-transcription/references/usage.md) · [Downloads](https://github.com/hx101700/asr-agent/releases) |
+| MemoFlow | [Usage guide](skills/asr-transcription/references/usage.md) · [Downloads](https://github.com/hx101700/memoflow/releases) |
 
 Licensed under [Apache-2.0](LICENSE).

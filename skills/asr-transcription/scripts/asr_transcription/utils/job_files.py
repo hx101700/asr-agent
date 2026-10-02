@@ -4,9 +4,12 @@ import hashlib
 import json
 import os
 import re
+from collections.abc import Mapping
 from pathlib import Path
+from typing import cast
 
 from .. import MODEL
+from ..models import DeliveryReport, ExecutionReport, JobConfig
 from .environment import Runtime, SetupError
 from .files import write_json_atomic
 
@@ -21,7 +24,7 @@ def job_directory(runtime: Runtime, job_id: str) -> Path:
     return path
 
 
-def publish_config(runtime: Runtime, config: dict) -> Path:
+def publish_config(runtime: Runtime, config: JobConfig) -> Path:
     """保存确认配置及其内容摘要，完成写入后发布配置文件。"""
     directory = job_directory(runtime, config["job_id"])
     directory.mkdir(parents=True, exist_ok=False)
@@ -40,7 +43,7 @@ def publish_config(runtime: Runtime, config: dict) -> Path:
     return destination
 
 
-def read_config(runtime: Runtime, job_id: str) -> dict:
+def read_config(runtime: Runtime, job_id: str) -> JobConfig:
     """读取已确认配置，并核对保存协议与内容摘要。"""
     path = job_directory(runtime, job_id) / "config.json"
     checksum = path.with_suffix(".sha256")
@@ -61,7 +64,8 @@ def read_config(runtime: Runtime, job_id: str) -> dict:
         raise SetupError("无法读取已确认的配置，请通过网页重新检查并保存。") from exc
     if not valid:
         raise SetupError("任务配置与当前模型、地域或保存协议不符，未执行。")
-    return config
+    # 配置由publish_config生成；上面的协议和摘要检查确定读取的是确认快照。
+    return cast(JobConfig, config)
 
 
 def reserve_execution(runtime: Runtime, job_id: str) -> Path:
@@ -71,7 +75,7 @@ def reserve_execution(runtime: Runtime, job_id: str) -> Path:
     return path
 
 
-def read_execution(root: Path) -> dict | None:
+def read_execution(root: Path) -> ExecutionReport | None:
     """读取执行记录；已占用任务的记录缺失或损坏时返回结果未知。"""
     execution = root / "execution"
     if execution.resolve() != execution:
@@ -83,13 +87,13 @@ def read_execution(root: Path) -> dict | None:
         if (not isinstance(report, dict) or report.get("job_id") != root.name
                 or report.get("status") not in ("PREPARING", "RUNNING", "STOPPED", "JSON_READY")):
             raise ValueError("invalid status")
-        return report
+        return cast(ExecutionReport, report)
     except (OSError, ValueError):
         return {"job_id": root.name, "status": "OUTCOME_UNKNOWN", "cloud_outcome": "unknown",
                 "message": "任务已被占用但执行记录不可读，不能重新提交。请检查本地进程和记录。"}
 
 
-def read_delivery(root: Path) -> dict | None:
+def read_delivery(root: Path) -> DeliveryReport | None:
     """读取任务的导出状态，记录损坏时返回结果未知。"""
     directory = root / "delivery"
     if not directory.exists():
@@ -108,7 +112,7 @@ def read_delivery(root: Path) -> dict | None:
                     or any(not isinstance(record, dict) or record.get("status") != "READY"
                            or not record.get("path") for record in files.values())):
                 raise ValueError("incomplete delivery")
-        return report
+        return cast(DeliveryReport, report)
     except (OSError, ValueError, TypeError):
         return {"status": "OUTCOME_UNKNOWN", "message": "本地导出记录不可读，请检查已有文件；不会重新识别或自动导出。"}
 
@@ -122,7 +126,7 @@ def prepare_delivery(root: Path) -> Path:
     return state
 
 
-def result_path(config: dict) -> Path:
+def result_path(config: JobConfig) -> Path:
     """解析已确认的JSON保存路径，并核对任务目录归属。"""
     directory = Path(config["json_directory"])
     if (not directory.is_absolute() or directory.name != "json"
@@ -137,7 +141,7 @@ def prepare_result(runtime: Runtime, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=False)
 
 
-def prepare_documents(runtime: Runtime, config: dict) -> Path:
+def prepare_documents(runtime: Runtime, config: JobConfig) -> Path:
     """核对并创建或复用已确认的文档保存目录。"""
     base = Path(config["document_directory"])
     if (not base.is_absolute() or base.name != "documents"
@@ -148,6 +152,6 @@ def prepare_documents(runtime: Runtime, config: dict) -> Path:
     return base
 
 
-def save_record(directory: Path, report: dict) -> None:
+def save_record(directory: Path, report: Mapping[str, object]) -> None:
     """原子保存本目录的执行或导出状态记录。"""
     write_json_atomic(directory / "status.json", report)

@@ -4,20 +4,28 @@
 
 ## 产品
 
-asr-transcription是单录音转写Skill，支持网页配置、热词与上下文、说话人区分，固定通过BL2.1.0调用北京地域qwen-audio-3.0-asr-flash-filetrans，交付原始JSON、Word、Excel和Markdown供用户校对。会议总结属于后续阶段。
+MemoFlow 的目标是把语音输入整理为符合用户习惯、重点要求和指定格式的会议纪要，并从用户确认的范例与修改反馈中持续学习。当前已实现第一阶段 `asr-transcription`：通过 BL 2.1.0 调用北京地域的固定模型，交付原始 JSON、Word、Excel 和 Markdown 校对稿。个性化纪要与反馈学习属于尚待实现的第二阶段。
+
+## 当前工作
+
+配置页面已采用 Vue 3、TypeScript 和 Element Plus，提供中文/English 切换及跟随系统、浅色、深色主题。API Key 可直接在网页填写、修改，在检查时保存到当前工作目录；转写执行继续从该固定文件读取。Python 已补充共享协议类型和开发阶段静态检查。前端源码放在仓库 `frontend/`，通过 Vite 构建为 Skill 内的网页资源，用户 ZIP 只包含构建结果。
+
+Vue 页面与 Python 类型改动已完成既有回归。本次对照官方 Skill 写作建议及实际代码完成独立情境复核，补充保存回执恢复、工作目录凭据范围和基础解释器诊断指引；新增终端回执丢失场景验证通过。详细证据见[ACCEPTANCE](ACCEPTANCE.md)。
+
+本地包：`dist/asr-transcription.zip`，42个文件、268874字节，SHA-256：`1a252216683db7867a2b68c15440fb9dc6995a190b96a655a1402de0f89d8bfb`。CRC、固定清单、每文件内容与 Skill 源码均核对通过；包内没有 TypeScript/Vue 源码、开发工具、测试、UML 或用户数据。
 
 ## 实现
 
 - Skill源位于skills/asr-transcription，代码按入口→application→utils组织。BL保持公开CLI适配模块，不另设BL Skill。
 - 用户工作目录显式传入--workspace；程序资源、私有运行目录与输出位置有明确边界。
 - 运行根与Skill重叠、原生选择/默认及最终输出写入Skill均被拒绝；Python检查和安装进程使用-I隔离工作目录模块。
-- 源码、配置、文档和9份UML已逐文件阅读，审查依据见[REVIEW](REVIEW.md)。
+- Vue组件、页面用例、HTTP协议与Python业务边界已按实现核对，审查依据见[REVIEW](REVIEW.md)。
 
-## 验证与发布
+## 版本与远端
 
-完整回归及独立环境验收已完成：解压源码267项Python检查无跳过通过，前端24项通过；新工作目录联网准备成功。发行ZIP共42个文件、107802字节，SHA-256：`ab9835fd40c52ea0fe7461ae3dbe233208b5e459d7217b4969cd49ad253f7643`，清单、CRC、源码及包边界核对通过。具体范围见[ACCEPTANCE](ACCEPTANCE.md)。
+GitHub 仓库已重命名为 [hx101700/memoflow](https://github.com/hx101700/memoflow)，默认分支为 `dev`，本地 origin 已同步。项目版本保持 `0.1.0`；仅通过验收并发布到 `master` 时才变更项目版本，开发提交沿用当前版本。
 
-已按用户要求替换现有[v0.1.0](https://github.com/hx101700/asr-agent/releases/tag/v0.1.0)，运行代码提交`9e6f739dd424bab6d4f10273186c212f587a8246`已推送dev。新版附件为[asr-transcription.zip](https://github.com/hx101700/asr-agent/releases/download/v0.1.0/asr-transcription.zip)，旧附件已删除；公开下载与本地文件逐字节一致，发布说明及中英文入口已核对。未新建版本，master保持`6c8371135d92b9f9d3bd52ca9ee246747f0c7f5e`，未合并本次改动。
+正在把当前开发代码和文档同步到 `dev`，并更新现有 `v0.1.0` 开发预览及 ZIP。此前的远端标签指向 `c0e84d169d4f9a8a5a67d89145bae680a86379e6`；更新完成后补记公开下载核对结果。`master` 保持 `6c8371135d92b9f9d3bd52ca9ee246747f0c7f5e`，本次不合并。
 
 ## 接续
 

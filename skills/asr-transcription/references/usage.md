@@ -26,6 +26,8 @@ bootstrap从Skill中的Python/npm依赖锁安装到工作目录的`.asr-transcri
 & $pythonPath -X utf8 $scriptPath --workspace $workspaceDir doctor
 ```
 
+工作目录的虚拟环境解释器缺失或无法运行时，使用首次准备环境的 CPython 3.12 执行 `python -S -X utf8 $scriptPath --workspace $workspaceDir doctor`。诊断只报告问题，修复按实际回执处理。
+
 Python依赖使用HTTPS阿里云PyPI镜像，BL由npm安装，均校验固定依赖锁。Skill不附带Python、Node、wheel或已安装依赖，不修改系统PATH或全局包。
 
 ## 认证与运行
@@ -38,13 +40,13 @@ Python依赖使用HTTPS阿里云PyPI镜像，BL由npm安装，均校验固定依
 & $pythonPath -X utf8 $scriptPath --workspace $workspaceDir login
 ```
 
-已有可用配置直接复用。首次状态不明或排障时可运行`console-status`；它报告本机配置存在性，不能代表云端权限已验证。账号准备见[阿里云官方指引](https://help.aliyun.com/zh/model-studio/first-api-call-to-qwen)。
+复用的是当前工作目录 `.asr-transcription/.state/bailian` 中的 BL 模型凭据。其他目录或系统级 BL 登录不代表这个工作目录已经配置。状态不明时运行`console-status`：`configured=true`表示模型 Key 存在；只有`console_configured=true`而`configured=false`时，先处理缺少模型凭据的提示。该命令只查询本机配置，云端鉴权由实际 BL 调用完成。账号准备见[阿里云官方指引](https://help.aliyun.com/zh/model-studio/first-api-call-to-qwen)。
 
 ### 指定API Key
 
-bootstrap在`WORKSPACE/.asr-transcription/.env`创建空模板。用户在本机填写`DASHSCOPE_API_KEY`，再在页面勾选“使用指定API Key”。此模式不运行login，正式执行读取当时的Key。密钥不填写到聊天或参数中。
+在页面选择“使用指定 API Key”，填写或修改北京地域的百炼 Key。已有 Key 会加载到密码输入框，默认遮蔽；点击“检查并预览”时，工具会将输入保存到当前工作目录的 `.asr-transcription/.env`。可以直接在网页完成配置，无需提前编辑文件。
 
-页面通过受保护的本机请求显示Key，默认遮蔽。能读取Key不表示已经在线验证，云端鉴权由BL处理。
+此模式不运行login，正式执行读取该文件中当时的Key。密钥不填写到聊天或命令参数中。页面读取和保存均通过受保护的本机请求完成，云端鉴权由BL处理。
 
 ### 打开转写页面
 
@@ -56,6 +58,8 @@ bootstrap在`WORKSPACE/.asr-transcription/.env`创建空模板。用户在本机
 
 ## 网页配置
 
+页面右上角提供中文/English和跟随系统、浅色、深色外观。界面语言与“音频语言”分别设置，界面切换不改变模型地域或转写原文。切换语言会保留当前输入，并要求重新检查已有预览；上传、检查或保存期间先等待当前操作结束。外观设置可独立调整。
+
 1. 添加一个音频文件。
 2. 选择语言、说话人区分和参考人数。说话人区分初始开启；多声道会提示生成单声道FLAC副本，原文件保留。
 3. 需要热词时下载模板、填写并导入Excel；需要上下文时填写含相关词语的参考文本。热词与上下文可同时使用。
@@ -63,6 +67,8 @@ bootstrap在`WORKSPACE/.asr-transcription/.env`创建空模板。用户在本机
 5. 检查并预览，核对后保存设置，再由Codex按本次上传授权开始转写。
 
 文件添加和设置保存都在本机完成。保存后的热词来自已确认的词典快照；修改Excel后须重新导入确认。没有保存的编辑在刷新后不会恢复。
+
+浏览器只保存当前页面来源下的界面语言和主题偏好。录音内容、Key、热词和上下文保留在本次交互与工作目录中，网页不会将这些内容存入浏览器持久存储。界面语言不改变三种转写文档的既定标题与排版。
 
 | 输入 | 当前要求 |
 | --- | --- |
@@ -76,6 +82,8 @@ GB和MB按十进制计量。开启说话人区分时，官方建议音频不超�
 ## 执行与交付
 
 同一个serve进程保存成功后输出`event="configured"`回执。Codex使用其中的确切job_id，在授权覆盖本次录音及增强内容后执行一次：
+
+若网页已保存而终端没有取得回执，使用[保存回执恢复](errors.md#保存回执恢复)核对任务，不根据文件时间猜测任务编号。
 
 ```powershell
 $jobId = '替换为网页保存回执中的编号'

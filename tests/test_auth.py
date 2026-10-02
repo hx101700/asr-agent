@@ -2,7 +2,7 @@ import json
 import os
 from unittest.mock import patch
 
-from asr_transcription.utils.auth import api_key_status, bailian_environment, read_api_key
+from asr_transcription.utils.auth import api_key_status, bailian_environment, read_api_key, write_api_key
 from asr_transcription.utils.environment import SetupError
 from tests.support import RuntimeTestCase
 
@@ -59,3 +59,32 @@ class ApiKeyTests(RuntimeTestCase):
         """验证拒绝未知鉴权方式。"""
         with self.assertRaises(SetupError):
             bailian_environment(self.runtime, "unknown")
+
+    def test_page_read_can_return_empty_while_execution_requires_key(self):
+        """验证未填写凭据时页面可编辑，而执行仍要求有效Key。"""
+        self.assertEqual(read_api_key(self.runtime, required=False), "")
+        with self.assertRaises(SetupError):
+            read_api_key(self.runtime)
+
+    def test_save_preserves_other_settings_and_roundtrips_literal_key(self):
+        """验证修改Key保留注释和其他设置，并按原文保存特殊字符。"""
+        path = self.runtime.path(".env")
+        path.write_text("# local settings\nOTHER_VALUE=keep\nDASHSCOPE_API_KEY=old-synthetic-key\n", encoding="utf-8")
+        write_api_key(self.runtime, "  synthetic-${VALUE}-'quoted'  ")
+        text = path.read_text(encoding="utf-8")
+        self.assertIn("# local settings", text)
+        self.assertIn("OTHER_VALUE=keep", text)
+        self.assertNotIn("old-synthetic-key", text)
+        self.assertEqual(read_api_key(self.runtime), "synthetic-${VALUE}-'quoted'")
+        self.assertFalse((self.runtime.skill_root / ".env").exists())
+        self.assertFalse((self.runtime.workspace / ".env").exists())
+
+    def test_invalid_save_keeps_previous_key_and_hides_input(self):
+        """验证无效输入不覆盖已有Key，错误说明不包含输入。"""
+        write_api_key(self.runtime, "previous-synthetic-key")
+        before = self.runtime.path(".env").read_bytes()
+        for value in (None, "", "synthetic secret", "synthetic\nsecret"):
+            with self.subTest(value_type=type(value).__name__), self.assertRaises(SetupError) as error:
+                write_api_key(self.runtime, value)
+            self.assertNotIn("synthetic", str(error.exception))
+            self.assertEqual(self.runtime.path(".env").read_bytes(), before)

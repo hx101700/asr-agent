@@ -3,6 +3,7 @@
 import argparse
 import json
 import sys
+from collections.abc import Callable, Mapping
 from pathlib import Path
 
 from .application.bootstrap import bootstrap
@@ -32,6 +33,7 @@ def main(argv: list[str] | None = None) -> int:
         if name == "transcribe":
             command.add_argument("--authorize-upload", action="store_true", help="用户明确同意将本次音频及所选增强内容发送至阿里云")
     args = parser.parse_args(argv)
+    report: Mapping[str, object]
     try:
         runtime = Runtime(args.workspace, Path(__file__).resolve().parents[2])
         if args.command == "serve":
@@ -50,7 +52,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             if args.command == "login":
                 print(json.dumps({"status": "WAITING_FOR_LOGIN", "message": "请在最后打开的阿里云官方页面完成授权。Windows可能先出现一个缺少参数的页面，程序会接收BL的完整备用链接并打开一次。最多等待15分钟；未打开时可按Ctrl+C停止。"}, ensure_ascii=False), flush=True)
-            actions = {
+            actions: dict[str, Callable[[Runtime], Mapping[str, object]]] = {
                 "doctor": doctor, "bootstrap": bootstrap, "api-key-status": api_key_status,
                 "console-status": console_status, "login": login_console,
             }

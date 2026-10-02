@@ -17,7 +17,7 @@ def load_transcript(path: Path) -> Transcript:
         result = json.loads(content.decode("utf-8"))
         if not isinstance(result, dict) or not isinstance(result["transcripts"], list):
             raise ValueError("unexpected document")
-        sentences = []
+        sentences: list[Sentence] = []
         for track_index, track in enumerate(result["transcripts"], 1):
             if not isinstance(track, dict) or not isinstance(track["sentences"], list):
                 raise ValueError("unexpected track")

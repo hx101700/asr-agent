@@ -3,14 +3,22 @@
 import hashlib
 import json
 import os
+from collections.abc import Collection, Mapping
 from pathlib import Path
+from .i18n import translate
+
+from ..models import FileFingerprint, FileStat
 
 
 class FileError(ValueError):
     """表示可向用户展示的本机文件错误。"""
 
+    def __init__(self, message: str) -> None:
+        """按当前界面语言提供文件操作提示。"""
+        super().__init__(translate(message))
 
-def resolve_input(root: Path, value: str | Path, allowed_suffixes) -> Path:
+
+def resolve_input(root: Path, value: object, allowed_suffixes: Collection[str]) -> Path:
     """核对输入的会话归属、真实路径、文件类型和扩展名。"""
     if not isinstance(value, (str, Path)) or not str(value).strip():
         raise FileError("本机文件位置无效，请重新添加文件。")
@@ -29,7 +37,7 @@ def resolve_input(root: Path, value: str | Path, allowed_suffixes) -> Path:
         raise FileError("无法读取指定文件，请检查路径和访问权限。") from exc
 
 
-def file_fingerprint(path: Path) -> dict:
+def file_fingerprint(path: Path) -> FileFingerprint:
     """读取完整内容建立SHA基线，并检查读取期间的常规修改。"""
     try:
         before = path.stat()
@@ -47,7 +55,7 @@ def file_fingerprint(path: Path) -> dict:
         raise FileError("无法读取文件，请检查访问权限后重新校验。") from exc
 
 
-def check_file_unchanged(path: Path, fingerprint: dict) -> None:
+def check_file_unchanged(path: Path, fingerprint: FileStat) -> None:
     """比较文件大小与修改时间，检查文件是否发生变化。"""
     current = path.stat()
     if (current.st_size, current.st_mtime_ns) != (
@@ -55,7 +63,7 @@ def check_file_unchanged(path: Path, fingerprint: dict) -> None:
         raise FileError("文件在校验期间发生变化，请重新校验。")
 
 
-def write_json_atomic(path: Path, payload: dict) -> None:
+def write_json_atomic(path: Path, payload: Mapping[str, object]) -> None:
     """写入JSON临时文件，再原子替换目标记录。"""
     temporary = path.with_suffix(path.suffix + ".tmp")
     with temporary.open("w", encoding="utf-8") as stream:

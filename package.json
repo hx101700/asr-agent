@@ -1,0 +1,28 @@
+{
+  "name": "memoflow-development",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check:web": "vue-tsc --noEmit -p frontend/tsconfig.json",
+    "build:web": "npm run check:web && vite build --config frontend/vite.config.ts",
+    "test:web": "tsx --test tests/test_frontend.ts tests/test_i18n.ts",
+    "test:browser": "tsx --test tests/test_browser.ts"
+  },
+  "dependencies": {
+    "element-plus": "2.14.7",
+    "vue": "3.5.43"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "@vitejs/plugin-vue": "6.0.9",
+    "playwright": "1.62.1",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vite": "8.3.2",
+    "vue-tsc": "3.3.12"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  }
+}

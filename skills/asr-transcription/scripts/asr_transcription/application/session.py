@@ -4,11 +4,15 @@ import secrets
 import tempfile
 import threading
 import uuid
+from collections.abc import Mapping
 from datetime import datetime, timezone
+from io import BufferedIOBase
 from pathlib import Path
+from typing import BinaryIO, TypedDict, cast
 
 from .. import MODEL
-from ..utils.auth import read_api_key
+from ..models import AuthMode, ConfirmationReceipt, EnhancementMode, JobConfig
+from ..utils.auth import read_api_key, write_api_key
 from ..utils.directory_picker import DirectoryPicker
 from ..utils.environment import Runtime, SetupError
 from ..utils.files import FileError, check_file_unchanged, resolve_input
@@ -24,7 +28,7 @@ from .rules import (
 MAX_LOCAL_AUDIO_BYTES = 2_000_000_000
 
 
-def output_directory(runtime: Runtime, value: str, field: str, approved: Path | None = None) -> Path:
+def output_directory(runtime: Runtime, value: object, field: str, approved: Path | None = None) -> Path:
     """解析并校验本次会话的保存目录。"""
     try:
         if value == "default":
@@ -47,20 +51,35 @@ def output_directory(runtime: Runtime, value: str, field: str, approved: Path | 
         raise ValidationError("此文件夹无法保存文件，请选择其他位置。", field) from exc
 
 
+class UploadRecord(TypedDict):
+    """保存当前会话已完整接收文件的本机位置。"""
+
+    path: str
+    name: str
+    kind: str
+
+
+class Draft(TypedDict):
+    """关联一次成功预览及其待确认的配置快照。"""
+
+    id: str
+    config: JobConfig
+
+
 class Session:
-    def __init__(self, runtime: Runtime):
+    def __init__(self, runtime: Runtime) -> None:
         """初始化会话令牌、上传登记和目录选择器。"""
         self.runtime = runtime
         self.token = secrets.token_urlsafe(32)
         self._state_lock = threading.Lock()
-        self.draft = None
-        self.receipt = None
+        self.draft: Draft | None = None
+        self.receipt: ConfirmationReceipt | None = None
         self.upload_directory = runtime.root.resolve() / ".state/web-uploads" / uuid.uuid4().hex
-        self.uploads = {}
-        self.output_directories = {}
+        self.uploads: dict[str, UploadRecord] = {}
+        self.output_directories: dict[str, Path] = {}
         self._picker = DirectoryPicker()
         self._closed = threading.Event()
-        self._pending_uploads = set()
+        self._pending_uploads: set[str] = set()
 
     def _require_open(self) -> None:
         """检查会话是否处于开放状态。"""
@@ -79,10 +98,11 @@ class Session:
             kind = next(iter(self._pending_uploads))
             raise ValidationError("文件仍在添加，请稍候。", f"{kind}_upload_id")
 
-    def select_directory(self, kind: str, picker_id: str | None = None) -> dict:
+    def select_directory(self, kind: object, picker_id: object = None) -> dict[str, object]:
         """打开原生目录窗口，校验并登记所选保存位置。"""
         if kind not in ("json", "document"):
             raise ValidationError("未知的保存位置。", "directory")
+        kind = cast(str, kind)
         request_id = picker_id if picker_id is not None else uuid.uuid4().hex
         with self._state_lock:
             self._require_editable()
@@ -111,7 +131,7 @@ class Session:
             self.draft = None
         return {"ok": True, "cancelled": False, "path": str(path)}
 
-    def cancel_directory(self, picker_id: str) -> dict:
+    def cancel_directory(self, picker_id: object) -> dict[str, bool]:
         """取消指定请求的目录选择等待。"""
         # 取消仅经过选择器自己的短锁，不等待文件接收、指纹或Excel校验。
         try:
@@ -120,18 +140,29 @@ class Session:
             raise ValidationError(str(exc), "directory") from exc
         return {"ok": True}
 
-    def api_key_display(self) -> dict:
+    def api_key_display(self) -> dict[str, str | bool]:
         """读取工作目录中的API Key，返回本机页面所需的显示数据。"""
         try:
-            return {"ok": True, "value": read_api_key(self.runtime)}
+            return {"ok": True, "value": read_api_key(self.runtime, required=False)}
         except (SetupError, OSError, UnicodeError) as exc:
             message = str(exc) if isinstance(exc, SetupError) else "无法读取 .env 文件。"
             raise ValidationError(message, "auth_mode") from exc
 
-    def description(self) -> dict:
+    def save_api_key(self, value: object) -> dict[str, bool]:
+        """保存当前页面填写的Key，返回完成状态。"""
+        with self._state_lock:
+            self._require_editable()
+            try:
+                write_api_key(self.runtime, value)
+            except (SetupError, OSError, UnicodeError) as exc:
+                message = str(exc) if isinstance(exc, SetupError) else "无法保存 API Key，请检查工作目录的访问权限。"
+                raise ValidationError(message, "auth_mode") from exc
+        return {"ok": True}
+
+    def description(self) -> dict[str, object]:
         """返回模型信息、表单选项、默认目录和确认回执。"""
         with self._state_lock:
-            return {"model": MODEL, "region": "华北2（北京）",
+            return {"model": MODEL, "region": "cn-beijing",
                     "output_defaults": {"json": str(self.runtime.output_root),
                                         "document": str(self.runtime.output_root)},
                     "languages": LANGUAGES,
@@ -143,7 +174,7 @@ class Session:
                                "speaker_max": MAX_SPEAKERS},
                     "confirmed": self.receipt}
 
-    def upload(self, kind: str, name: str, source, size: int) -> dict:
+    def upload(self, kind: str, name: str, source: BinaryIO | BufferedIOBase, size: int) -> dict[str, object]:
         """接收文件字节，保存会话副本并返回上传编号。"""
         if kind not in ("audio", "hotwords"):
             raise ValidationError("不支持的文件用途。", "upload")
@@ -202,7 +233,7 @@ class Session:
                     if self._closed.is_set():
                         self._remove_empty_upload_directory()
 
-    def uploaded(self, identifier, kind: str) -> dict:
+    def uploaded(self, identifier: object, kind: str) -> UploadRecord:
         """按会话上传编号查找指定用途的已完成副本。"""
         if not isinstance(identifier, str) or identifier not in self.uploads:
             raise ValidationError("请选择音频文件。" if kind == "audio" else "请选择热词文件。", f"{kind}_upload_id")
@@ -224,7 +255,7 @@ class Session:
             self._closed.set()
         self._picker.close()
         with self._state_lock:
-            keep = set()
+            keep: set[str] = set()
             if self.receipt and self.draft:
                 config = self.draft["config"]
                 keep.add(config["audio"]["path"])
@@ -235,7 +266,7 @@ class Session:
                     Path(record["path"]).unlink(missing_ok=True)
             self._remove_empty_upload_directory()
 
-    def validate(self, payload: dict) -> dict:
+    def validate(self, payload: Mapping[str, object]) -> dict[str, object]:
         """读取已上传内容并应用规则，生成确认快照和面向网页的预览。"""
         with self._state_lock:
             self._require_editable()
@@ -246,20 +277,22 @@ class Session:
                        "language_hint", "speaker_count"}
             if set(payload) - allowed:
                 raise ValidationError("请求含不支持的配置字段。", "form")
-            mode = payload.get("auth_mode")
-            if mode not in ("console", "api_key"):
+            mode_value = payload.get("auth_mode")
+            if mode_value not in ("console", "api_key"):
                 raise ValidationError("请选择有效的鉴权方式。", "auth_mode")
+            mode = cast(AuthMode, mode_value)
             diarization = payload.get("diarization_enabled")
             recognition_options = validate_options(payload, diarization)
             source = self.uploaded(payload.get("audio_upload_id"), "audio")
             audio = validate_audio(self.upload_directory, source["path"], diarization)
             audio["name"] = source["name"]
-            enhancement = payload.get("enhancement_mode")
+            enhancement_value = payload.get("enhancement_mode")
             warnings = list(audio["warnings"])
             hotwords = None
             context = None
-            if enhancement not in ("none", "hotwords", "context", "both"):
+            if enhancement_value not in ("none", "hotwords", "context", "both"):
                 raise ValidationError("请选择有效的识别增强方式。", "enhancement_mode")
+            enhancement = cast(EnhancementMode, enhancement_value)
             if enhancement in ("hotwords", "both"):
                 source = self.uploaded(payload.get("hotwords_upload_id"), "hotwords")
                 hotwords = load_hotwords(self.upload_directory, source["path"])
@@ -270,9 +303,9 @@ class Session:
             job_id = uuid.uuid4().hex
             json_base = output_directory(self.runtime, payload.get("json_directory"), "json_directory", self.output_directories.get("json"))
             document_base = output_directory(self.runtime, payload.get("document_directory"), "document_directory", self.output_directories.get("document"))
-            config = {
+            config: JobConfig = {
                 "schema_version": 1, "job_id": job_id, "model": MODEL, "region": "cn-beijing",
-                "auth_mode": mode, "audio": audio, "diarization_enabled": diarization,
+                "auth_mode": mode, "audio": audio, "diarization_enabled": cast(bool, diarization),
                 "recognition_options": recognition_options,
                 "enhancement": {"mode": enhancement, "hotwords": hotwords, "context": context},
                 "json_directory": str(json_base / job_id / "json"),
@@ -282,8 +315,7 @@ class Session:
             summary = {
                 "auth_mode": mode,
                 "audio": {"name": audio["name"], **{
-                    field: audio["metadata"][field] for field in (
-                        "channels", "sample_rate", "duration_seconds", "size_bytes", "format_name")}},
+                    field: value for field, value in audio["metadata"].items() if field != "audio_tracks"}},
                 "enhancement": {"mode": enhancement, "count": hotwords["count"] if hotwords else 0,
                                 "context_chars": len(context) if context else 0},
                 "json_directory": config["json_directory"], "document_directory": config["document_directory"],
@@ -292,7 +324,7 @@ class Session:
             self.draft = {"id": secrets.token_urlsafe(24), "config": config}
             return {"ok": True, "validation_id": self.draft["id"], "summary": summary}
 
-    def confirm(self, validation_id: str) -> dict:
+    def confirm(self, validation_id: object) -> ConfirmationReceipt:
         """保存指定预览的配置快照并返回任务回执。"""
         with self._state_lock:
             self._require_open()

@@ -18,7 +18,7 @@ from ..utils.environment import (
 )
 
 
-def bootstrap(runtime: Runtime) -> dict:
+def bootstrap(runtime: Runtime) -> dict[str, str]:
     """检查本机运行时，按Skill依赖锁准备工作区环境与Key模板。"""
     check_python()
     node, _ = check_node(runtime)

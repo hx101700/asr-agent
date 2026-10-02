@@ -3,6 +3,7 @@
 import argparse
 import json
 from pathlib import Path
+from typing import TypedDict
 from zipfile import ZIP_DEFLATED, ZipFile
 
 
@@ -35,13 +36,22 @@ REQUIRED_FILES = (
     "scripts/asr_transcription/utils/files.py",
     "scripts/asr_transcription/utils/job_files.py",
     "scripts/asr_transcription/utils/hotwords.py",
+    "scripts/asr_transcription/utils/i18n.py",
     "scripts/asr_transcription/static/index.html",
     "scripts/asr_transcription/static/app.css",
-    "scripts/asr_transcription/static/app.mjs",
-    "scripts/asr_transcription/static/model.mjs",
-    "scripts/asr_transcription/static/view.mjs",
-    "scripts/asr_transcription/static/api.mjs",
+    "scripts/asr_transcription/static/app.js",
+    "scripts/asr_transcription/static/favicon.svg",
+    "scripts/asr_transcription/static/THIRD_PARTY_LICENSES.txt",
 )
+
+
+class BuildReport(TypedDict):
+    """描述发行文件及其固定清单。"""
+
+    status: str
+    path: str
+    file_count: int
+    files: list[str]
 
 
 def release_files(skill_root: Path) -> dict[str, Path]:
@@ -53,7 +63,7 @@ def release_files(skill_root: Path) -> dict[str, Path]:
     return dict(sorted(files.items()))
 
 
-def build_zip(root: Path, destination: Path | None = None) -> dict:
+def build_zip(root: Path, destination: Path | None = None) -> BuildReport:
     """从仓库的 Skill 源文件创建 ZIP 并返回包清单。"""
     root = root.resolve(strict=True)
     files = release_files(root / SKILL_DIRECTORY)

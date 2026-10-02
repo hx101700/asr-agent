@@ -1,19 +1,21 @@
-# asr-transcription
+# MemoFlow
 
 中文 | [English](README.en.md)
 
-在 Codex 中转写录音，得到可供校对的 Word、Excel 和 Markdown。asr-transcription 是一个独立的 Codex Skill，通过官方 [BL CLI](https://github.com/modelstudioai/cli) 调用[阿里云百炼](https://help.aliyun.com/zh/model-studio/what-is-model-studio)的语音识别能力，并提供本机网页帮助你配置转写。
+MemoFlow 的目标是把录音整理成符合你习惯和指定格式的会议纪要，并从你提供的范例、格式要求与确认的修改反馈中持续学习。
+
+当前可用的是第一阶段的 `asr-transcription` Skill：在 Codex 中转写单个录音，生成可供校对的 Word、Excel 和 Markdown。它通过官方 [BL CLI](https://github.com/modelstudioai/cli) 调用[阿里云百炼](https://help.aliyun.com/zh/model-studio/what-is-model-studio)，并提供本机网页帮助你配置转写。
 
 ## 功能特性
 
 - **录音转写**：处理单个音频，保留时间戳，支持区分发言人。
 - **精度增强**：从 Excel 导入热词，添加上下文参考文本，两种方式可以同时使用。
-- **可视化配置**：在浏览器中添加录音、调整转写设置并选择保存位置。
+- **可视化配置**：在浏览器中添加录音、调整设置并选择保存位置，支持中英文界面及浅色、深色主题。
 - **文档生成**：同时生成 Word、Excel 和 Markdown，保留原始 JSON，支持本地重新导出。
 
 ## Skill 安装
 
-从 [Releases](https://github.com/hx101700/asr-agent/releases/latest) 下载 `asr-transcription.zip`。
+从 [Releases](https://github.com/hx101700/memoflow/releases) 下载第一阶段的开发预览包 `asr-transcription.zip`。
 
 使用前，请先[注册阿里云账号](https://help.aliyun.com/zh/account/step-1-register-an-alibaba-cloud-account)，按[官方指引](https://help.aliyun.com/zh/model-studio/first-api-call-to-qwen)完成实名认证、开通百炼服务等准备。
 
@@ -33,10 +35,10 @@ Skill 安装位置存放工具与说明；你选择的工作目录存放运行�
 帮我转写这段录音。
 ```
 
-Codex 会使用这个 Skill 打开本机转写网页。按页面提示添加录音，调整语言、说话人区分等设置，并选择保存位置。百炼认证可选择：
+Codex 会使用这个 Skill 打开本机转写网页。按页面提示添加录音，调整音频语言、说话人区分等设置，并选择保存位置。页面右上角可切换中文/English，以及跟随系统、浅色或深色外观。百炼认证可选择：
 
 - **控制台登录（推荐）**：在阿里云官方网页完成授权，由 BL 管理登录凭据。
-- **API Key**：使用自己的北京地域百炼 Key，按提示填入工作目录下的 `.asr-transcription/.env`，在转写页面选择“使用指定 API Key”。
+- **API Key**：在转写页面选择“使用指定 API Key”，填入或修改自己的北京地域百炼 Key。检查并预览时会保存到当前工作目录。
 
 <!-- SCREENSHOT: overview
 在此放实际转写页面截图，展示添加录音、转写设置和保存位置。
@@ -54,11 +56,11 @@ Codex 会使用这个 Skill 打开本机转写网页。按页面提示添加录�
 
 核对并保存设置后，Codex 会按所选方式引导认证。确认开始转写后，Codex 调用 BL 完成识别，生成三种文档并告知保存位置，供你检查和校对。转写会将录音及启用的增强内容发送到百炼，可能产生调用费用。
 
-当前完成录音转写与文档交付。根据已校对的内容和用户提供的文档样式生成会议总结，属于后续阶段。
+**第二阶段（规划中）**将根据校对稿、文档范例和格式要求生成会议纪要，并利用你确认的修改反馈改善后续结果。偏好如何保存、反馈如何采纳将在该阶段确定，当前 Skill 交付到转写校对稿。
 
 ## 参与贡献
 
-欢迎提交 [Issue](https://github.com/hx101700/asr-agent/issues)、功能建议和 PR。代码结构、开发约定与验证方法见[开发文档](doc/README.md)。
+欢迎提交 [Issue](https://github.com/hx101700/memoflow/issues)、功能建议和 PR。代码结构、开发约定与验证方法见[开发文档](doc/README.md)。
 
 ## 相关链接
 
@@ -67,6 +69,6 @@ Codex 会使用这个 Skill 打开本机转写网页。按页面提示添加录�
 | 阿里云百炼 | [控制台](https://bailian.console.aliyun.com/) · [官方文档](https://help.aliyun.com/zh/model-studio/) |
 | 百炼 CLI | [官方主页](https://bailian.console.aliyun.com/cli) · [GitHub](https://github.com/modelstudioai/cli) |
 | 识别精度增强 | [热词与上下文说明](https://help.aliyun.com/zh/model-studio/improve-asr-accuracy) |
-| asr-transcription | [使用指南](skills/asr-transcription/references/usage.md) · [版本下载](https://github.com/hx101700/asr-agent/releases) |
+| MemoFlow | [使用指南](skills/asr-transcription/references/usage.md) · [版本下载](https://github.com/hx101700/memoflow/releases) |
 
 本项目采用 [Apache-2.0](LICENSE) 许可证。

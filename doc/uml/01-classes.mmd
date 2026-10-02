@@ -15,10 +15,10 @@ class Runtime {
 }
 class Session {
   +Runtime runtime
-  +dict uploads
-  +dict output_directories
-  +dict_or_None draft
-  +dict_or_None receipt
+  +dict~str,UploadRecord~ uploads
+  +dict~str,Path~ output_directories
+  +Draft_or_None draft
+  +ConfirmationReceipt_or_None receipt
   -Lock _state_lock
   -DirectoryPicker _picker
   -Event _closed
@@ -31,7 +31,14 @@ class Session {
   +cancel_directory(picker_id) dict
   +description() dict
   +api_key_display() dict
+  +save_api_key(value) dict
   +cleanup()
+}
+class ThreadingHTTPServer
+class LocalServer {
+  +Session session
+  +server_bind()
+  +server_close()
 }
 class DirectoryPicker {
   -Lock _lock
@@ -46,6 +53,9 @@ class DirectoryPicker {
 }
 Session --> Runtime : 持有外部传入的工作目录与资源边界
 Session "1" *-- "1" DirectoryPicker : 会话创建并关闭
+ThreadingHTTPServer <|-- LocalServer
+LocalServer "1" *-- "1" Session : 持有会话并在关闭时清理
 note for Runtime "scripts/asr_transcription/utils/environment.py<br/>resource读取Skill；path定位工作目录/.asr-transcription<br/>运行目录与Skill互不包含；check_output_path保护Skill<br/>output_root为工作目录/transcriptions"
-note for Session "scripts/asr_transcription/application/session.py<br/>上传短锁登记与发布，文件字节接收在锁外<br/>validate与confirm处理当前快照；draft和receipt采用dict"
+note for Session "scripts/asr_transcription/application/session.py<br/>上传短锁登记与发布，文件字节接收在锁外<br/>Draft与ConfirmationReceipt描述普通dict字段<br/>Key通过独立方法写入当前工作目录"
 note for DirectoryPicker "scripts/asr_transcription/utils/directory_picker.py<br/>choose_directory函数管理窗口子进程<br/>独立取消信号；Session登记所选精确路径"
+note for LocalServer "scripts/asr_transcription/web.py<br/>create_server创建对象并绑定127.0.0.1<br/>请求处理器使用language_scope隔离提示语言"

@@ -9,10 +9,15 @@ import sys
 import sysconfig
 from dataclasses import dataclass
 from pathlib import Path
+from .i18n import translate
 
 
 class SetupError(Exception):
     """表示可向用户解释的环境配置错误。"""
+
+    def __init__(self, message: str) -> None:
+        """按当前界面语言提供配置与运行环境提示。"""
+        super().__init__(translate(message))
 
 
 @dataclass(frozen=True)
@@ -52,14 +57,14 @@ class Runtime:
         path = (root / relative).resolve()
         # Windows junction / 符号链接不能把凭据和临时文件引向运行目录外。
         if not path.is_relative_to(root):
-            raise SetupError(f"运行路径指向私有目录外：{relative}")
+            raise SetupError(translate("运行路径指向私有目录外：{relative}").format(relative=relative))
         return path
 
     def resource(self, relative: str) -> Path:
         """解析Skill资源路径并检查其位于安装目录内。"""
         path = (self.skill_root / relative).resolve()
         if not path.is_relative_to(self.skill_root):
-            raise SetupError(f"资源路径指向Skill目录外：{relative}")
+            raise SetupError(translate("资源路径指向Skill目录外：{relative}").format(relative=relative))
         return path
 
     def check_output_path(self, path: Path) -> None:

@@ -42,7 +42,7 @@ API资料核验基线：2026-09-29。CLI固定2.1.0，对照源码提交`8bbbbc7
 | 音轨 | channel_id指音轨，默认[0]；不同于PyAV音轨内的channels。当前不开放选择 |
 | 未开放参数 | special_word_filter没有已核实BL公开入口；keep_dialect只属3.1，固定3.0不使用 |
 
-Excel的5MB、20MiB解压、200个内部文件、10001行和两列是本地解析资源限制，集中在tools/hotwords.py，不冒称模型限额。模型输入规则集中在application/rules.py，界面从服务端取得显示限制。
+Excel的5MB、20MiB解压、200个内部文件、10001行和两列是本地解析资源限制，集中在utils/hotwords.py，不冒称模型限额。模型输入规则集中在application/rules.py，界面从服务端取得显示限制。
 
 ## BL复用边界
 
@@ -86,6 +86,5 @@ BL中间件会检查版本并可能写update-state.json；quiet阻止后续自�
 - [tkinter.askdirectory](https://docs.python.org/3.12/library/dialog.html#tkinter.filedialog.askdirectory)：选择现有目录。当前无人工总时限，取消与进程回收由项目处理；显示窗口需要正常交互桌面。
 - [python-docx文本/分页](https://python-docx.readthedocs.io/en/latest/user/text.html)：段落、keep_with_next和widow_control；不代表无需实际页面检查。
 - [openpyxl样式](https://openpyxl.readthedocs.io/en/stable/styles.html)及[Excel规格](https://support.microsoft.com/en-us/excel/excel-specifications-and-limits)：单元格32767字符、工作表1048576行、行高409。项目正文自动换行，按内容估算展示行高并封顶409，单元格保留长段全文；存储超限不截断。
-- [Ant Design表单](https://ant.design/docs/spec/research-form/)与[输入](https://ant.design/docs/spec/data-entry/)为界面组织参考；不是本项目使用了Ant组件库，也不是阿里官方产品认证。
 
 使用步骤见[usage.md](usage.md)，任务状态和错误解释见[errors.md](errors.md)。

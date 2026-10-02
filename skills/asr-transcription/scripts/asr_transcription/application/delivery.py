@@ -3,13 +3,13 @@
 from ..utils.documents import DocumentError, publish_document, write_docx, write_markdown, write_xlsx
 from ..utils.environment import Runtime, SetupError
 from ..utils.job_files import job_directory, prepare_documents, prepare_delivery, save_record
-from ..models import Transcript
+from ..models import DeliveryReport, JobConfig, Transcript
 
 
-def export_documents(runtime: Runtime, config: dict, transcript: Transcript) -> dict:
+def export_documents(runtime: Runtime, config: JobConfig, transcript: Transcript) -> DeliveryReport:
     """生成并替换任务的Excel、Word和Markdown，汇总各格式交付结果。"""
     state = prepare_delivery(job_directory(runtime, config["job_id"]))
-    report = {"job_id": config["job_id"], "status": "EXPORTING",
+    report: DeliveryReport = {"job_id": config["job_id"], "status": "EXPORTING",
               "files": {}, "message": "正在本地生成文档。"}
     save_record(state, report)
     try:
@@ -17,8 +17,8 @@ def export_documents(runtime: Runtime, config: dict, transcript: Transcript) -> 
     except (OSError, SetupError, KeyError, TypeError) as exc:
         message = (str(exc) + "JSON已保留。" if isinstance(exc, SetupError)
                    else "无法创建文档目录，请检查已确认的保存位置、权限和磁盘空间；JSON已保留。")
-        report.update(status="FAILED", message=message,
-                      error_type=type(exc).__name__)
+        report.update({"status": "FAILED", "message": message,
+                       "error_type": type(exc).__name__})
         save_record(state, report)
         return report
 
@@ -41,7 +41,7 @@ def export_documents(runtime: Runtime, config: dict, transcript: Transcript) -> 
                                           "error_type": type(exc).__name__}
         save_record(state, report)
     ready = sum(item["status"] == "READY" for item in report["files"].values())
-    report.update(status="COMPLETE" if ready == 3 else "PARTIAL" if ready else "FAILED",
-                  message="Excel、Word和Markdown已保存，Excel和Word已回读核验。" if ready == 3 else "部分或全部文档未完成；JSON及已完成文件已保留，未自动重试。")
+    report.update({"status": "COMPLETE" if ready == 3 else "PARTIAL" if ready else "FAILED",
+                   "message": "Excel、Word和Markdown已保存，Excel和Word已回读核验。" if ready == 3 else "部分或全部文档未完成；JSON及已完成文件已保留，未自动重试。"})
     save_record(state, report)
     return report

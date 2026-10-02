@@ -6,8 +6,10 @@ import subprocess
 import sys
 from pathlib import Path
 from threading import Event, Lock
+from typing import cast
 
 from .environment import SetupError
+from .i18n import translate
 
 WAIT_SLICE_SECONDS = 0.2
 
@@ -15,25 +17,26 @@ WAIT_SLICE_SECONDS = 0.2
 class DirectoryPicker:
     """管理单个目录窗口的打开、取消和关闭。"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """初始化目录窗口状态和取消信号。"""
         self._lock = Lock()
-        self._active_id = None
-        self._cancel_event = None
-        self._cancelled_id = None
+        self._active_id: str | None = None
+        self._cancel_event: Event | None = None
+        self._cancelled_id: str | None = None
         self._closed = False
         self._finished = Event()
         self._finished.set()
 
     @staticmethod
-    def _check_id(request_id: str) -> None:
+    def _check_id(request_id: object) -> str:
         """检查用于关联窗口打开与取消操作的请求编号。"""
         if not isinstance(request_id, str) or not 1 <= len(request_id) <= 64:
             raise SetupError("目录选择请求无效。")
+        return request_id
 
-    def select(self, initial: Path, request_id: str) -> Path | None:
+    def select(self, initial: Path, request_id: object) -> Path | None:
         """等待当前窗口选择，返回所选目录或取消结果。"""
-        self._check_id(request_id)
+        request_id = self._check_id(request_id)
         with self._lock:
             if self._closed:
                 raise SetupError("当前会话已关闭。")
@@ -56,12 +59,13 @@ class DirectoryPicker:
                 self._cancel_event = None
                 self._finished.set()
 
-    def cancel(self, request_id: str) -> None:
+    def cancel(self, request_id: object) -> None:
         """取消指定请求，也允许取消先于该请求的打开操作到达。"""
-        self._check_id(request_id)
+        request_id = self._check_id(request_id)
         with self._lock:
             if request_id == self._active_id:
-                self._cancel_event.set()
+                # 活动请求编号与取消事件在select的同一临界区成对登记。
+                cast(Event, self._cancel_event).set()
             else:
                 # 允许取消先于打开抵达；仅作用于这个ID，不影响下一次选择。
                 self._cancelled_id = request_id
@@ -100,7 +104,8 @@ def choose_directory(initial: Path, *, cancel_event: Event | None = None) -> Pat
            if key.upper() in {"SYSTEMROOT", "SYSTEMDRIVE", "PROGRAMDATA", "WINDIR", "PATH", "TEMP", "TMP"}}
     try:
         process = subprocess.Popen(
-            [sys.executable, "-I", "-X", "utf8", str(Path(__file__).with_name("_directory_dialog.py")), str(initial)],
+            [sys.executable, "-I", "-X", "utf8", str(Path(__file__).with_name("_directory_dialog.py")),
+             str(initial), translate("录音转写 · 选择保存位置")],
             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             text=True, encoding="utf-8", env=env, shell=False,
             creationflags=subprocess.CREATE_NO_WINDOW,

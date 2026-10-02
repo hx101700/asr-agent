@@ -2,7 +2,8 @@
 
 asr-transcription 的安装、认证、网页操作、文件要求及重新导出说明集中维护在 Skill 的 [usage.md](../skills/asr-transcription/references/usage.md)。
 
-- 第一次使用：阅读[项目介绍](../README.md)，再按 [usage.md](../skills/asr-transcription/references/usage.md)准备工作目录与环境。
+- 第一次使用：阅读[项目介绍](../README.md)，再按 [usage.md](../skills/asr-transcription/references/usage.md)准备工作目录与环境；网页中可以直接填写或修改 API Key。
+- 界面设置：在页面右上角切换中文/English和主题，音频语言在转写设置中另行选择。
 - 操作失败：根据 [errors.md](../skills/asr-transcription/references/errors.md)保留回执、定位阶段并处理问题。
 - 查询参数依据：参阅 [model.md](../skills/asr-transcription/references/model.md)中的官方来源。
 

@@ -1,0 +1,4 @@
+# 仅开发静态检查使用，不进入Skill发行包。
+mypy==1.19.1
+types-openpyxl==3.1.5.20260827
+types-defusedxml==0.7.0.20260504

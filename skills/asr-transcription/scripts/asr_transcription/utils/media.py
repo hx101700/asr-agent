@@ -1,6 +1,7 @@
 """通过PyAV探测音频信息并生成单声道副本。"""
 
 from pathlib import Path
+from collections.abc import Iterable
 
 import av
 
@@ -49,7 +50,7 @@ def convert_to_mono(source: Path, destination: Path, source_info: AudioInfo) -> 
                     stream.format = "s32"
                     resampler = av.AudioResampler(format="s32", layout="mono", rate=source_info.sample_rate)
 
-                    def write_frames(frames):
+                    def write_frames(frames: Iterable[av.AudioFrame]) -> None:
                         """编码重采样后的音频帧，写入当前FLAC容器。"""
                         for frame in frames:
                             for packet in stream.encode(frame):

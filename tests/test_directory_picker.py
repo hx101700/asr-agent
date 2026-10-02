@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 from asr_transcription.utils._directory_dialog import show_directory_dialog
 from asr_transcription.utils.directory_picker import choose_directory, validate_directory
 from asr_transcription.utils.environment import SetupError
+from asr_transcription.utils.i18n import language_scope
 from tests.support import RuntimeTestCase
 
 
@@ -36,6 +37,13 @@ class DirectoryPickerTests(RuntimeTestCase):
         self.assertEqual(choose_directory(self.runtime.root), selected.resolve())
         self.popen.assert_called_once()
         self.process.kill.assert_not_called()
+
+    def test_page_language_sets_child_title_and_translates_child_error(self) -> None:
+        """验证父进程传递英文窗口标题并翻译独立窗口的错误。"""
+        self.process.communicate.return_value = (json.dumps({"error": "当前 Python 缺少 tkinter/Tcl/Tk 组件。"}), "")
+        with language_scope("en"), self.assertRaisesRegex(SetupError, "missing tkinter/Tcl/Tk"):
+            choose_directory(self.runtime.root)
+        self.assertEqual(self.popen.call_args.args[0][-1], "Audio transcription · Choose an output folder")
 
     def test_native_cancel_returns_none(self):
         """验证原生窗口取消后返回空结果。"""
@@ -244,7 +252,7 @@ class NativeDirectoryDialogTests(RuntimeTestCase):
 
     def test_selected_directory_cleans_up_hidden_parent(self):
         """验证成功选择后销毁隐藏父窗口。"""
-        self.assertEqual(show_directory_dialog(str(self.runtime.root)), str(self.runtime.root))
+        self.assertEqual(show_directory_dialog(str(self.runtime.root), "录音转写 · 选择保存位置"), str(self.runtime.root))
         window = self.tk.Tk.return_value
         window.withdraw.assert_called_once()
         window.attributes.assert_called_once_with("-topmost", True)
@@ -256,21 +264,21 @@ class NativeDirectoryDialogTests(RuntimeTestCase):
     def test_cancel_cleans_up_hidden_parent(self):
         """验证取消后销毁隐藏父窗口。"""
         self.tk.filedialog.askdirectory.return_value = ""
-        self.assertIsNone(show_directory_dialog(str(self.runtime.root)))
+        self.assertIsNone(show_directory_dialog(str(self.runtime.root), "录音转写 · 选择保存位置"))
         self.tk.Tk.return_value.destroy.assert_called_once()
 
     def test_missing_tkinter_reports_component_error(self):
         """验证缺少Tkinter时说明组件错误。"""
         with patch.dict(sys.modules, {"tkinter": None}):
             with self.assertRaisesRegex(RuntimeError, "缺少 tkinter/Tcl/Tk"):
-                show_directory_dialog(str(self.runtime.root))
+                show_directory_dialog(str(self.runtime.root), "录音转写 · 选择保存位置")
         self.tk.Tk.assert_not_called()
 
     def test_failed_tk_creation_does_not_open_or_retry_dialog(self):
         """验证Tk创建失败时直接返回组件错误。"""
         self.tk.Tk.side_effect = FakeTclError("synthetic initialization failure")
         with self.assertRaisesRegex(RuntimeError, "无法打开文件夹窗口"):
-            show_directory_dialog(str(self.runtime.root))
+            show_directory_dialog(str(self.runtime.root), "录音转写 · 选择保存位置")
         self.tk.Tk.assert_called_once()
         self.tk.filedialog.askdirectory.assert_not_called()
 
@@ -279,6 +287,6 @@ class NativeDirectoryDialogTests(RuntimeTestCase):
         self.tk.filedialog.askdirectory.side_effect = FakeTclError("synthetic dialog failure")
         self.tk.Tk.return_value.destroy.side_effect = FakeTclError("already destroyed")
         with self.assertRaisesRegex(RuntimeError, "无法打开文件夹窗口"):
-            show_directory_dialog(str(self.runtime.root))
+            show_directory_dialog(str(self.runtime.root), "录音转写 · 选择保存位置")
         self.tk.filedialog.askdirectory.assert_called_once()
         self.tk.Tk.return_value.destroy.assert_called_once()

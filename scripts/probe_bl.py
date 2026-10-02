@@ -15,7 +15,7 @@ from asr_transcription.utils.environment import Runtime, SetupError, run_process
 SYNTHETIC_AUDIO_URL = "https://example.invalid/asr-transcription-probe.wav"
 
 
-def probe(runtime: Runtime) -> dict:
+def probe(runtime: Runtime) -> dict[str, str]:
     """核对BL公开帮助及请求参数映射，保存合约检查报告。"""
     runtime.prepare()
     # 探针与将来的真实登录配置分开；不读取或复用任何既存凭据。
@@ -66,17 +66,18 @@ def probe(runtime: Runtime) -> dict:
         raise SetupError("BL dry-run输出结构与核实契约不一致。") from exc
     if not valid:
         raise SetupError("BL未按预期构造固定模型、语言、说话人或增强参数。")
+    scope = "CLI公开帮助与虚构URL请求构造；非真实识别验收"
     report = {
         "version": BAILIAN_VERSION,
         "model": MODEL,
         "status": "passed",
-        "scope": "CLI公开帮助与虚构URL请求构造；非真实识别验收",
+        "scope": scope,
         "observations": observations,
         "request_preview": payload,
     }
     path = runtime.path(".state/bl-probe.json")
     path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return {"status": "passed", "report": str(path), "scope": report["scope"]}
+    return {"status": "passed", "report": str(path), "scope": scope}
 
 
 def main(argv: list[str] | None = None) -> int:

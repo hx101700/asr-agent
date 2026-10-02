@@ -3,13 +3,16 @@
 import io
 import zipfile
 from pathlib import Path
+from typing import cast
 from xml.etree.ElementTree import ParseError
 
 from defusedxml.common import DefusedXmlException
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
+from openpyxl.worksheet.worksheet import Worksheet
 
-from ..models import HotwordRow
+from ..models import HotwordIssue, HotwordRow
+from .i18n import translate
 
 
 # 本机工作簿解析资源上限，不是阿里云接口限制。
@@ -22,9 +25,9 @@ MAX_WORKSHEET_ROWS = 10_001
 class HotwordFileError(ValueError):
     """表示热词Excel文件结构错误及行级提示。"""
 
-    def __init__(self, message: str, details: list[dict] | None = None):
+    def __init__(self, message: str, details: list[HotwordIssue] | None = None) -> None:
         """保存可展示的文件错误及可选行级修改提示。"""
-        super().__init__(message)
+        super().__init__(translate(message))
         self.details = details or []
 
 
@@ -51,9 +54,9 @@ def read_hotwords(path: Path) -> tuple[list[HotwordRow], list[str]]:
         with path.open("rb") as stream:
             workbook = load_workbook(stream, read_only=False, data_only=False, keep_links=False)
         if "热词" in workbook.sheetnames:
-            sheet = workbook["热词"]
+            sheet = cast(Worksheet, workbook["热词"])
         elif len(workbook.sheetnames) == 1:
-            sheet = workbook.active
+            sheet = cast(Worksheet, workbook.active)
         else:
             raise HotwordFileError("多个工作表时请将待使用的工作表命名为“热词”。")
         if sheet.max_row > MAX_WORKSHEET_ROWS or sheet.max_column > 2:
@@ -64,9 +67,9 @@ def read_hotwords(path: Path) -> tuple[list[HotwordRow], list[str]]:
                                    [{"row": 1, "field": "header", "message": "请按模板修改表头。"}])
         warnings = []
         if len(workbook.sheetnames) > 1:
-            warnings.append("仅读取名为“热词”的工作表，其他工作表不参与此次转写。")
+            warnings.append(translate("仅读取名为“热词”的工作表，其他工作表不参与此次转写。"))
         if header != ["text", "weight"]:
-            warnings.append("已按中文别名读取表头：热词对应text，权重对应weight。")
+            warnings.append(translate("已按中文别名读取表头：热词对应text，权重对应weight。"))
         rows = [HotwordRow(number, cells[0].value, cells[1].value,
                            any(cell.data_type == "f" for cell in cells))
                 for number, cells in enumerate(sheet.iter_rows(min_row=2, max_col=2), start=2)]
@@ -84,10 +87,10 @@ def read_hotwords(path: Path) -> tuple[list[HotwordRow], list[str]]:
 def hotwords_template() -> bytes:
     """生成带示例词条的两列Excel模板，供网页直接下载。"""
     workbook = Workbook()
-    sheet = workbook.active
+    sheet = cast(Worksheet, workbook.active)
     sheet.title = "热词"
     sheet.append(["text", "weight"])
-    sheet.append(["示例术语", 4])
+    sheet.append([translate("示例术语"), 4])
     sheet.column_dimensions["A"].width = 32
     sheet.column_dimensions["B"].width = 12
     sheet.freeze_panes = "A2"

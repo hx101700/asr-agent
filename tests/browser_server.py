@@ -1,0 +1,47 @@
+"""为浏览器回归提供隔离的本机服务及合成输入。"""
+
+import argparse
+import json
+import wave
+from pathlib import Path
+
+from openpyxl import Workbook
+
+from asr_transcription.utils.environment import Runtime
+from asr_transcription.web import create_server
+from tests.support import SKILL_ROOT
+
+
+def main() -> None:
+    """创建合成音频与词表，输出本机连接信息并启动服务。"""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--workspace", type=Path, required=True)
+    options = parser.parse_args()
+    fixtures = options.workspace / "fixtures"
+    fixtures.mkdir()
+    with wave.open(str(fixtures / "sample.wav"), "wb") as stream:
+        stream.setnchannels(2)
+        stream.setsampwidth(2)
+        stream.setframerate(16000)
+        stream.writeframes(b"\0" * 64000)
+    for name, header in (("words.xlsx", ("text", "weight")), ("invalid.xlsx", ("wrong", "weight"))):
+        workbook = Workbook()
+        sheet = workbook.active
+        assert sheet is not None
+        sheet.title = "热词"
+        sheet.append(header)
+        sheet.append(("Kubernetes", 5))
+        sheet.append(("Kubernetes", 5))
+        workbook.save(fixtures / name)
+        workbook.close()
+    server = create_server(Runtime(options.workspace, SKILL_ROOT))
+    url = f"http://127.0.0.1:{server.server_port}/#token={server.session.token}"
+    print(json.dumps({"url": url}), flush=True)
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
+
+
+if __name__ == "__main__":
+    main()

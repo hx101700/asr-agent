@@ -1,9 +1,11 @@
 """校验固定模型的音频属性、识别选项和增强内容。"""
 
 import math
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
+from typing import cast
 
-from ..models import AudioInfo, HotwordRow
+from ..models import AudioInfo, HotwordConfig, HotwordIssue, HotwordRow, RecognitionOptions
+from ..utils.i18n import translate
 
 
 # 官方模型/临时OSS限制见Skill的references/model.md A02、A04、A06。
@@ -26,11 +28,13 @@ MAX_SPEAKERS = 100
 class ValidationError(ValueError):
     """携带表单字段和修改提示的输入校验错误。"""
 
-    def __init__(self, message: str, field: str, details: list[dict] | None = None):
+    def __init__(self, message: str, field: str, details: list[HotwordIssue] | None = None) -> None:
         """携带可公开的说明、表单字段和可选行级错误。"""
-        super().__init__(message)
+        super().__init__(translate(message))
         self.field = field
-        self.details = details or []
+        self.details: list[HotwordIssue] = [
+            {**detail, "message": translate(detail["message"])} for detail in details or []
+        ]
 
 
 def check_audio_limits(info: AudioInfo, diarization: bool) -> None:
@@ -46,22 +50,24 @@ def check_audio_limits(info: AudioInfo, diarization: bool) -> None:
         raise ValidationError("待上传音频超过临时OSS的1 GB上限。", "audio_path")
 
 
-def validate_context(text: str) -> str:
+def validate_context(text: object) -> str:
     """校验参考文本的长度与字符要求，保留用户原文。"""
     if not isinstance(text, str) or not text.strip():
         raise ValidationError("请输入参考文本，或关闭上下文增强。", "context")
     if len(text) > MAX_CONTEXT_CHARS:
-        raise ValidationError(f"参考文本共 {len(text)} 个字符，最多支持 {MAX_CONTEXT_CHARS} 个，请精简后重新检查。", "context")
+        raise ValidationError(translate(
+            "参考文本共 {count} 个字符，最多支持 {maximum} 个，请精简后重新检查。"
+        ).format(count=len(text), maximum=MAX_CONTEXT_CHARS), "context")
     if "\x00" in text or any(0xD800 <= ord(char) <= 0xDFFF for char in text):
         raise ValidationError("参考文本中含有无法识别的特殊字符，请删除后重新检查。", "context")
     return text
 
 
-def build_vocabulary(rows: Iterable[HotwordRow]) -> dict:
+def build_vocabulary(rows: Iterable[HotwordRow]) -> HotwordConfig:
     """校验热词行并构建即时词典，汇总行级错误和导入提示。"""
-    vocabulary = {}
-    first_rows = {}
-    details = []
+    vocabulary: dict[str, int] = {}
+    first_rows: dict[str, int] = {}
+    details: list[HotwordIssue] = []
     warnings = []
     ignored_blank_rows = 0
     super_count = 0
@@ -90,13 +96,17 @@ def build_vocabulary(rows: Iterable[HotwordRow]) -> dict:
             details.extend({"row": row_number, "field": name, "message": message}
                            for name, message in row_errors)
             continue
-        weight = int(weight)
+        # 行级错误已排除非文本热词与非法权重，转换只保留已接受的值。
+        text = cast(str, text)
+        weight = int(cast(int | float, weight))
         if text in vocabulary:
             if vocabulary[text] != weight:
                 details.append({"row": row_number, "field": "weight",
-                                "message": f"与第{first_rows[text]}行热词重复但权重不同，请统一。"})
+                                "message": translate("与第{first_row}行热词重复但权重不同，请统一。").format(
+                                    first_row=first_rows[text])})
             else:
-                warnings.append(f"第{row_number}行与第{first_rows[text]}行完全相同，已合并为一个词条。")
+                warnings.append(translate("第{row}行与第{first_row}行完全相同，已合并为一个词条。").format(
+                    row=row_number, first_row=first_rows[text]))
             continue
         vocabulary[text] = weight
         first_rows[text] = row_number
@@ -111,7 +121,7 @@ def build_vocabulary(rows: Iterable[HotwordRow]) -> dict:
     if not vocabulary:
         raise ValidationError("热词Excel未包含有效词条。", "hotwords_path")
     if ignored_blank_rows:
-        warnings.append(f"已忽略{ignored_blank_rows}个完全空白行。")
+        warnings.append(translate("已忽略{count}个完全空白行。").format(count=ignored_blank_rows))
     return {"vocabulary": vocabulary, "count": len(vocabulary), "warnings": warnings}
 
 
@@ -129,7 +139,7 @@ LANGUAGES = [
 LANGUAGE_CODES = frozenset(code for code, _ in LANGUAGES)
 
 
-def validate_options(payload: dict, diarization: bool) -> dict:
+def validate_options(payload: Mapping[str, object], diarization: object) -> RecognitionOptions:
     """核对语言和参考人数，形成执行所用的识别选项。"""
     language = payload.get("language_hint")
     if language is not None and (
@@ -143,7 +153,9 @@ def validate_options(payload: dict, diarization: bool) -> dict:
             raise ValidationError("设置发言人数前，请开启区分发言人。", "speaker_count")
         # bool 是 int 的子类，但不能把勾选状态当作人数。
         if type(speaker_count) is not int or not MIN_SPEAKERS <= speaker_count <= MAX_SPEAKERS:
-            raise ValidationError(f"发言人数需为 {MIN_SPEAKERS}–{MAX_SPEAKERS} 的整数，或使用自动识别。", "speaker_count")
+            raise ValidationError(translate(
+                "发言人数需为 {minimum}–{maximum} 的整数，或使用自动识别。"
+            ).format(minimum=MIN_SPEAKERS, maximum=MAX_SPEAKERS), "speaker_count")
 
     return {
         "language_hints": [] if language is None else [language],

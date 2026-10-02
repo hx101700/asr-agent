@@ -1,7 +1,7 @@
 sequenceDiagram
 actor U as 用户
 participant C as Codex＋Skill
-participant W as 本机网页
+participant W as Vue页面
 participant H as web（HTTP函数模块）
 participant S as Session对象
 participant P as DirectoryPicker对象
@@ -12,7 +12,16 @@ C->>H: Skill/scripts/asr.py --workspace 用户目录 serve
 H->>S: 创建本次Session
 H-->>C: 启动回执url、pid
 H->>W: 按启动选项打开本机网页
-Note over W,H: 127.0.0.1动态端口；HTTP来源与会话校验<br/>前端app编排、model状态、view界面、api传输
+Note over W,H: App.vue与Element Plus呈现界面<br/>useTranscription编排，model处理纯状态，api发送HTTP<br/>令牌保留在接口闭包；请求携带Accept-Language
+W->>H: actions.start()经api.ts请求GET /api/session
+H->>S: description()
+S-->>H: 模型、限制、默认目录与已保存回执
+H-->>W: 当前会话描述
+opt 调整界面语言或主题
+    U->>W: 选择中文/English或system/light/dark
+    W->>W: usePreferences同步组件、html与偏好
+    Note over W,H: 语言切换保留输入，已有预览作废<br/>localStorage只保存当前来源下的语言和主题
+end
 U->>W: 选择一个音频
 W->>H: POST /api/upload-audio，传文件字节
 H->>S: upload(audio, name, rfile, size)
@@ -41,6 +50,14 @@ opt 选择自定义保存位置
     H-->>W: 目录回执
 end
 U->>W: 检查并预览
+W->>W: actions.validate()核对必填输入
+opt Key模式且凭据待保存
+    W->>H: POST /api/save-api-key，独立发送当前Key
+    H->>S: save_api_key(value)
+    S->>F: auth.write_api_key()保存<br/>WORKSPACE/.asr-transcription/.env
+    S-->>H: ok
+    H-->>W: 凭据保存完成；详细交互见图04
+end
 W->>H: POST /api/validate，提交upload_id和选项
 H->>S: validate(payload)
 S->>S: rules.validate_options()校验选项
@@ -61,8 +78,9 @@ S->>F: job_files.publish_config()写配置与摘要并发布配置
 S-->>H: 同一job_id的确认回执
 H-->>C: 同一serve进程stdout：event=configured
 H-->>W: HTTP回执：job_id与保存位置
+Note over C,S: stdout回执丢失且网页已显示保存成功时<br/>从同一页面取得确切job_id，用job-status核对<br/>同会话GET /api/session的confirmed提供auth_mode与输出路径
 Note over U,C: Codex核对本次上传授权<br/>覆盖音频、增强内容与费用<br/>已覆盖的授权可继续使用
 Note over H,S: 字段或文件错误返回422，由网页定位<br/>保存配置不启动BL<br/>execution_started=false<br/>config.execution_authorized=false<br/>凭据在执行时读取
 Note over W,S: 输入变化使旧预览失效；确认结果未知时网页持续冻结<br/>关闭网页不关闭serve；服务正常退出保留已确认音频并清理临时副本
 Note over I,F: 默认根：工作目录/transcriptions<br/>JSON与成品分别选择保存根<br/>预览解析热词，执行使用词典快照
-Note over C,F: scripts/asr_transcription/web.py；application/session.py、inputs.py、rules.py<br/>utils/job_files.py、files.py、directory_picker.py<br/>static/app.mjs、model.mjs、view.mjs、api.mjs
+Note over C,F: 前端路径相对仓库根：frontend/App.vue、useTranscription.ts、model.ts、api.ts、preferences.ts<br/>Python路径相对Skill：scripts/asr_transcription/web.py；application/session.py、inputs.py、rules.py<br/>application/transcription.py::job_status；utils/job_files.py、files.py、directory_picker.py、i18n.py
