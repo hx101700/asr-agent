@@ -11,7 +11,7 @@
 
 ## 当前工作
 
-文档与`v0.1.0`安装包已整理完成，发布说明位于[release/NOTES.md](../release/NOTES.md)。版本下载入口为[GitHub Releases](https://github.com/hx101700/asr-agent/releases)。
+首个版本[v0.1.0](https://github.com/hx101700/asr-agent/releases/tag/v0.1.0)已发布，当前Releases仅保留这一版本。发布说明位于[release/NOTES.md](../release/NOTES.md)，[安装包可直接下载](https://github.com/hx101700/asr-agent/releases/download/v0.1.0/asr-agent.zip)。
 
 发布说明仅包含用户可见功能和安装入口；开发验证集中在[ACCEPTANCE](ACCEPTANCE.md)。业务代码未改。
 
@@ -22,6 +22,7 @@
 - 发行清单固定为46个文件：运行代码、项目Skill、依赖锁、中英文README/AGENTS及必要使用文档。
 - 本地ZIP已构建并核对，路径为`dist/asr-agent.zip`，大小118434字节。内部校验SHA-256：`de6fe64e89181f18e6ee5a8216cd7707c326321cd29c06e4779ea28a1cc8c871`。
 - 文档整理后9项打包测试通过；20份Markdown及双语链接、代码字面量、Skill元信息检查通过。ZIP与当前发行源文件一致，变更均为Markdown内容。
+- 发布标签`v0.1.0`对应源码`07c60975a1ec5455d972654886ffdb6ed0df2e04`。已从公开链接下载附件并逐字节核对，与本地ZIP一致。
 
 ## 接续
 
