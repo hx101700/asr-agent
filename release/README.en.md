@@ -4,9 +4,16 @@
 
 Transcribe recordings in Codex and generate Word, Excel, and Markdown documents. Speech recognition is provided by [Alibaba Cloud Model Studio](https://help.aliyun.com/zh/model-studio/what-is-model-studio) through its official [BL CLI](https://github.com/modelstudioai/cli).
 
-Before you start, [register an Alibaba Cloud account](https://help.aliyun.com/zh/account/step-1-register-an-alibaba-cloud-account) and follow the [official setup guide](https://help.aliyun.com/zh/model-studio/first-api-call-to-qwen) to complete account verification and activate Model Studio.
+## Features
+
+- **Recording transcription** — Turn local audio into text with timestamps and speaker labels.
+- **Accuracy enhancements** — Import hotwords from Excel and add reference context; both can be used together.
+- **Visual configuration** — Add recordings, adjust transcription settings, and choose save locations in the browser.
+- **Document export** — Generate Word, Excel, and Markdown together, retain the original JSON, and re-export locally.
 
 ## Agent installation (recommended)
+
+Before you start, [register an Alibaba Cloud account](https://help.aliyun.com/zh/account/step-1-register-an-alibaba-cloud-account) and follow the [official setup guide](https://help.aliyun.com/zh/model-studio/first-api-call-to-qwen) to complete account verification and activate Model Studio.
 
 Download **asr-agent.zip** from [Releases](https://github.com/hx101700/asr-agent/releases). Send the ZIP and this prompt to Codex; it will check your environment and follow the project instructions to install and verify asr-agent:
 
@@ -37,6 +44,10 @@ After reviewing and saving the settings, return to Codex and confirm that transc
 
 Transcription sends the recording and enabled enhancement content to Model Studio and may incur charges.
 
+## Contributing
+
+Issues, feature requests, and pull requests are welcome. See the [development docs](https://github.com/hx101700/asr-agent/blob/dev/doc/README.md) for the code structure, project conventions, and verification methods.
+
 ## Related links
 
 | Resource | Links |
@@ -45,7 +56,5 @@ Transcription sends the recording and enabled enhancement content to Model Studi
 | Model Studio CLI | [Website](https://bailian.console.aliyun.com/cli) · [GitHub](https://github.com/modelstudioai/cli) |
 | Recognition accuracy | [Hotwords and context](https://help.aliyun.com/zh/model-studio/improve-asr-accuracy) |
 | asr-agent | [User guide](doc/HELP.md) · [Downloads](https://github.com/hx101700/asr-agent/releases) |
-
-Found a problem or have a suggestion? Open an [issue](https://github.com/hx101700/asr-agent/issues).
 
 Licensed under [Apache-2.0](LICENSE).
