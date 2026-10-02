@@ -1,4 +1,4 @@
-"""验证本地导出轮次、格式失败和保存位置。"""
+"""验证固定目录导出、同名替换和格式失败处理。"""
 
 import hashlib
 import json
@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from asr_agent import MODEL
-from asr_agent.tools.job_files import latest_delivery
+from asr_agent.tools.job_files import read_delivery
 from asr_agent.tools.documents import DocumentError
 from asr_agent.tools.environment import SetupError
 from asr_agent.tools.results import load_transcript
@@ -71,7 +71,7 @@ class DeliveryTests(ProjectTestCase):
             content = Path(record["path"]).read_bytes()
             self.assertEqual(len(content), record["bytes"])
             self.assertNotIn("sha256", record)
-        self.assertEqual(report["delivery"]["source_sha256"], hashlib.sha256(original).hexdigest())
+        self.assertEqual(report["result"]["sha256"], hashlib.sha256(original).hexdigest())
         self.assertEqual(self.json_path.read_bytes(), original)
         self.cloud.assert_not_called()
         self.assertEqual(job_status(self.project, self.job_id), report)
@@ -117,29 +117,79 @@ class DeliveryTests(ProjectTestCase):
         self.assertNotIn("private transcript", json.dumps(report))
         self.assertEqual(report["delivery"]["status"], "PARTIAL")
 
-    def test_explicit_reexport_uses_new_directory_and_preserves_first_round(self):
-        """验证显式重导建立新目录且保留上一轮。"""
+    def test_explicit_reexport_replaces_the_same_three_files(self):
+        """验证重导使用固定目录并替换三个同名文件。"""
         first = export_job(self.project, self.job_id)["delivery"]
+        expected = {Path(self.config["document_directory"]) / f"transcription.{ext}"
+                    for ext in ("xlsx", "docx", "md")}
+        for record in first["files"].values():
+            Path(record["path"]).write_bytes(b"synthetic edited document")
         second = export_job(self.project, self.job_id)["delivery"]
-        self.assertNotEqual(first["export_id"], second["export_id"])
+        self.assertEqual(second["status"], "COMPLETE")
         for extension, record in first["files"].items():
-            self.assertTrue(Path(record["path"]).is_file())
-            self.assertNotEqual(record["path"], second["files"][extension]["path"])
-        self.assertEqual(latest_delivery(self.root), second)
+            self.assertEqual(record["path"], second["files"][extension]["path"])
+            self.assertNotEqual(Path(record["path"]).read_bytes(), b"synthetic edited document")
+        self.assertEqual(set(Path(self.config["document_directory"]).iterdir()), expected)
+        self.assertTrue((self.root / "delivery/status.json").is_file())
+        self.assertFalse((self.root / "exports").exists())
+        self.assertEqual(read_delivery(self.root), second)
+        self.cloud.assert_not_called()
+
+    def test_failed_reexport_preserves_the_existing_document(self):
+        """验证重导写入失败时保留已有成品并完成其他格式。"""
+        first = export_job(self.project, self.job_id)["delivery"]
+        document = Path(first["files"]["docx"]["path"])
+        original = document.read_bytes()
+
+        def fail_docx(transcript, path, **metadata):
+            """模拟临时Word写到一半时发生文件错误。"""
+            path.write_bytes(b"synthetic incomplete document")
+            raise OSError("synthetic write failure")
+
+        with patch("asr_agent.application.delivery.write_docx", side_effect=fail_docx) as writer:
+            report = export_job(self.project, self.job_id)
+        writer.assert_called_once()
+        self.assertEqual(document.read_bytes(), original)
+        self.assertEqual(report["delivery"]["status"], "PARTIAL")
+        self.assertEqual(report["delivery"]["files"]["docx"]["status"], "FAILED")
+        for extension in ("xlsx", "md"):
+            self.assertEqual(report["delivery"]["files"][extension]["status"], "READY")
+        self.assertEqual(job_status(self.project, self.job_id), report)
+        self.cloud.assert_not_called()
+
+    def test_locked_target_preserves_the_existing_document(self):
+        """验证同名文件被占用时报告替换失败并保留旧文件。"""
+        first = export_job(self.project, self.job_id)["delivery"]
+        document = Path(first["files"]["docx"]["path"])
+        original = document.read_bytes()
+        replace = Path.replace
+
+        def refuse_word_replacement(source, target):
+            """模拟目标Word被其他程序占用，其余文件照常发布。"""
+            if Path(target) == document:
+                raise PermissionError("synthetic file in use")
+            return replace(source, target)
+
+        with patch.object(Path, "replace", autospec=True, side_effect=refuse_word_replacement):
+            report = export_job(self.project, self.job_id)
+        self.assertEqual(document.read_bytes(), original)
+        self.assertEqual(report["delivery"]["status"], "PARTIAL")
+        self.assertEqual(report["delivery"]["files"]["docx"]["error_type"], "PermissionError")
+        self.cloud.assert_not_called()
 
     def test_changed_json_after_recognition_is_rejected(self):
         """验证识别后JSON内容改变时拒绝导出。"""
         self.json_path.write_bytes(self.json_path.read_bytes() + b"\n")
         with self.assertRaisesRegex(SetupError, "发生变化"):
             export_job(self.project, self.job_id)
-        self.assertFalse((self.root / "exports").exists())
+        self.assertFalse((self.root / "delivery").exists())
 
     def test_result_without_digest_is_not_exported_or_resubmitted(self):
         """验证结果摘要缺失时返回导出来源错误。"""
         self.save_execution(result={"audio_tracks": 2, "sentences": 3})
         with self.assertRaisesRegex(SetupError, "缺少结果JSON摘要"):
             export_job(self.project, self.job_id)
-        self.assertFalse((self.root / "exports").exists())
+        self.assertFalse((self.root / "delivery").exists())
         self.cloud.assert_not_called()
 
     def test_no_export_when_recognition_did_not_finish(self):
@@ -147,7 +197,7 @@ class DeliveryTests(ProjectTestCase):
         self.save_execution(status="RUNNING")
         with self.assertRaisesRegex(SetupError, "尚无"):
             export_job(self.project, self.job_id)
-        self.assertFalse((self.root / "exports").exists())
+        self.assertFalse((self.root / "delivery").exists())
 
     def test_unwritable_output_is_local_failure_and_preserves_json(self):
         """验证保存目录写入失败时保留JSON并报告导出失败。"""
@@ -158,10 +208,10 @@ class DeliveryTests(ProjectTestCase):
         self.assertFalse(report["documents_ready"])
         self.assertTrue(self.json_path.is_file())
 
-    def test_unknown_latest_round_does_not_claim_previous_success(self):
-        """验证最新导出记录异常时返回结果未知状态。"""
+    def test_unreadable_delivery_record_reports_unknown(self):
+        """验证导出记录损坏时返回结果未知状态。"""
         export_job(self.project, self.job_id)
-        (self.root / "exports" / "99999999-incomplete").mkdir()
+        (self.root / "delivery/status.json").write_text("{", encoding="utf-8")
         report = job_status(self.project, self.job_id)
         self.assertEqual(report["delivery"]["status"], "OUTCOME_UNKNOWN")
         self.assertFalse(report["documents_ready"])
@@ -177,11 +227,11 @@ class DeliveryTests(ProjectTestCase):
         self.assertTrue(Path(report["json_path"]).is_file())
         self.cloud.assert_not_called()
 
-    def test_call_returns_its_own_delivery_even_if_another_round_starts(self):
-        """验证并发导出返回当前调用自己的轮次。"""
-        expected = {"status": "EXPORTING", "message": "synthetic", "export_id": "this-call"}
+    def test_export_returns_current_delivery_without_status_lookup(self):
+        """验证导出直接返回当前执行结果。"""
+        expected = {"status": "PARTIAL", "message": "synthetic"}
         with patch("asr_agent.application.transcription.export_documents", return_value=expected), \
-             patch("asr_agent.application.transcription.latest_delivery", side_effect=AssertionError("重导不读取上一轮交付")):
+             patch("asr_agent.application.transcription.read_delivery", side_effect=AssertionError("导出不重新读取状态")):
             report = export_job(self.project, self.job_id)
         self.assertEqual(report["delivery"], expected)
 

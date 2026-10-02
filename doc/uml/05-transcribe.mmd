@@ -49,21 +49,21 @@ else 本次取得执行占用
     T->>J: _save_status()调用save_record(JSON_READY / result_received)
     T->>T: _deliver(project, config, transcript, report)
     T->>D: export_documents(job_root, config, transcript)
-    D->>D: 用UTC时间和UUID生成export_id
-    D->>J: reserve_export()；save_record(EXPORTING)
-    D->>J: prepare_documents()创建本轮成品目录
+    D->>J: prepare_delivery()创建或复用delivery目录
+    D->>J: save_record(EXPORTING)
+    D->>J: prepare_documents(config)创建或复用固定documents目录
     loop xlsx、docx、md逐格式各执行一次
         D->>L: documents.publish_document(writer, transcript, final_path)
-        L->>F: 写partial文件并发布final<br/>Excel和Word回读；Markdown编码写入
+        L->>F: 写partial文件，完成后替换同名成品<br/>Excel和Word回读；Markdown编码写入
         L-->>D: 字节数或格式异常
         D->>J: save_record()保存该格式READY / FAILED
     end
     D->>J: save_record(COMPLETE / PARTIAL / FAILED)
-    D-->>T: 本轮delivery回执
+    D-->>T: delivery回执
     T->>T: _attach_delivery()计算documents_ready
-    T-->>C: JSON状态＋本轮delivery＋已知文件位置
+    T-->>C: JSON状态＋delivery＋已知文件位置
 end
 Note over B,F: 云端鉴权、临时上传、提交、轮询、下载和原JSON落盘属于BL<br/>Python等待完整命令；云端失败停止，job占用保持<br/>job_id是本机编号；Python未提供可靠task_id恢复入口
-Note over T,F: JSON：已选根 / job_id / json / transcription.json<br/>成品：已选根 / job_id / documents / export_id<br/>json_path先记录目标位置，其存在本身不是JSON成功证明
+Note over T,F: JSON：已选根 / job_id / json / transcription.json<br/>成品：已选根 / job_id / documents / transcription.xlsx、.docx、.md<br/>导出状态：.state / jobs / job_id / delivery / status.json<br/>json_path先记录目标位置，其存在本身不是JSON成功证明
 Note over T,D: Excel和Word回读核验；Markdown编码写入<br/>COMPLETE表示三成品就绪；识别准确率由人工评价
 Note over C,D: src/asr_agent/application/transcription.py、delivery.py<br/>src/asr_agent/tools/bailian.py::recognition_arguments、prepare_command、run_recognition<br/>tools/media.py、results.py、documents.py、job_files.py、files.py<br/>context参数合约探针：application/diagnostics.py::probe

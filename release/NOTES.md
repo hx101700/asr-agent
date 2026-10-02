@@ -1,35 +1,29 @@
 ## 中文
 
-asr-agent 首次发布：在 Codex 中将录音转成带时间戳的 Word、Excel 和 Markdown。
+### 改进
 
-### 功能
+- 转写文档直接保存在任务的 `documents` 文件夹，移除额外的导出编号目录。
+- 重新导出更新同一组 Word、Excel 和 Markdown 文件，保存位置保持固定。
+- 写入或替换失败时保留已有文件，其他格式继续处理。
+- 同步中英文使用说明、Agent 规则和 UML。
 
-- 通过本机网页选择音频、设置语言和保存位置。
-- 默认区分发言人，支持热词与上下文同时使用。
-- 一次转写生成三种文档，并保留原始 JSON。
-- 已完成任务支持本地重新导出。
-- 提供中英文使用说明和 Agent 规则。
+### 使用说明
 
-### 开始使用
+下载 Assets 中的 **asr-agent.zip**，按[中文说明](https://github.com/hx101700/asr-agent/blob/v0.1.1/README.md)使用。
 
-从 Assets 下载 **asr-agent.zip**，解压后用 Codex 打开 `asr-agent` 文件夹，输入“请安装 asr-agent，并打开录音转写页面”。
-
-支持 Windows 10/11 x64，每次处理一个已有音频。环境准备和账号配置见[中文使用说明](https://github.com/hx101700/asr-agent/blob/v0.1.0/README.md)。
+重新导出会覆盖该任务的三个同名成品。如需保留手动修改的文档，请先另存副本。此前导出的历史文件保留在原位置。
 
 ## English
 
-The first release of asr-agent turns recordings into timestamped Word, Excel, and Markdown documents in Codex.
+### Improvements
 
-### Features
+- Save transcripts directly in the task's `documents` folder, without an additional export-ID directory.
+- Re-export updates the same Word, Excel, and Markdown files at a fixed location.
+- Keep existing files if writing or replacement fails, while processing the other formats.
+- Update the Chinese and English guides, agent rules, and UML.
 
-- Select audio, language, and output folders on a local web page.
-- Distinguish speakers and combine hotwords with reference context.
-- Generate all three document formats and retain the original JSON.
-- Re-export completed tasks locally.
-- Read the user guide and agent rules in Chinese or English.
+### Usage
 
-### Get started
+Download **asr-agent.zip** from Assets and follow the [English guide](https://github.com/hx101700/asr-agent/blob/v0.1.1/README.en.md).
 
-Download **asr-agent.zip** from Assets, extract it, open the `asr-agent` folder in Codex, and ask: “Install asr-agent and open the recording transcription page.”
-
-Supports Windows 10/11 x64 and one existing audio file at a time. See the [English guide](https://github.com/hx101700/asr-agent/blob/v0.1.0/README.en.md) for prerequisites and account setup.
+Re-export replaces the task's three generated files. Save a separate copy of any manual edits you want to keep. Files exported by earlier versions remain in their original locations.

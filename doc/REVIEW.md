@@ -17,7 +17,7 @@
 | 外部能力集中 | [bailian](../src/asr_agent/tools/bailian.py) 包装公开 CLI；[results](../src/asr_agent/tools/results.py) 集中解析官方转写结果 JSON | 参数与返回结构变化在调用边界处理，继续复用 BL 的鉴权、上传、轮询和下载 |
 | 规则与数据分离 | [rules](../src/asr_agent/application/rules.py) 表达无 I/O 规则，[models](../src/asr_agent/models.py) 保存共享不可变数据 | 只把多个模块共享的稳定概念放入 models |
 | 前端职责分离 | [model](../src/asr_agent/static/model.mjs) 管状态与权限，view 管 DOM，app 管事件编排，api 管传输 | 普通表单留 DOM；Key 不进入 model；操作权限由状态派生 |
-| 简单导出策略 | [delivery](../src/asr_agent/application/delivery.py) 使用固定 writer 列表调用三格式 | 格式逻辑位于 writer，轮次和部分成功处理位于 delivery |
+| 简单导出策略 | [delivery](../src/asr_agent/application/delivery.py) 使用固定 writer 列表调用三格式 | 格式生成与替换位于 tools/documents，编排和部分成功处理位于 delivery |
 
 分层约束有明确范围：`tools` 包含项目文件协议，并非纯通用工具集合；入口也允许直接调用单一工具。[结构测试](../tests/test_architecture.py) 检查已约定的导入方向和旧模块清理，不替代职责审查。
 
@@ -43,7 +43,9 @@
 
 ### 分开记录外部结果与本地交付
 
-`JSON_READY` 表示原始 JSON 已通过结构检查；导出轮次的 `COMPLETE` 才表示三种文档完成。单格式导出失败保留其他文件，重新导出读取已有 JSON，不再识别音频。
+`JSON_READY` 表示原始 JSON 已通过结构检查；导出记录的 `COMPLETE` 才表示三种文档完成。文档直接写入任务的 `documents` 目录，显式重导读取同一结果 JSON 并替换同名成品，不再识别音频。每个任务只维护一份导出状态，不管理导出历史。
+
+各格式完成生成及自身检查后才替换目标文件，失败保留已有目标及其他成功文件。用户需要保留的手工修改应另存副本；导出按命令顺序完成，当前没有并发导出需求。
 
 外部进程完成与本地记录保存不能组成一个原子操作。`_save_status` 在记录写入失败时为回执附加 `record_error`：未启动 BL 的情形保持 `not_started`；已经取得 JSON 的情形保留路径、摘要和 `result_received`。磁盘记录可能滞后，当前仍缺少记录恢复入口。
 

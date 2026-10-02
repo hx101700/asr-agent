@@ -11,18 +11,18 @@
 
 ## 当前工作
 
-首个版本[v0.1.0](https://github.com/hx101700/asr-agent/releases/tag/v0.1.0)已发布，当前Releases仅保留这一版本。发布说明位于[release/NOTES.md](../release/NOTES.md)，[安装包可直接下载](https://github.com/hx101700/asr-agent/releases/download/v0.1.0/asr-agent.zip)。
+正在准备`v0.1.1`：导出文档直接保存到任务的固定`documents`目录；显式重新导出替换三个同名成品，失败保留已有目标。删除导出编号、历史目录排序及重复摘要字段，只保留一份`delivery/status.json`。发布说明位于[release/NOTES.md](../release/NOTES.md)。
 
-发布说明仅包含用户可见功能和安装入口；开发验证集中在[ACCEPTANCE](ACCEPTANCE.md)。业务代码未改。
+中英文使用文档、Agent规则和相关UML已同步。原JSON来源检查与一次识别占用保持不变；旧导出文件不自动清理。现有发布版为[v0.1.0](https://github.com/hx101700/asr-agent/releases/tag/v0.1.0)，新包发布后在此更新链接。
 
 ## 验证与发布
 
 - 既有代码回归、独立安装和本机网页检查的证据见[ACCEPTANCE](ACCEPTANCE.md)。
 - 新Codex完整使用、真实云端、原生窗口和Office视觉验收仍待完成，详见[ISSUES](ISSUES.md)。
 - 发行清单固定为46个文件：运行代码、项目Skill、依赖锁、中英文README/AGENTS及必要使用文档。
-- 本地ZIP已构建并核对，路径为`dist/asr-agent.zip`，大小118434字节。内部校验SHA-256：`de6fe64e89181f18e6ee5a8216cd7707c326321cd29c06e4779ea28a1cc8c871`。
-- 文档整理后9项打包测试通过；20份Markdown及双语链接、代码字面量、Skill元信息检查通过。ZIP与当前发行源文件一致，变更均为Markdown内容。
-- 发布标签`v0.1.0`对应源码`07c60975a1ec5455d972654886ffdb6ed0df2e04`。已从公开链接下载附件并逐字节核对，与本地ZIP一致。
+- 本地ZIP已构建并核对，路径为`dist/asr-agent.zip`，大小118969字节。内部校验SHA-256：`7b62539f470ce0346fd58717ce2bab6878fd89559062c05e9823ce740cb5eee4`。
+- 59项导出相关检查与250项全量Python回归通过；双语文档、Skill和包内链接检查通过。ZIP的CRC及当前源文件逐字节比较通过。
+- 三张受影响的UML图已重新渲染并查看；运行代码及使用文档中没有旧轮次实现残留。
 
 ## 接续
 

@@ -54,9 +54,9 @@ Codex reports where the files were saved when it finishes. You can close the pag
 | `transcription.md` | Read and archive the transcript in Markdown editors or notes |
 | `transcription.json` | Retain the original result for local re-export |
 
-Document titles use the recording's filename stem followed by `录音转写` (recording transcript). Output is grouped by task under `outputs` by default, with a separate folder for each export. Codex provides the actual paths.
+Document titles use the recording's filename stem followed by `录音转写` (recording transcript). By default, documents are saved in `outputs/task-id/documents/` and the original JSON in `outputs/task-id/json/`. Codex provides the actual paths.
 
-To regenerate documents, retain the project folder and original JSON, then ask Codex: “Re-export all three document formats for task `<task-id>`.” Previous exports are preserved. A JSON file alone is not enough to restore a complete task.
+To regenerate documents, retain the project folder and original JSON, then ask Codex: “Re-export all three document formats for task `<task-id>`.” The documents replace the task's files with the same names without recognizing the recording again. Save a separate copy of any documents you have edited first. A JSON file alone is not enough to restore a complete task.
 
 ## Usage notes
 

@@ -1,25 +1,21 @@
-"""按独立轮次导出三种文档并记录交付结果。"""
+"""向任务的固定目录导出三种文档并记录交付结果。"""
 
-import uuid
-from datetime import datetime, timezone
 from pathlib import Path
 
 from ..tools.documents import DocumentError, publish_document, write_docx, write_markdown, write_xlsx
 from ..tools.environment import SetupError
-from ..tools.job_files import prepare_documents, reserve_export, save_record
+from ..tools.job_files import prepare_documents, prepare_delivery, save_record
 from ..models import Transcript
 
 
 def export_documents(job_root: Path, config: dict, transcript: Transcript) -> dict:
-    """生成本轮Excel、Word和Markdown，汇总各格式交付结果。"""
-    export_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ-") + uuid.uuid4().hex[:8]
-    state = reserve_export(job_root, export_id)
-    report = {"job_id": config["job_id"], "export_id": export_id, "status": "EXPORTING",
-              "source_sha256": transcript.sha256, "sentences": len(transcript.sentences),
+    """生成并替换任务的Excel、Word和Markdown，汇总各格式交付结果。"""
+    state = prepare_delivery(job_root)
+    report = {"job_id": config["job_id"], "status": "EXPORTING",
               "files": {}, "message": "正在本地生成文档。"}
     save_record(state, report)
     try:
-        destination = prepare_documents(config, export_id)
+        destination = prepare_documents(config)
     except (OSError, SetupError, KeyError, TypeError) as exc:
         report.update(status="FAILED", message="无法创建文档目录，请检查已确认的保存位置、权限和磁盘空间；JSON已保留。",
                       error_type=type(exc).__name__)

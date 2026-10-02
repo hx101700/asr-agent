@@ -22,19 +22,19 @@ alt 用户明确要求重新导出
             alt JSON有效且摘要一致
                 T->>T: _deliver(project, config, transcript, report)
                 T->>D: export_documents(job_root, config, transcript)
-                D->>D: 生成本轮export_id
-                D->>J: reserve_export()创建记录目录并保存EXPORTING
-                D->>J: prepare_documents()创建本轮成品目录
+                D->>J: prepare_delivery()创建或复用delivery目录
+                D->>J: save_record(EXPORTING)
+                D->>J: prepare_documents(config)创建或复用固定documents目录
                 loop 三格式各执行一次
                     D->>W: publish_document(writer, transcript, final_path)
-                    W->>F: 写入并发布本格式成品<br/>Excel和Word回读；Markdown编码写入
+                    W->>F: 写partial文件，完成后替换同名成品<br/>Excel和Word回读；Markdown编码写入
                     W-->>D: 字节数或格式异常
                     D->>J: 保存该格式交付结果
                 end
                 D->>J: 保存COMPLETE / PARTIAL / FAILED
-                D-->>T: 本轮delivery；记录中断可抛出异常
+                D-->>T: delivery回执；记录中断可抛出异常
                 T->>T: _attach_delivery()；中断时附加OUTCOME_UNKNOWN
-                T-->>C: 保留JSON状态并附加本轮delivery
+                T-->>C: 保留JSON状态并附加delivery
                 C-->>U: 报告已知结果与保存位置
             else 结果无法核对
                 T-->>C: SetupError；CLI输出失败说明
@@ -55,13 +55,13 @@ else 用户查看本地任务状态
     else execution存在但记录不可读
         T-->>C: OUTCOME_UNKNOWN / unknown
     else 执行记录可读
-        T->>J: latest_delivery()
-        J-->>T: None或最近一轮交付记录
+        T->>J: read_delivery()
+        J-->>T: None或固定delivery/status.json中的记录
         T->>T: 有交付记录时附加delivery及documents_ready
         T-->>C: 本地执行状态及已有交付信息
     end
 end
-Note over T,F: 自动交付与显式export复用同一export_documents()<br/>重导保存新轮次并保留历史；本次调用返回自己的轮次<br/>读取范围为确认配置、执行记录和原JSON
-Note over C,J: 状态来自本机磁盘，既不查询云端，也不证明进程仍存活<br/>job-status读取最近发起的轮次，不重新核验成品文件
+Note over T,F: 自动交付与显式export复用同一export_documents()<br/>重导更新固定documents中的三个同名文件；失败格式保留已有成品<br/>读取范围为确认配置、执行记录和原JSON
+Note over C,J: 状态来自本机磁盘，既不查询云端，也不证明进程仍存活<br/>job-status读取固定delivery/status.json，不重新核验成品文件
 Note over T,J: 当次JSON成功回执不能替代磁盘JSON_READY记录和摘要<br/>授权与配置检查通过后，已有execution的同job返回本地记录<br/>记录恢复入口尚未提供
-Note over C,F: src/asr_agent/application/transcription.py::export_job、job_status、_deliver<br/>tools/job_files.py::read_execution、latest_delivery<br/>application/delivery.py::export_documents；tools/documents.py::publish_document
+Note over C,F: src/asr_agent/application/transcription.py::export_job、job_status、_deliver<br/>tools/job_files.py::read_execution、read_delivery、prepare_delivery、prepare_documents<br/>application/delivery.py::export_documents；tools/documents.py::publish_document

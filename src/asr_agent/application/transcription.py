@@ -9,7 +9,7 @@ from ..tools.bailian import BailianFailure, PreparedCommand, prepare_command, re
 from ..tools.environment import Project, SetupError
 from ..tools.files import FileError, file_fingerprint
 from ..tools.job_files import (
-    job_directory, read_config, read_execution, latest_delivery, reserve_execution,
+    job_directory, read_config, read_execution, read_delivery, reserve_execution,
     result_path, prepare_result, save_record,
 )
 from ..tools.results import load_transcript
@@ -45,7 +45,7 @@ def job_status(project: Project, job_id: str) -> dict:
         return report
     if report["status"] in ("PREPARING", "RUNNING"):
         report["message"] = "这是最近保存的执行状态，不代表进程仍存活。请检查原执行进程，勿重新提交。"
-    delivery = latest_delivery(root)
+    delivery = read_delivery(root)
     if delivery is not None:
         if delivery["status"] == "EXPORTING":
             delivery["message"] = "这是最近保存的导出状态，不代表进程仍在运行。请检查原进程和已完成文件；不会自动重试。"
@@ -61,19 +61,18 @@ def _attach_delivery(report: dict, delivery: dict) -> dict:
 
 
 def _deliver(project: Project, config: dict, transcript: Transcript, report: dict) -> dict:
-    """生成本轮文档，将交付结果合并到执行回执。"""
+    """生成任务文档，将交付结果合并到执行回执。"""
     try:
         delivery = export_documents(job_directory(project, config["job_id"]), config, transcript)
     except (OSError, SetupError, KeyboardInterrupt) as exc:
         # 即使状态文件也无法写入，仍把已保存的JSON交给调用者，不能误报识别失败。
         delivery = {"status": "OUTCOME_UNKNOWN", "error_type": type(exc).__name__,
                     "message": "本地导出中断或记录无法保存。JSON及已生成文件已保留，请检查目录权限、空间和文件；未重新识别。"}
-    # 返回本次调用的轮次；并行发起的另一轮不能替换本调用的回执。
     return _attach_delivery(report, delivery)
 
 
 def export_job(project: Project, job_id: str) -> dict:
-    """核对已保存的转写结果并生成一轮文档。"""
+    """核对已保存的转写结果并更新任务文档。"""
     config = read_config(project, job_id)
     report = read_execution(job_directory(project, job_id))
     if report is None or report["status"] != "JSON_READY":

@@ -43,7 +43,7 @@ def timestamp(milliseconds: int) -> str:
 
 def publish_document(writer, transcript: Transcript, final_path: Path, *,
                      source_name: str, job_id: str) -> int:
-    """调用writer生成临时文件，发布成品并返回文件大小。"""
+    """先生成临时文件，再替换同名成品并返回文件大小。"""
     temporary = final_path.with_name("transcription.partial" + final_path.suffix)
     writer(transcript, temporary, source_name=source_name, job_id=job_id)
     temporary.replace(final_path)

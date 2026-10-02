@@ -107,7 +107,7 @@ Codex 会执行转写，并在完成后告诉你文件保存在哪里。网页�
 使用已获授权、可公开的样本；补图本身不代表已完成识别准确率或逐页排版验收。
 -->
 
-默认目录结构如下，任务编号和导出编号由程序生成：
+默认目录结构如下，任务编号由程序生成：
 
 ```text
 outputs/
@@ -115,13 +115,12 @@ outputs/
     ├── json/
     │   └── transcription.json
     └── documents/
-        └── 导出编号/
-            ├── transcription.docx
-            ├── transcription.xlsx
-            └── transcription.md
+        ├── transcription.docx
+        ├── transcription.xlsx
+        └── transcription.md
 ```
 
-需要重新生成文档时，保留项目文件夹和原始 JSON，并告诉 Codex：“请为任务 `<任务编号>` 重新导出三种文档。”新文件会保存在新的导出目录，上一轮文件保留。仅有一份 JSON 文件不足以恢复完整任务。
+需要重新生成文档时，保留项目文件夹和原始 JSON，并告诉 Codex：“请为任务 `<任务编号>` 重新导出三种文档。”文档会保存到该任务的 `documents` 文件夹，覆盖同名成品，无需再次识别录音。如果手动编辑过成品，请先另存一份。仅有一份 JSON 文件不足以恢复完整任务。
 
 ## 常见问题
 

@@ -19,7 +19,7 @@
 
 1. 只为当前业务写代码；删除无消费者字段、重复检查和未发生需求的后备路径。不新增通用基类、任务队列、数据库、额外LLM或云客户端。
 2. 前端保持轻量MVP：model管理交互状态/派生权限，view处理DOM，app编排事件/API。普通表单留DOM，Key不入Model，不读取DOM.disabled作业务判断。
-3. 多步骤用例按入口→application→tools组织；登录、凭据状态和模板等单一工具操作允许入口直接分派。models只放共享不可变数据。web只做HTTP；application/session承载本机用例；tools/bailian只包装公开CLI进程；tools/results是转写结果JSON的唯一解析边界；tools/documents是普通writer；application/delivery决定独立导出轮次。工具不反向导入用例，规则不执行I/O。
+3. 多步骤用例按入口→application→tools组织；登录、凭据状态和模板等单一工具操作允许入口直接分派。models只放共享不可变数据。web只做HTTP；application/session承载本机用例；tools/bailian只包装公开CLI进程；tools/results是转写结果JSON的唯一解析边界；tools/documents负责各格式生成与替换；application/delivery编排三格式导出并汇总状态。工具不反向导入用例，规则不执行I/O。
 4. 工具能力直接复用：tools/files统一状态原子写入与文件身份，tools/job_files统一任务文件协议，tools/hotwords统一Excel模板/读取；static/api管理HTTP传输，app仅编排。不得保留旧根模块转发或另写相同能力。
 5. BL负责鉴权、临时上传、提交、轮询、结果下载和原始JSON落盘。已有能力不得用Python/SDK/HTTP重写，也不得改BL内部源码绕过公开接口。
 6. 官方参数/限制的来源放doc/REFERENCES.md；固定版本--help、发布源码与最小探针核对后再使用。不能猜参数或做静默兼容。
@@ -53,7 +53,8 @@
 - JSON_READY只表示原JSON通过结构检查。delivery COMPLETE且documents_ready=true表示三成品已保存；Excel/Word运行时回读，Markdown直接编码写入，保真由测试验证。不表示识别质量或人工视觉验收已通过。
 - json_path是结果目标，是否取得有效JSON由JSON_READY判断。record_error表示执行记录保存失败：保留当次回执中的已知事实，磁盘记录可能滞后，当前没有自动恢复记录或补摘要入口。
 - Excel长段存全文、正文自动换行并调整展示行高；真实字符/行数限制不截断。单格式失败保留其他成功文件；未知程序异常只报告类型，不输出私有正文。
-- 显式export核对已有任务的确认配置、已保存的JSON_READY执行记录和结果JSON摘要，全部三格式在新目录生成，不读Key/音频/Excel、不调用BL、不覆盖历史。每次调用返回自己的轮次；job-status只读最近记录，不查云端或重新验证成品。
+- 显式export核对已有任务的确认配置、已保存的JSON_READY执行记录和结果JSON摘要，在已确认的`<document_root>/<job_id>/documents/`生成三格式并覆盖同名成品；不读Key/音频/Excel、不调用BL。手工修改的成品先另存，等待当前导出命令结束后再发起下一次。各格式写入临时文件，成功后替换目标，失败保留已有目标。
+- 每个任务只保留`.state/jobs/<job_id>/delivery/status.json`这一份导出状态，job-status读取当前执行和导出记录，不查云端或重新验证成品。升级不删除已有文件，也不扫描旧导出记录。
 - 错误码从error_catalog.json取得有来源的解释；未知码保留脱敏code/message/request_id并说明未收录，不能猜余额/权限/其它模型含义。
 
 ## 操作与交付

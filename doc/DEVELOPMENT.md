@@ -40,7 +40,7 @@ src/asr_agent/
 | [inputs.py](../src/asr_agent/application/inputs.py) | 读取文件事实并应用规则，形成预览数据与字段错误 |
 | [rules.py](../src/asr_agent/application/rules.py) | 表达固定模型的输入规则、选项规则和热词词典规则 |
 | [transcription.py](../src/asr_agent/application/transcription.py) | 核对授权，管理一次执行与状态转移，编排媒体准备、BL 调用和本地导出 |
-| [delivery.py](../src/asr_agent/application/delivery.py) | 创建独立导出轮次，调用三种 writer，汇总完整或部分交付结果 |
+| [delivery.py](../src/asr_agent/application/delivery.py) | 向任务的固定目录导出三种文档，汇总完整或部分交付结果 |
 | [environment.py](../src/asr_agent/tools/environment.py) / [auth.py](../src/asr_agent/tools/auth.py) | 管理项目路径、子进程环境、依赖事实及 `.env` 凭据读取 |
 | [bailian.py](../src/asr_agent/tools/bailian.py) | 映射公开 CLI 参数，执行 BL，转交登录链接并解释脱敏错误 |
 | [files.py](../src/asr_agent/tools/files.py) / [job_files.py](../src/asr_agent/tools/job_files.py) | 提供文件身份、原子状态写入、配置发布、任务占用与输出路径协议 |
@@ -109,7 +109,7 @@ API Key 模式从项目 `.env` 读取 `DASHSCOPE_API_KEY`，只检查非空和�
 | `STOPPED` | 本次执行停止；结合 `cloud_outcome` 和错误阶段判断已知范围 |
 | `JSON_READY` | 原始 JSON 已保存并通过结构检查 |
 | `OUTCOME_UNKNOWN` | 本地记录缺失、损坏或不可读，无法从记录确定结果 |
-| `documents_ready=true` | 对应导出轮次的三种文档全部完成 |
+| `documents_ready=true` | 当前导出记录中的三种文档全部完成 |
 | `json_path` | 结果目标位置；字段存在不证明结果已取得 |
 | `record_error` | 执行记录保存失败；磁盘状态可能落后于本次回执 |
 
@@ -117,15 +117,17 @@ API Key 模式从项目 `.env` 读取 `DASHSCOPE_API_KEY`，只检查非空和�
 
 本地异常使用固定 `phase` 和必要的 `error_type` 定位；第三方未知异常只公开类型。官方错误解释集中在 `error_catalog.json`，状态解释见[错误与状态说明](ERRORS.md)。
 
-`job-status` 读取本地执行记录和最近一轮导出记录，不检查进程存活、不查询云端、不重新验证成品。
+`job-status` 读取本地执行记录和任务的固定导出记录，不检查进程存活、不查询云端、不重新验证成品。
 
 ## 文档交付
 
-`tools.results` 是官方转写结果 JSON 的唯一解析入口。`application.delivery` 为每次导出创建新编号，顺序调用 Excel、Word 和 Markdown writer。各格式之间没有成功依赖；单个 writer 失败后仍尝试其余格式一次。记录保存失败或中断可能结束当次交付，已生成文件保留。
+`tools.results` 是官方转写结果 JSON 的唯一解析入口。`application.delivery` 顺序生成 Excel、Word 和 Markdown，目标为已确认的任务文档目录中的三个固定文件名。各格式之间没有成功依赖；单个 writer 失败后仍尝试其余格式一次。记录保存失败或中断可能结束当次交付，已生成文件保留。
 
-Excel 和 Word 在发布前回读核对，Markdown 直接编码写入，编码保真由测试覆盖。导出状态为 `COMPLETE`、`PARTIAL` 或 `FAILED`；当次调用返回当次导出轮次，后续查询读取最近记录。
+各格式先写入同目录临时文件，成功后替换目标文件；失败保留已有目标。Excel 和 Word 在替换前回读核对，Markdown 直接编码写入，编码保真由测试覆盖。每个任务只有一份导出记录：运行时为 `EXPORTING`，完成后为 `COMPLETE`、`PARTIAL` 或 `FAILED`。当次命令返回本次结果，`read_delivery` 直接读取该任务的固定记录。
 
-显式 `export` 需要已保存的 `JSON_READY` 执行记录及匹配的结果摘要，不读取 Key、音频或原 Excel，不调用 BL，也不覆盖历史导出。结构与内容保真检查不代表识别准确率或 Office 排版已通过人工验收。
+显式 `export` 核对确认配置、已保存的 `JSON_READY` 执行记录及匹配的结果摘要，重新生成并覆盖该任务的同名成品。重导不读取 Key、音频或原 Excel，也不调用 BL。手工修改过的文档应先另存；同一任务等待当前导出命令结束后再发起下一次。结构与内容保真检查不代表识别准确率或 Office 排版已通过人工验收。
+
+升级保留旧版本已生成的文件，不自动迁移、删除或扫描旧导出记录。已有任务明确重新导出后，成品和状态使用下表中的固定位置。
 
 | 数据 | 位置 |
 | --- | --- |
@@ -134,14 +136,14 @@ Excel 和 Word 在发布前回读核对，Markdown 直接编码写入，编码�
 | 确认配置 | `.state/jobs/<job_id>/config.json` 与 `config.sha256` |
 | 执行记录 | `.state/jobs/<job_id>/execution/status.json` |
 | 原始 JSON | `<json_root>/<job_id>/json/transcription.json` |
-| 导出记录 | `.state/jobs/<job_id>/exports/<export_id>/status.json` |
-| 文档成品 | `<document_root>/<job_id>/documents/<export_id>/` |
+| 导出记录 | `.state/jobs/<job_id>/delivery/status.json` |
+| 文档成品 | `<document_root>/<job_id>/documents/transcription.{xlsx,docx,md}` |
 
 ## 维护与发行
 
 命名函数和方法使用简短中文职责说明：Python 使用 docstring，JavaScript 使用函数前注释。说明面向调用者，交代动作、结果及必要的返回约定；实现原因和外部限制写在对应代码旁。
 
-修改行为时，沿当前职责定位消费者：输入限制在 `rules`，确认快照在 `Session`，CLI 映射在 `bailian`，结果解析在 `results`，导出轮次在 `delivery`。调用顺序或状态协议改变时，同步对应 UML 源稿和渲染图。
+修改行为时，沿当前职责定位消费者：输入限制在 `rules`，确认快照在 `Session`，CLI 映射在 `bailian`，结果解析在 `results`，导出编排在 `delivery`。调用顺序或状态协议改变时，同步对应 UML 源稿和渲染图。
 
 [`scripts/build_zip.py`](../scripts/build_zip.py) 使用固定逐文件清单，当前清单为 46 个文件。运行代码、静态页面、错误字典、入口、依赖锁、Skill、LICENSE 和 `.env.example` 进入 ZIP。根目录 README、AGENTS 的中英文版本及 `.gitignore` 来自 `release/` 中的明确模板映射；包内 `doc/` 仅含 HELP、ERRORS、REFERENCES。
 

@@ -12,7 +12,7 @@ Preparing --> Stopped : 准备失败或首次记录保存失败 / not_started
 Running --> Stopped : RUNNING保存失败或BL进程启动失败 / not_started
 Running --> Stopped : BL等待失败或该阶段本地异常 / unknown
 Running --> JsonReady : BL结束且结果结构与正文通过检查 / result_received
-JsonReady --> JsonReady : 成功记录已保存 / 附加本轮delivery
+JsonReady --> JsonReady : 成功记录已保存 / 附加delivery
 note right of Configured
   配置文件保持CONFIGURED与execution_authorized=false
   执行授权和状态另记入execution/status.json
@@ -38,7 +38,7 @@ note right of JsonReady
 end note
 note left of Preparing
   本图建模dict中的状态字符串，代码没有State类
-  交付轮次另用EXPORTING、COMPLETE、PARTIAL、FAILED
+  delivery/status.json另记EXPORTING、COMPLETE、PARTIAL、FAILED
   读取损坏记录或导出中断可合成OUTCOME_UNKNOWN
   源码：src/asr_agent/application/transcription.py、delivery.py
   文件协议：src/asr_agent/tools/job_files.py
