@@ -18,7 +18,7 @@ Before you start, [register an Alibaba Cloud account](https://help.aliyun.com/zh
 Download **asr-agent.zip** from [Releases](https://github.com/hx101700/asr-agent/releases). Send the ZIP and this prompt to Codex; it will check your environment and follow the project instructions to install and verify asr-agent:
 
 ```text
-Extract this ZIP, read AGENTS.md in the extracted project, and follow its instructions to install and configure asr-agent for me.
+Extract this ZIP into a separate project folder, read its AGENTS.md, and follow the instructions to install and configure asr-agent for me.
 ```
 
 Currently supports Windows 10/11 x64. Python 3.12 x64 and Node.js 18.17+ with npm must be installed on your computer. See the [user guide](doc/HELP.md) for environment requirements. The web UI and document labels are currently in Chinese.

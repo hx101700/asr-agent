@@ -16,7 +16,7 @@ from asr_agent import MODEL
 from asr_agent.tools.auth import bailian_environment
 from asr_agent.tools.environment import Project
 from asr_agent.tools.bailian import bl_command
-from asr_agent.application.diagnostics import SYNTHETIC_AUDIO_URL
+from scripts.probe_bl import SYNTHETIC_AUDIO_URL
 from asr_agent.tools.bailian import PreparedCommand, run_recognition
 from asr_agent.application.session import Session
 from asr_agent.application.transcription import job_status, transcribe

@@ -61,15 +61,15 @@ Excel的5MB、20MiB解压、200个内部文件、10001行和两列是本地解�
 
 BL可能跳过失败子项、写空数组，或在没有子结果时不写文件；因此退出0仍需检查实际JSON。固定单文件成功结果已实测为对象，包含file_url/properties/transcripts；句子含begin_time/end_time/text及可空speaker_id，时间单位毫秒。Python不猜字段别名，也不声称获得了全部云端子任务信封。
 
-完整模式不稳定暴露task_id，未提供已验收的独立恢复流程。本项目不为此补HTTP客户端。BL会在真实本地文件dry-run判断前执行上传，所以probe只能使用固定虚构URL。
+完整模式不稳定暴露task_id，当前没有独立恢复入口。BL会在真实本地文件dry-run判断前执行上传，因此不能把本地文件dry-run当作无上传的预览。
 
 ### 增强文本与Windows参数
 
-锁定的BL 2.1.0发布包中，bailian-cli-runtime/dist/index.mjs的parsePath先识别独立的--help/--version，parseFlags将分离参数中以--开头的值视为缺少参数值。解析器也支持以首个等号分隔选项和值，因此本项目将上下文构造成单个`--context=<原文>`参数；其中后续等号、引号、换行和反斜杠作为文本保留。该行为已用真实BL和127.0.0.1模拟接口核对。
+锁定的BL 2.1.0发布包中，bailian-cli-runtime/dist/index.mjs的parsePath先识别独立的--help/--version，parseFlags将分离参数中以--开头的值视为缺少参数值。解析器也支持以首个等号分隔选项和值，因此本项目将上下文构造成单个`--context=<原文>`参数；其中后续等号、引号、换行和反斜杠作为文本保留。
 
 热词由`json.dumps`编码为一个JSON参数，再由BL的parseInstantVocabulary通过JSON.parse还原。bailian-cli-core/dist/index.mjs中的buildAsrContextMessages将上下文直接包装为input_text。本项目使用参数数组、Node入口和shell=False；Windows参数引用交给Python标准库处理。[Python参数传递规则](https://docs.python.org/3.12/library/subprocess.html#converting-an-argument-sequence-to-a-string-on-windows)、[JSON序列化](https://docs.python.org/3.12/library/json.html#json.dumps)
 
-增强文本的请求保真由本机合约测试核对。完整命令受Windows的32767个UTF-16单元限制（含末尾NUL）；超限在执行准备阶段明确停止。[CreateProcessW](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw)
+完整命令受Windows的32767个UTF-16单元限制（含末尾NUL）；超限在执行准备阶段明确停止。[CreateProcessW](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw)
 
 ### Windows登录转交
 
@@ -83,7 +83,7 @@ BL中间件会检查版本并可能写update-state.json；quiet阻止后续自�
 
 ## 本机窗口与成品
 
-- [tkinter.askdirectory](https://docs.python.org/3.12/library/dialog.html#tkinter.filedialog.askdirectory)：选择现有目录。当前无人工总时限，取消与进程回收由项目处理。正常桌面的可见性属于本机运行证据，不用“可import”替代验收。
+- [tkinter.askdirectory](https://docs.python.org/3.12/library/dialog.html#tkinter.filedialog.askdirectory)：选择现有目录。当前无人工总时限，取消与进程回收由项目处理；显示窗口需要正常交互桌面。
 - [python-docx文本/分页](https://python-docx.readthedocs.io/en/latest/user/text.html)：段落、keep_with_next和widow_control；不代表无需实际页面检查。
 - [openpyxl样式](https://openpyxl.readthedocs.io/en/stable/styles.html)及[Excel规格](https://support.microsoft.com/en-us/excel/excel-specifications-and-limits)：单元格32767字符、工作表1048576行、行高409。项目正文自动换行，按内容估算展示行高并封顶409，单元格保留长段全文；存储超限不截断。
 - [Ant Design表单](https://ant.design/docs/spec/research-form/)与[输入](https://ant.design/docs/spec/data-entry/)为界面组织参考；不是本项目使用了Ant组件库，也不是阿里官方产品认证。

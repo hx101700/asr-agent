@@ -53,11 +53,11 @@ def build_zip(root: Path, destination: Path | None = None) -> dict:
     destination = destination or root / "dist" / "asr-agent.zip"
     destination = destination.resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
-    names = [f"asr-agent/{name}" for name in files]
+    names = list(files)
     # x 模式拒绝覆盖既有包。
     with ZipFile(destination, "x", compression=ZIP_DEFLATED) as archive:
         for name, path in files.items():
-            archive.write(path, f"asr-agent/{name}")
+            archive.write(path, name)
     return {"status": "created", "path": str(destination), "file_count": len(names), "files": names}
 
 

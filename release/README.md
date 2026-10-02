@@ -18,7 +18,7 @@
 从 [Releases](https://github.com/hx101700/asr-agent/releases) 下载 **asr-agent.zip**，把 ZIP 和下面这句话发给 Codex，它会根据本机环境，按项目说明完成安装与校验：
 
 ```text
-请解压 ZIP，阅读解压目录中的 AGENTS.md，并按照说明帮我安装和配置 asr-agent。
+请将 ZIP 解压到独立项目文件夹，阅读其中的 AGENTS.md，并按照说明帮我安装和配置 asr-agent。
 ```
 
 当前支持 Windows 10/11 x64。本机需安装 Python 3.12 x64 和 Node.js 18.17+（含 npm）；环境要求见[使用说明](doc/HELP.md)。

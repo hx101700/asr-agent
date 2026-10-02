@@ -4,10 +4,24 @@
 
 本文为使用指令入口，英文对照见AGENTS.en.md；两种语言描述同一套规则。
 
-本目录是可安装的录音转写 Agent。收到安装、转写或本地重导请求时，先读 [.agents/skills/asr-agent/SKILL.md](.agents/skills/asr-agent/SKILL.md)，使用已有入口完成任务。
+本目录是录音转写 Agent 的项目根目录，包含 `scripts/asr.py`。
+
+## 安装
+
+确认本机有 Windows x64 CPython 3.12（含 venv、ensurepip、tkinter）、Node.js 18.17.0 或更高版本及配套 npm。在本目录执行：
+
+```powershell
+python -S -X utf8 scripts/asr.py bootstrap
+```
+
+依赖安装在项目内，根据回执报告安装状态。已安装的可用环境直接复用；问题处理见 [HELP](doc/HELP.md)。保留用户已有文件、凭据和结果。
+
+## 使用
+
+收到转写或本地重新导出请求时，读 [.agents/skills/asr-agent/SKILL.md](.agents/skills/asr-agent/SKILL.md)，使用已有入口完成任务。
 
 - 固定模型 `qwen-audio-3.0-asr-flash-filetrans`、北京地域、单个音频、临时 OSS。没有批量、实时录音、翻译或摘要能力。
-- 本机需要 Windows x64 CPython 3.12（含 venv、ensurepip、tkinter）、Node.js 18.17.0 或更高版本及配套 npm。安装入口为 `python -S -X utf8 scripts/asr.py bootstrap`；依赖在项目内安装，禁止全局安装、修改系统 PATH 或绕过工具执行权限。
+- 使用项目内的依赖环境，遵循工具执行权限；禁止全局安装或修改系统 PATH。
 - 网页负责添加本机文件、填写和保存配置；保存不自动上传。Codex 从同一网页服务的回执取得 job_id，并在用户上传授权覆盖本次音频及增强内容后调用转写入口。
 - BL 负责鉴权、临时上传、提交、轮询和下载；不要用 Python、SDK 或 HTTP 重写这些能力，也不要修改 BL 内部源码。
 - API Key 只从项目 `.env` 读取。密钥、令牌和签名 URL 不进入聊天、日志或配置快照；录音、增强内容、原响应和转写结果不进入 Git，只按现有本地流程保存。除用户需要，不把私有正文贴进聊天；控制台已有登录配置直接复用。

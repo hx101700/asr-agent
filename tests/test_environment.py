@@ -1,3 +1,5 @@
+import contextlib
+import io
 import json
 import os
 import subprocess
@@ -9,11 +11,30 @@ from asr_agent.application.bootstrap import bootstrap
 from asr_agent.tools.environment import SetupError, child_environment, check_python, find_node, installed_python_versions, locked_python_versions, run_process
 from asr_agent.tools.bailian import bl_command, verify_bl_installation
 from asr_agent.application.diagnostics import doctor
-from asr_agent.application.diagnostics import SYNTHETIC_AUDIO_URL, probe
+from scripts.probe_bl import SYNTHETIC_AUDIO_URL, probe
+from scripts.probe_bl import main as probe_main
+from asr_agent.__main__ import main as runtime_main
 from tests.support import ProjectTestCase, ROOT
 
 
 class EnvironmentTests(ProjectTestCase):
+    def test_runtime_cli_rejects_development_probe(self):
+        """验证用户命令入口拒绝开发合约探针。"""
+        with contextlib.redirect_stderr(io.StringIO()) as error:
+            with self.assertRaises(SystemExit) as stopped:
+                runtime_main(["probe-bl"])
+        self.assertEqual(stopped.exception.code, 2)
+        self.assertIn("invalid choice", error.getvalue())
+
+    def test_development_probe_rejects_audio_arguments(self):
+        """验证开发探针的独立入口拒绝外部音频参数。"""
+        with patch("scripts.probe_bl.probe") as run, \
+                contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit) as stopped:
+                probe_main(["--url", "https://example.invalid/another.wav"])
+        self.assertEqual(stopped.exception.code, 2)
+        run.assert_not_called()
+
     def test_python_runtime_matches_locked_binary_wheels(self):
         """验证Python平台与锁定二进制依赖匹配。"""
         for version, platform in (((3, 12, 1), "win-amd64"), ((3, 13, 0), "win-amd64"),
@@ -199,8 +220,8 @@ class EnvironmentTests(ProjectTestCase):
             *[subprocess.CompletedProcess([], 0, "", "Usage: test") for _ in range(3)],
             subprocess.CompletedProcess([], 0, json.dumps(payload), ""),
         ]
-        with patch("asr_agent.application.diagnostics.bl_command", side_effect=lambda project, args: ["node.exe", *args, "--quiet"]), \
-             patch("asr_agent.application.diagnostics.run_process", side_effect=outputs) as run:
+        with patch("scripts.probe_bl.bl_command", side_effect=lambda project, args: ["node.exe", *args, "--quiet"]), \
+             patch("scripts.probe_bl.run_process", side_effect=outputs) as run:
             self.assertEqual(probe(self.project)["status"], "passed")
         for call in run.call_args_list:
             self.assertTrue(call.kwargs["probe_mode"])

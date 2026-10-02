@@ -145,7 +145,9 @@ API Key 模式从项目 `.env` 读取 `DASHSCOPE_API_KEY`，只检查非空和�
 
 修改行为时，沿当前职责定位消费者：输入限制在 `rules`，确认快照在 `Session`，CLI 映射在 `bailian`，结果解析在 `results`，导出编排在 `delivery`。调用顺序或状态协议改变时，同步对应 UML 源稿和渲染图。
 
-[`scripts/build_zip.py`](../scripts/build_zip.py) 使用固定逐文件清单，当前清单为 46 个文件。运行代码、静态页面、错误字典、入口、依赖锁、Skill、LICENSE 和 `.env.example` 进入 ZIP。根目录 README、AGENTS 的中英文版本及 `.gitignore` 来自 `release/` 中的明确模板映射；包内 `doc/` 仅含 HELP、ERRORS、REFERENCES。
+[`scripts/build_zip.py`](../scripts/build_zip.py) 使用固定逐文件清单，当前清单为 46 个文件。ZIP内直接放项目文件，解压目录即项目根目录。运行代码、静态页面、错误字典、入口、依赖锁、Skill、LICENSE 和 `.env.example` 进入 ZIP。根目录 README、AGENTS 的中英文版本及 `.gitignore` 来自 `release/` 中的明确模板映射；包内 `doc/` 仅含 HELP、ERRORS、REFERENCES。
+
+安装指令由发行AGENTS和HELP提供，Skill只负责转写与重新导出。开发合约探针位于[`scripts/probe_bl.py`](../scripts/probe_bl.py)，不进入发行清单或用户命令入口；仓库内使用`.venv/Scripts/python.exe -X utf8 scripts/probe_bl.py`执行。
 
 中文 `AGENTS.md` 是指令入口，`AGENTS.en.md` 为同一规则的英文对照。README 与发行模板同步维护两种语言。仓库 README 在快速开始中为转写页面和精度增强预留两处 HTML 注释截图位置；截图尚待提供，当前发行清单不收录展示截图。
 

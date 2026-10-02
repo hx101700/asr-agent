@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from .application.bootstrap import bootstrap
-from .application.diagnostics import doctor, probe
+from .application.diagnostics import doctor
 from .tools.auth import api_key_status
 from .tools.environment import Project, SetupError
 from .tools.bailian import BailianFailure, console_status, login_console
@@ -20,7 +20,7 @@ def main(argv: list[str] | None = None) -> int:
             stream.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description="asr-agent本地工具；转写须明确授权上传。")
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("doctor", "bootstrap", "probe-bl", "api-key-status", "console-status", "login"):
+    for name in ("doctor", "bootstrap", "api-key-status", "console-status", "login"):
         commands.add_parser(name)
     serve_parser = commands.add_parser("serve", help="打开本地配置网页")
     serve_parser.add_argument("--port", type=int, default=0, help="本地网页端口，默认自动选择")
@@ -51,7 +51,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(json.dumps({"status": "WAITING_FOR_LOGIN", "message": "请在最后打开的阿里云官方页面完成授权。Windows可能先出现一个缺少参数的页面，程序会接收BL的完整备用链接并打开一次。最多等待15分钟；未打开时可按Ctrl+C停止。"}, ensure_ascii=False), flush=True)
             actions = {
                 "doctor": doctor, "bootstrap": bootstrap, "api-key-status": api_key_status,
-                "console-status": console_status, "login": login_console, "probe-bl": probe,
+                "console-status": console_status, "login": login_console,
             }
             report = actions[args.command](project)
     except BailianFailure as exc:

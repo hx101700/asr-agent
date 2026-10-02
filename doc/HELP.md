@@ -19,9 +19,11 @@ Python 和 Node.js 可从 [Python Windows 下载页](https://www.python.org/down
 ## 安装与打开页面
 
 1. 从 [Releases](https://github.com/hx101700/asr-agent/releases) 下载 `asr-agent.zip`。
-2. 把 ZIP 和“请解压 ZIP，阅读解压目录中的 AGENTS.md，并按照说明帮我安装和配置 asr-agent”发给 Codex。
+2. 把 ZIP 和“请将 ZIP 解压到独立项目文件夹，阅读其中的 AGENTS.md，并按照说明帮我安装和配置 asr-agent”发给 Codex。
 3. 等待 Codex 检查本机环境，按项目说明完成安装与校验。
 4. 安装完成后，在该项目中说“帮我转写录音”，按提示完成百炼认证并打开本机页面。
+
+解压到独立项目文件夹后，`AGENTS.md`、`README.md` 和 `scripts` 直接位于该文件夹中，该目录就是运行命令的位置。
 
 依赖保存在项目文件夹内。安装过程中可能暂时没有新输出，请等待同一次安装结束。若安装失败，先查看 Codex 返回的原因，再决定下一步；不要同时启动多个安装。
 

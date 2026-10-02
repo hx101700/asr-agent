@@ -31,7 +31,7 @@ class PackageTests(ProjectTestCase):
             "doc/private.md", "src/asr_agent/job/private.py", "src/asr_agent/debug.py",
             "src/asr_agent/static/debug.mjs", "src/asr_agent/static/job/private.mjs",
             "tests/test_package.py", "tests/job/private.py", "pyproject.toml",
-            "scripts/build_zip.py", "doc/README.md", "doc/STATUS.md", "doc/DEVLOG.md",
+            "scripts/build_zip.py", "scripts/probe_bl.py", "doc/README.md", "doc/STATUS.md", "doc/DEVLOG.md",
             "doc/ISSUES.md", "doc/DEVELOPMENT.md", "doc/ACCEPTANCE.md",
             ".agents/private/SKILL.md", "tools/bailian/node_modules/private.js",
             "tools/bailian/bailian-runtime.tgz", "tools/bailian/runtime-manifest.json",
@@ -56,16 +56,15 @@ class PackageTests(ProjectTestCase):
             names = archive.namelist()
             self.assertEqual(names, report["files"])
             self.assertEqual(len(names), report["file_count"])
-            self.assertTrue(all(name.startswith("asr-agent/") for name in names))
-            self.assertEqual(set(names), {f"asr-agent/{name}" for name in (*REQUIRED_FILES, *RELEASE_TEMPLATES)})
+            self.assertEqual(set(names), set((*REQUIRED_FILES, *RELEASE_TEMPLATES)))
             for name in ("README.md", "README.en.md", "AGENTS.md", "AGENTS.en.md"):
-                self.assertIn(f"asr-agent/{name}", names)
+                self.assertIn(name, names)
             for relative in REQUIRED_FILES:
-                self.assertIn(f"asr-agent/{relative}", names)
+                self.assertIn(relative, names)
             for relative in excluded:
-                self.assertNotIn(f"asr-agent/{relative}", names)
+                self.assertNotIn(relative, names)
             for name, source in RELEASE_TEMPLATES.items():
-                self.assertEqual(archive.read(f"asr-agent/{name}"), (self.source / source).read_bytes())
+                self.assertEqual(archive.read(name), (self.source / source).read_bytes())
             self.assertTrue(all(archive.read(name) != b"synthetic-private-marker" for name in names))
             self.assertTrue(all(archive.read(name) != b"developer-only-marker" for name in names))
 
@@ -129,7 +128,7 @@ class PackageTests(ProjectTestCase):
         unpacked = self.project.path("解压 验收目录")
         with ZipFile(report["path"]) as archive:
             archive.extractall(unpacked)
-        project = unpacked / "asr-agent"
+        project = unpacked
         self.assertFalse((project / ".git").exists())
         result = subprocess.run(
             [sys.executable, "-S", "-X", "utf8", "scripts/asr.py", "--help"],
@@ -138,6 +137,7 @@ class PackageTests(ProjectTestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("bootstrap", result.stdout)
         self.assertIn("transcribe", result.stdout)
+        self.assertNotIn("probe-bl", result.stdout)
         for relative in ("tests", "scripts/build_zip.py", "pyproject.toml", "doc/STATUS.md",
                          "src/asr_agent/transcription.py", "src/asr_agent/validation.py"):
             self.assertFalse((project / relative).exists())
@@ -148,7 +148,7 @@ class PackageTests(ProjectTestCase):
         unpacked = self.project.path("运行 验收目录")
         with ZipFile(report["path"]) as archive:
             archive.extractall(unpacked)
-        project = unpacked / "asr-agent"
+        project = unpacked
         script = (
             "import importlib, pathlib, sys; "
             "root=pathlib.Path('src').resolve(); sys.path.insert(0,str(root)); "
