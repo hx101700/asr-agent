@@ -18,10 +18,10 @@ Python 和 Node.js 可从 [Python Windows 下载页](https://www.python.org/down
 
 ## 安装与打开页面
 
-1. 从 [Releases](https://github.com/hx101700/asr-agent/releases) 下载 `asr-agent.zip` 并解压。
-2. 用 Codex 打开其中的 `asr-agent` 文件夹。
-3. 输入“请安装 asr-agent，并打开录音转写页面”。
-4. 等待安装完成并打开本机页面。后续在同一项目中说“帮我转写录音”即可。
+1. 从 [Releases](https://github.com/hx101700/asr-agent/releases) 下载 `asr-agent.zip`。
+2. 把 ZIP 和“请解压 ZIP，阅读解压目录中的 AGENTS.md，并按照说明帮我安装和配置 asr-agent”发给 Codex。
+3. 等待 Codex 检查本机环境，按项目说明完成安装与校验。
+4. 安装完成后，在该项目中说“帮我转写录音”，按提示完成百炼认证并打开本机页面。
 
 依赖保存在项目文件夹内。安装过程中可能暂时没有新输出，请等待同一次安装结束。若安装失败，先查看 Codex 返回的原因，再决定下一步；不要同时启动多个安装。
 

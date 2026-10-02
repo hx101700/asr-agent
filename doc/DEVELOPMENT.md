@@ -147,7 +147,7 @@ API Key 模式从项目 `.env` 读取 `DASHSCOPE_API_KEY`，只检查非空和�
 
 [`scripts/build_zip.py`](../scripts/build_zip.py) 使用固定逐文件清单，当前清单为 46 个文件。运行代码、静态页面、错误字典、入口、依赖锁、Skill、LICENSE 和 `.env.example` 进入 ZIP。根目录 README、AGENTS 的中英文版本及 `.gitignore` 来自 `release/` 中的明确模板映射；包内 `doc/` 仅含 HELP、ERRORS、REFERENCES。
 
-中文 `AGENTS.md` 是指令入口，`AGENTS.en.md` 为同一规则的英文对照。README 与发行模板同步维护两种语言。仓库 README 的页面概览、精度增强、输出结果三处使用 HTML 注释预留真实截图位置；截图尚待提供，当前发行清单不收录展示截图。
+中文 `AGENTS.md` 是指令入口，`AGENTS.en.md` 为同一规则的英文对照。README 与发行模板同步维护两种语言。仓库 README 在快速开始中为转写页面和精度增强预留两处 HTML 注释截图位置；截图尚待提供，当前发行清单不收录展示截图。
 
 测试、构建器、pyproject、开发文档和 UML 保留在仓库。运行环境、下载文件、凭据、录音、转写结果和日志不发布。新增运行文件时更新发行清单及包边界测试；新增静态资源时同时检查 HTTP 路由。
 
