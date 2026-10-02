@@ -15,9 +15,9 @@ asr-transcription是单录音转写Skill，支持网页配置、热词与上下�
 
 ## 验证与发布
 
-完整回归及独立环境验收已完成：解压源码267项Python检查无跳过通过，前端24项通过；新工作目录联网准备成功。候选ZIP共42个文件、107802字节，SHA-256：`ab9835fd40c52ea0fe7461ae3dbe233208b5e459d7217b4969cd49ad253f7643`，清单、CRC、源码及包边界核对通过。具体范围见[ACCEPTANCE](ACCEPTANCE.md)。
+完整回归及独立环境验收已完成：解压源码267项Python检查无跳过通过，前端24项通过；新工作目录联网准备成功。发行ZIP共42个文件、107802字节，SHA-256：`ab9835fd40c52ea0fe7461ae3dbe233208b5e459d7217b4969cd49ad253f7643`，清单、CRC、源码及包边界核对通过。具体范围见[ACCEPTANCE](ACCEPTANCE.md)。
 
-按用户要求替换现有v0.1.0并推送dev，master保留原状态。尚未执行本轮远端更新，发布完成后记录源码提交、附件摘要与公开下载结果。
+已按用户要求替换现有[v0.1.0](https://github.com/hx101700/asr-agent/releases/tag/v0.1.0)，运行代码提交`9e6f739dd424bab6d4f10273186c212f587a8246`已推送dev。新版附件为[asr-transcription.zip](https://github.com/hx101700/asr-agent/releases/download/v0.1.0/asr-transcription.zip)，旧附件已删除；公开下载与本地文件逐字节一致，发布说明及中英文入口已核对。未新建版本，master保持`6c8371135d92b9f9d3bd52ca9ee246747f0c7f5e`，未合并本次改动。
 
 ## 接续
 
