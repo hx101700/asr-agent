@@ -11,9 +11,9 @@
 
 ## 当前工作
 
-文档与首版安装包已整理完成，发布说明稿位于[release/NOTES.md](../release/NOTES.md)。现有Release已全部删除，GitHub API核对剩余数量为0；Git提交和旧标签保留。
+文档与`v0.1.0`安装包已整理完成，发布说明位于[release/NOTES.md](../release/NOTES.md)。版本下载入口为[GitHub Releases](https://github.com/hx101700/asr-agent/releases)。
 
-`v0.1.0`尚未发布：源码推送连续两次无法连接github.com:443，已按约定停止上传。发布说明仅包含用户可见功能和安装入口；开发验证集中在[ACCEPTANCE](ACCEPTANCE.md)。业务代码未改。
+发布说明仅包含用户可见功能和安装入口；开发验证集中在[ACCEPTANCE](ACCEPTANCE.md)。业务代码未改。
 
 ## 验证与发布
 
@@ -25,6 +25,6 @@
 
 ## 接续
 
-网络恢复并继续任务后，先同步dev及尚未上传的双语文档，核对远端提交，再用准确提交创建`v0.1.0`、上传本节摘要对应的ZIP并验证公开下载。当前远端README尚未同步，仍可能引用已删除的旧附件；不要把本地准备完成当作发布成功。
+源码在dev维护，发行代码通过版本标签定位。核对实际Git分支、工作区与Release附件后继续工作，使用本节摘要核对安装包。
 
 独立复测使用空目录，不复用旧凭据或任务；原始data与开发环境保留。正常使用按HELP进行，评审按ACCEPTANCE的范围进行。
