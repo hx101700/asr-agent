@@ -1,51 +1,28 @@
 # 当前状态
 
-更新：2026-10-02。当前目标是交付供Windows全新Codex对话评审的源码ZIP。项目固定北京、qwen-audio-3.0-asr-flash-filetrans、单文件及临时OSS；Windows 10/11 x64为支持范围。
+更新：2026-10-02。
 
-## 当前实现与边界
+## 产品与实现
 
-- Codex编排命令，网页接收本机文件、预览并确认配置；上传授权与配置保存分开。
-- 多步骤用例位于application，文件、媒体、BL和文档能力位于tools，共享models为数据结构。登录、凭据状态、模板等单一操作允许入口直接分派。
-- 热词与上下文可并用，词典保存在确认快照；执行复用选项并核对实际音频内容。多声道且开启说话人时生成单声道FLAC副本。
-- 热词通过JSON参数传递，上下文使用BL原生--context=值绑定；Windows参数引用交给subprocess，特殊字符保持原文。
-- BL负责鉴权、上传、提交、轮询、下载及原JSON落盘；Python完成结果解析和三格式交付。失败不自动重试，每个job保持一次执行占用。
-- JSON_READY表示本次JSON通过结构检查；三成品是否完成看documents_ready和delivery。json_path仅为目标位置，record_error说明磁盘记录可能滞后。
-- 重导核对确认配置、已保存的JSON_READY执行记录及JSON摘要；保留历史导出轮次。记录缺失时的恢复能力尚未提供。
+- Windows 10/11 x64；北京地域；固定模型`qwen-audio-3.0-asr-flash-filetrans`；每次处理一个已有音频。
+- 本机网页配置，Codex按授权调用BL；热词与上下文可并用，输出原JSON及Excel、Word、Markdown。
+- 用例与工具按application/tools分离，执行与导出分别记录状态。模块和协议见[DEVELOPMENT](DEVELOPMENT.md)。
+- README与AGENTS提供中英文，网页及导出标签仍为中文。README的三处真实截图等待用户补充。
 
-## 本次复核与修正
+## 当前工作
 
-已对照源码核对开发文档、项目Skill、发行AGENTS/README及固定打包清单。统一运行时前提、安装等待、凭据、结果目标及重导条件，删除重复登录查询和旧文档表述。9份现行UML源稿及PNG位于doc/uml，由[UML索引](UML.md)进入。
+正在整理全部文档并重建首个Release `v0.1.0`。旧Release将在新包准备和源码同步完成后删除；不重写Git提交历史。
 
-随后按用户反馈重写仓库首页与发行README，以项目介绍、使用条件、Codex话术、网页操作、输出文件和常见问题组织内容；源码下载与精简发行包的区别已说明。此次仅改文档，运行代码、Skill、依赖和UML保持一致。
+本次修改集中于文档职责、操作说明和指令精确性，业务代码未改。Release正文使用用户可见功能及安装入口；开发验证集中在[ACCEPTANCE](ACCEPTANCE.md)。
 
-中英文README与AGENTS现已在仓库和发行模板中配对提供；中文AGENTS.md保持指令入口，英文为同一规则的对照。热词/上下文说明按阿里云官方资料改写，去除具体人名示例。仓库两种语言README各预留3处HTML截图注释，位置为页面概览、增强设置、导出结果，真实截图等待用户提供。构建器明确收录两份英文使用文档，业务代码与界面语言未改。
+## 验证与发布
 
-已删除ValidationError.message的重复赋值及热词文件名快照；异常文本继续由父类保存，网页文件名继续来自上传登记。旧平铺模块、离线运行时/依赖包及旧验收文档没有进入当前运行源码和发行清单；测试中的旧名称是排除反例。
+- 既有代码回归、独立安装和本机网页检查的证据见[ACCEPTANCE](ACCEPTANCE.md)。
+- 新Codex完整使用、真实云端、原生窗口和Office视觉验收仍待完成，详见[ISSUES](ISSUES.md)。
+- 发行清单固定为46个文件：运行代码、项目Skill、依赖锁、中英文README/AGENTS及必要使用文档。
+- 本地ZIP已构建并核对，路径为`dist/asr-agent.zip`，大小118434字节。内部校验SHA-256：`de6fe64e89181f18e6ee5a8216cd7707c326321cd29c06e4779ea28a1cc8c871`。
+- 文档整理后9项打包测试通过；20份Markdown及双语链接、代码字面量、Skill元信息检查通过。ZIP与当前发行源文件一致，变更均为Markdown内容。
 
-追加的增强输入验证复现了BL 2.1.0将--help、--version及--前缀上下文误认成命令选项的问题。recognition_arguments现采用单个--context=值，diagnostics中的合约探针也使用相同格式；17个特殊字符热词和12组上下文已通过真实BL本机HTTP请求的逐字核对。
+## 接续
 
-## 验证与发行包
-
-- 全量248项Python测试、24项前端测试通过；最终文档整理后的11项结构/打包检查通过。
-- Skill元信息和引用通过现有YAML解析器检查；两类合成失败回执的指引模拟符合当前边界。官方快捷校验脚本的工具依赖限制及验证范围见[ACCEPTANCE](ACCEPTANCE.md)。
-- README改写前的发行包在项目内新的独立空目录中联网安装成功，doctor未报告环境问题。使用新安装的源码、Python依赖和BL完成60项本机合约、媒体、网页及文档检查。
-- 实际Edge页面验证通过：合成文件添加、联合增强、Key密码显示与清空、多声道提示、预览保存、刷新恢复、转写信息停靠及三种视口无横向溢出。
-- UML已按源码核对并检查渲染图；发行清单、CRC、源码逐字节一致性及包内/开发文档链接通过。
-- 当前本地发行包为dist/asr-agent.zip，46个文件、119356字节。SHA-256：`8e2a200733187707a26c3941dae633e25cb0be7c226d844597f800277dbe1c6b`。新增README.en.md、AGENTS.en.md；原有文件仅README、AGENTS、REFERENCES内容变化，业务代码保持一致。
-- 双语更新已通过9项打包测试、8份双语文档链接/锚点/代码字面量核对、ZIP的CRC及逐文件内容比较；本轮未重复安装或执行识别。
-- 已有GitHub预览版[v0.1.0-preview.1](https://github.com/hx101700/asr-agent/releases/tag/v0.1.0-preview.1)对应双语更新之前的包。双语内容已本地提交，但推送连续两次无法连接github.com:443，按约定停止。新Release尚未创建；当前双语包仅在本地dist中，README下载入口继续指向有效的Releases列表。
-- README更新后9项打包测试、文档链接与目录锚点、ZIP的CRC和源码一致性检查通过；本次没有重复安装或执行识别。
-- 运行代码与`0f76157f39099413a146532fa3ff7f2c2ff17909`一致。后续README及交付记录修改通过[dev分支](https://github.com/hx101700/asr-agent/tree/dev)的Git历史追溯，当前包以本节摘要核对。
-- 根README/README.en、AGENTS/AGENTS.en和.gitignore来自release模板。包内doc仅HELP、ERRORS、REFERENCES；开发文档、截图、测试、UML图、运行时、依赖包、凭据、数据和成品均不发布。
-
-## 本机数据与接续
-
-历史.env、BL凭据、测试副本及私有验收产物已清理；原始data和开发依赖.venv/.tools保留。outputs/uml为用户请求的个人图稿，独立于发行包。后续真实使用需重新提供项目Key或完成官方登录。
-
-本轮空目录安装及网页检查完成后，确认进程结束并清理了临时安装、合成凭据、样本、结果、截图与渲染工具；现行UML保留在doc/uml。
-
-新Codex对话的完整编排、官方登录、云端识别质量、原生目录窗口可见性和Office逐页视觉仍待专家验收。本轮没有读取用户录音、使用真实凭据或调用云端识别；不能用本机模拟替代上述验收。
-
-接续先核对Git工作区和实际远端引用，按[ACCEPTANCE](ACCEPTANCE.md)执行相称验证。开发分支为dev，master保持验收里程碑用途；本地提交不代表推送完成。现有恢复、安装反馈和任务找回限制见[ISSUES](ISSUES.md)，模块及协议见[DEVELOPMENT](DEVELOPMENT.md)。
-
-本轮交付待办：网络恢复并继续任务后，先同步dev，再以包含双语模板的准确提交发布v0.1.0-preview.2，上传本节摘要对应的ZIP并核对公开下载。不要把preview.1附件当成双语包，也不要覆盖其既有摘要。
+核对本地dev、origin/dev及实际Release状态后继续发布。独立复测使用空目录，不复用旧凭据或任务；原始data与开发环境保留。正常使用按HELP进行，评审按ACCEPTANCE的范围进行。

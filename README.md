@@ -6,7 +6,7 @@
 
 asr-agent 是一个面向 Windows 用户的录音转写工具，适合处理会议、访谈、课程等已经录制好的音频。在 Codex 中提出转写需求，在本机网页选择文件和设置，完成后就能获得可阅读、编辑和归档的转写文档。
 
-语音识别由阿里云百炼的 `qwen-audio-3.0-asr-flash-filetrans` 提供，使用北京地域。当前为 Windows 预览版，每次处理一个文件。
+语音识别由阿里云百炼的 `qwen-audio-3.0-asr-flash-filetrans` 提供，使用北京地域。支持 Windows 10/11 x64，每次处理一个文件。
 
 [下载安装包](https://github.com/hx101700/asr-agent/releases) · [开始使用](#开始使用) · [输出文件](#输出文件) · [常见问题](#常见问题) · [详细使用说明](doc/HELP.md)
 
@@ -33,8 +33,8 @@ asr-agent 是一个面向 Windows 用户的录音转写工具，适合处理会�
 | --- | --- |
 | 操作系统 | Windows 10 / 11，64 位 |
 | Codex | 已安装并可正常使用的桌面端 |
-| Python | CPython 3.12，Windows x64，包含 venv、ensurepip 和 tkinter |
-| Node.js | 18.17.0 或更高版本，包含 npm |
+| Python | [CPython 3.12](https://www.python.org/downloads/windows/)，Windows x64，包含 venv、ensurepip 和 tkinter |
+| Node.js | [18.17.0 或更高版本](https://nodejs.org/en/download)，包含 npm |
 | 百炼账号 | 具备该模型调用权限的阿里云账号，或北京地域的百炼 API Key |
 | 网络 | 首次安装需下载依赖；转写时需连接阿里云百炼 |
 
@@ -63,7 +63,7 @@ API Key 由网页从本机文件读取，请勿把密钥发送到聊天中。识
 
 1. **添加音频**：选择或拖入一个文件，支持 MP3、WAV、M4A、FLAC 等格式。
 2. **设置转写选项**：选择音频语言，按需调整发言人区分和参考人数。
-3. **添加精度增强**：需要热词时下载网页模板并填写 Excel；需要上下文时填写与录音相关的参考文本。
+3. **添加精度增强**：需要热词时下载模板、填写并导入 Excel；需要上下文时填写与录音相关的参考文本。
 4. **选择保存位置**：原始 JSON 和转写文档可以分别选择文件夹，默认保存在项目的 `outputs` 中。
 5. 点击 **“检查并预览”**，核对信息后点击 **“保存设置”**。
 

@@ -19,7 +19,7 @@
 
 1. 只为当前业务写代码；删除无消费者字段、重复检查和未发生需求的后备路径。不新增通用基类、任务队列、数据库、额外LLM或云客户端。
 2. 前端保持轻量MVP：model管理交互状态/派生权限，view处理DOM，app编排事件/API。普通表单留DOM，Key不入Model，不读取DOM.disabled作业务判断。
-3. 多步骤用例按入口→application→tools组织；登录、凭据状态和模板等单一工具操作允许入口直接分派。models只放共享不可变数据。web只做HTTP；application/session承载本机用例；tools/bailian只包装公开CLI进程；tools/results是唯一JSON解析边界；tools/documents是普通writer；application/delivery决定独立导出轮次。工具不反向导入用例，规则不执行I/O。
+3. 多步骤用例按入口→application→tools组织；登录、凭据状态和模板等单一工具操作允许入口直接分派。models只放共享不可变数据。web只做HTTP；application/session承载本机用例；tools/bailian只包装公开CLI进程；tools/results是转写结果JSON的唯一解析边界；tools/documents是普通writer；application/delivery决定独立导出轮次。工具不反向导入用例，规则不执行I/O。
 4. 工具能力直接复用：tools/files统一状态原子写入与文件身份，tools/job_files统一任务文件协议，tools/hotwords统一Excel模板/读取；static/api管理HTTP传输，app仅编排。不得保留旧根模块转发或另写相同能力。
 5. BL负责鉴权、临时上传、提交、轮询、结果下载和原始JSON落盘。已有能力不得用Python/SDK/HTTP重写，也不得改BL内部源码绕过公开接口。
 6. 官方参数/限制的来源放doc/REFERENCES.md；固定版本--help、发布源码与最小探针核对后再使用。不能猜参数或做静默兼容。
@@ -28,11 +28,11 @@
 ## 配置、输入与凭据
 
 - 浏览器直接选文件，把字节交给127.0.0.1；只通过会话upload_id引用本机副本，不接受浏览器任意输入文件路径。
-- 预览检测音频并建立内容SHA基线；Excel只解析一次并保存vocabulary。确认复用预览，音频只做size/mtime早检查，不重读Excel、Key或完整SHA。
+- 预览检测音频并建立内容SHA基线，同时解析Excel并保存vocabulary。确认和执行复用预览快照；确认时音频只做size/mtime早检查，不重读Excel、Key或完整SHA。
 - config与config.sha256保存确认快照，execution_authorized=false。执行核对配置协议/摘要以及实际音频大小+SHA；摘要不是签名，不补签缺摘要配置。
 - 热词与上下文从config取，执行不再依赖原Excel。用户修改词表需要重新导入确认。正常会话清理仅保留已确认音频副本，导入的Excel临时副本可以清理；原始用户文件不动。
 - API Key仅从项目.env读取，检查非空和内部空白、不做额外在线预验证。勾选指定Key后经受保护本机POST显示到只读密码控件；切换方式/保存清空。显示和正式执行分别读取，预览/确认不绑定.env；执行使用当时的Key。
-- Key不进payload、配置、日志、截图或浏览器持久存储。只在指定Key模式下注入BL子进程环境。console模式不读.env。
+- Key不进入浏览器提交的配置payload、任务快照、日志、截图或浏览器持久存储；显示值仅通过受保护的本机响应返回。只在指定Key模式下注入BL子进程环境。console模式不读.env。
 - login只用于首次或明确重新登录；已有BL配置直接复用。console-status分别报告模型Key及控制台凭据存在性，不冒充在线权限验证，不自动改用.env。
 - 保留已验证的Windows登录完整备用URL转交：校验BL输出的官方URL并用os.startfile打开一次，仍使用原BL回调会话；不构造state、记录链接或重写认证。
 
@@ -66,7 +66,8 @@
 - 安装入口是`python -S -X utf8 scripts/asr.py bootstrap`；Python依赖使用阿里云PyPI镜像和`requirements.txt`的固定版本/摘要，`tools/bailian/package-lock.json`锁定BL依赖。依赖下载失败应报告实际原因，不自动重试、换源或改锁。再运行与修改相称的测试。全量命令：`.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -t . -v`；前端：`node --test tests/test_frontend.mjs`。
 - 发行清单固定在`scripts/build_zip.py`，不扫描目录收录开发文件。`release/README*.md`、`release/AGENTS*.md`的中英文模板及`release/.gitignore`逐项映射到发行包根目录；doc中仅包含HELP、ERRORS、REFERENCES。开发测试、构建器、pyproject和状态/验收文档保留在仓库。新增运行文件时明确审查并更新清单及包边界测试。
 - README与AGENTS均提供中文入口和英文对照，发行模板同步维护两种语言。README的截图先以HTML注释预留位置，用户提供实际截图后再插入；不添加不存在的图片链接，不将截图标成已完成验收。
-- 独立ZIP验收每轮开始前先确认验收目录无用户数据和运行进程，再清空整个目录（含旧源码、`.venv`、`.tools`、`.runtime`、`.state`），重新解压；正常用户使用时不清理其安装。2026-09-30用户反馈清华PyPI镜像当前不可用，不自动改用清华源。下载较慢不代表失败，等待同一进程的结果。若隔离执行出现网络异常，按工具权限流程排查，不用脚本绕过隔离。
+- 独立ZIP验收每轮开始前先确认验收目录无用户数据和运行进程，再清空整个目录（含旧源码、`.venv`、`.tools`、`.runtime`、`.state`），重新解压；正常用户使用时不清理其安装。安装使用既定阿里云镜像，清华源不作为自动回退。下载较慢不代表失败，等待同一进程的结果。若隔离执行出现网络异常，按工具权限流程排查，不用脚本绕过隔离。
 - probe-bl仅固定虚构URL；真实BL合约测试只连127.0.0.1模拟服务、用合成Key。BL仍可能检查公开版本；不可把本机测试称为云端识别验收。
 - 当前状态写STATUS，使用写HELP，实际验证写ACCEPTANCE，未决问题写ISSUES，简短进展写DEVLOG。删除已失效方案/重复历史，不把文档变成聊天记录。
+- 按读者维护文档：README介绍产品与上手步骤，HELP提供操作，ERRORS先给处理方法再给状态参考，Release说明用户可见功能、变化和下载。测试数量、提交摘要、包校验及评审记录保留在开发文档，不拼入Release正文。中英文采用同一术语和步骤。
 - UML索引为doc/UML.md，源稿与PNG位于doc/uml；修改调用顺序或状态协议时同步对应图稿。图中函数模块不应画成不存在的服务类；开发图稿不进入用户ZIP。

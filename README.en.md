@@ -6,7 +6,7 @@
 
 asr-agent is a recording transcription tool for Windows. It is designed for existing meeting, interview, and lecture recordings. Ask Codex to start, choose a file and options on a local web page, and receive documents you can read, edit, and archive.
 
-Speech recognition uses Alibaba Cloud Model Studio's `qwen-audio-3.0-asr-flash-filetrans` in the Beijing region. This Windows preview processes one file at a time. The current web UI and generated document labels are in Chinese.
+Speech recognition uses Alibaba Cloud Model Studio's `qwen-audio-3.0-asr-flash-filetrans` in the Beijing region. The tool supports Windows 10/11 x64 and processes one file at a time. The current web UI and generated document labels are in Chinese.
 
 [Download the package](https://github.com/hx101700/asr-agent/releases) · [Get started](#get-started) · [Output files](#output-files) · [FAQ](#faq) · [Detailed guide (Chinese)](doc/HELP.md)
 
@@ -33,8 +33,8 @@ Hide keys, account details, and private file paths before capture. Share the sam
 | --- | --- |
 | Operating system | Windows 10 / 11, 64-bit |
 | Codex | A working installation of the desktop app |
-| Python | Windows x64 CPython 3.12, including venv, ensurepip, and tkinter |
-| Node.js | Version 18.17.0 or later, including npm |
+| Python | [Windows x64 CPython 3.12](https://www.python.org/downloads/windows/), including venv, ensurepip, and tkinter |
+| Node.js | [Version 18.17.0 or later](https://nodejs.org/en/download), including npm |
 | Model Studio access | An Alibaba Cloud account with permission to call the model, or a Model Studio API key for Beijing |
 | Network | Required to download dependencies during installation and to connect to Model Studio for transcription |
 
@@ -63,7 +63,7 @@ The page reads your API key from the local file. Do not send the key in chat. Re
 
 1. **Add audio**: select or drag in one file. Supported formats include MP3, WAV, M4A, and FLAC.
 2. **Set transcription options**: choose the audio language and adjust speaker diarization and the estimated speaker count if needed.
-3. **Add accuracy enhancements**: download and fill in the Excel template for hotwords, or enter reference text related to the recording.
+3. **Add accuracy enhancements**: download the Excel template, fill it in, and upload the completed workbook for hotwords, or enter reference text related to the recording.
 4. **Choose output folders**: select separate destinations for JSON and documents if needed. The default is the project's `outputs` folder.
 5. Click **`检查并预览` (Check and preview)**, review the details, then click **`保存设置` (Save settings)**.
 

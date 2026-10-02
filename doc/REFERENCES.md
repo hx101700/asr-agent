@@ -2,7 +2,7 @@
 
 API资料核验基线：2026-09-29。CLI固定2.1.0，对照源码提交`8bbbbc722d70fb200641ef22b6f6d033aeae9f74`及本机发布包；不把未核实的新版本能力加入当前接口。
 
-2026-10-02复核[A04]即时热词、上下文增强及[A03]说话人分离说明，用于中英文README的用户说明。README概述按官方含义转述，并将本项目的Excel输入与单声道副本行为单独说明；未修改参数或模型范围。
+精度增强[A04]与说话人分离[A03]资料最近核验：2026-10-02。产品输入方式和媒体处理以项目实现为准。
 
 ## 来源
 
@@ -69,7 +69,7 @@ BL可能跳过失败子项、写空数组，或在没有子结果时不写文件
 
 热词由`json.dumps`编码为一个JSON参数，再由BL的parseInstantVocabulary通过JSON.parse还原。bailian-cli-core/dist/index.mjs中的buildAsrContextMessages将上下文直接包装为input_text。本项目使用参数数组、Node入口和shell=False；Windows参数引用交给Python标准库处理。[Python参数传递规则](https://docs.python.org/3.12/library/subprocess.html#converting-an-argument-sequence-to-a-string-on-windows)、[JSON序列化](https://docs.python.org/3.12/library/json.html#json.dumps)
 
-本机合约测试覆盖17个特殊字符词条与12组上下文，并逐字比对BL发出的HTTP请求。验证的是传递保真，不代表云端识别准确率。完整命令仍受Windows的32767个UTF-16单元限制（含末尾NUL）；超限在执行准备阶段明确停止。[CreateProcessW](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw)
+增强文本的请求保真由本机合约测试核对。完整命令受Windows的32767个UTF-16单元限制（含末尾NUL）；超限在执行准备阶段明确停止。[CreateProcessW](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw)
 
 ### Windows登录转交
 

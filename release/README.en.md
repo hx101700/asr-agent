@@ -6,7 +6,7 @@
 
 asr-agent processes existing meeting, interview, and lecture recordings. Ask Codex to start, select a file and options on a local web page, and receive three document formats plus the original recognition JSON.
 
-Speech recognition uses Alibaba Cloud Model Studio's `qwen-audio-3.0-asr-flash-filetrans` in Beijing. This Windows preview processes one file at a time, with timestamps, speaker diarization, and combined hotword and context support. The current web UI and generated document labels are in Chinese.
+Speech recognition uses Alibaba Cloud Model Studio's `qwen-audio-3.0-asr-flash-filetrans` in Beijing. The tool supports Windows 10/11 x64 and processes one file at a time, with timestamps, speaker diarization, and combined hotword and context support. The current web UI and generated document labels are in Chinese.
 
 ## Before you start
 
