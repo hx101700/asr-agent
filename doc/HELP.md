@@ -10,7 +10,6 @@ asr-transcription 的安装、认证、网页操作、文件要求及重新导�
 - 保存位置：点击“选择文件夹”更换目录；原位置不存在或被文件占用时，窗口从当前工作目录打开。
 - 操作失败：根据 [errors.md](../skills/asr-transcription/references/errors.md)保留回执、定位阶段并处理问题。
 - 查询参数依据：参阅 [model.md](../skills/asr-transcription/references/model.md)中的官方来源。
-- 更新工具：将新ZIP交给Codex，明确要求更新已安装的Skill，按[更新说明](../skills/asr-transcription/references/update.md)先完成正在运行的任务，保留工作目录的数据。
 - 当前模型：新识别使用Qwen-Audio-3.1-ASR-Flash-Filetrans。历史成功结果可本地重导并保留原模型标签；模型不同的待执行配置需要在当前网页重新确认。
 
 Skill 中的 `SKILL.md` 是 Codex 执行入口；仓库的 `AGENTS.md` 是维护者指令。使用时的凭据、环境、任务和结果存放在用户选择的工作目录。

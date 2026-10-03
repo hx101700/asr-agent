@@ -19,7 +19,6 @@
 - 运行命令使用 Skill 内 `scripts/asr.py` 的绝对路径，并显式传入 `--workspace`。凭据修复复用[错误说明](skills/asr-transcription/references/errors.md#鉴权失败与重新配置)中已核实的BL原生命令，限定当前工作目录与default Profile。依赖环境、BL 安装、凭据、暂存输入和任务记录写入工作目录，运行时 Skill 文件保持只读。
 - API Key 从私有运行目录 `.env` 读取；bootstrap 只复制空模板。网页允许用户填写或修改 Key，在“检查并预览”时保存到该固定文件。控制台模式使用 BL 在同一工作目录保存的配置。凭据不得写回 Skill。
 - 源码仓库包含 Skill 源文件，维护操作不自动安装到用户级或项目级 Skill 发现目录。
-- 用户明确提供ZIP要求更新时，复用同一Skill的[更新分支](skills/asr-transcription/references/update.md)。从新包解压目录运行独立`update_skill.py`，核对任务已结束后整体替换安装资源，保留工作目录。入口执行期间的只读文件句柄阻止Windows改名替换；旧版没有此保护，不宣称自动检测所有旧进程。
 
 ## 实现原则
 

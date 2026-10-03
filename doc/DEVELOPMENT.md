@@ -36,11 +36,10 @@ skills/asr-transcription/       # 独立安装的 Skill，运行时只读
 ├── agents/openai.yaml         # Codex 展示信息
 ├── scripts/
 │   ├── asr.py                 # CLI 入口
-│   ├── update_skill.py        # 用户明确提供ZIP时更新安装资源
 │   ├── requirements.txt       # Python 固定版本与摘要
 │   ├── bailian/               # BL npm 依赖锁
 │   └── asr_runtime/           # Python 模块与网页
-├── references/                # 按需读取的操作、模型、错误与更新说明
+├── references/                # 按需读取的操作、模型和错误说明
 ├── assets/env.example         # 空 Key 配置模板
 └── LICENSE
 
@@ -118,7 +117,7 @@ Python 的 TypedDict 描述已有 JSON 字段和允许的状态，数据在运�
 
 `style.css`负责页面布局、响应式适配和少量主题配置：区分控件与卡片底色，将警告映射为红色，标记需要修正的字段。悬停、聚焦、禁用等交互沿用Element Plus默认行为。调整第三方组件前先确认公开参数是否满足具体需求，避免维护重复的组件外观或行为。
 
-顶部标识MemoFlow，正文只保留一个录音转写标题。主按钮用于检查与保存，辅助操作使用文字按钮。热词模板直接放在表格工具栏，点击执行下载。
+顶部标识MemoFlow，正文只保留一个录音转写标题。主按钮用于检查与保存，辅助操作使用文字按钮。
 
 开启热词后，展开区提供带下载图标的“下载模板”入口；复用`actions.downloadTemplate`、`GET /api/hotwords-template`和`hotwords_template()`，由浏览器保存Excel工作簿。浅深色的文字按钮保持与背景可区分，避免用主按钮样式突出辅助下载操作。
 
@@ -138,7 +137,7 @@ Python 的 TypedDict 描述已有 JSON 字段和允许的状态，数据在运�
 
 | 阶段 | 检查与读取 | 产出 |
 | --- | --- | --- |
-| 添加文件 | 文件用途、文件名、大小和接收字节数 | 会话副本与 `upload_id` |
+| 添加音频 | 文件用途、文件名、大小和接收字节数 | 会话副本与 `upload_id` |
 | 预览 | 编辑表格及上下文规则、音频探测与SHA基线、识别选项及保存目录 | 内存 draft 与 `validation_id` |
 | 确认 | 复用 draft，核对音频 size/mtime | `config.json`、`config.sha256` 与 `job_id` |
 | 执行 | 配置协议与摘要、音频实际大小与 SHA、执行时凭据 | 执行记录与原始 JSON |
@@ -252,14 +251,6 @@ npm run test:browser
 `scripts/build_zip.py` 以固定逐文件清单构建 `asr-transcription.zip`，归档根直接为 Skill 内容。包只含 SKILL、展示 metadata、运行代码、前端构建资源、运行依赖锁、参考说明、空配置模板和 LICENSE。仓库 README、AGENTS、开发文档、UML、测试、开发探针、TypeScript/Vue 源码、构建工具、node_modules、运行环境和用户数据都不进入包。
 
 使用仓库中 `skills/asr-transcription/scripts/asr.py` 的绝对路径和明确工作目录准备运行环境；开发测试命令见 [ACCEPTANCE](ACCEPTANCE.md)。开发探针在仓库 `scripts/probe_bl.py`，固定虚构 URL，不进入 Skill。修改模块时沿当前职责定位消费者，同时维护清单、相称测试与相关 UML，实际结果再写验证记录。
-
-### 更新已安装的 Skill
-
-同一Skill包含按需更新入口，具体操作只维护在[update.md](../skills/asr-transcription/references/update.md)。`scripts/update_skill.py`使用标准库，从新包解压目录运行，只接收本项目标准发行ZIP与明确的安装目录。它核对Skill名称、入口、归档路径和读取时的CRC，并完整读取新旧两种依赖锁后比较；这些检查不验证任意重新封装包能否运行，标准包的文件完整性由`build_zip.py`固定清单保证。
-
-资源在安装目录同卷暂存，两个改名步骤使用同一个异常与中断恢复边界：仅在原副本已移走且安装位置空缺时尝试恢复；安装位置已有资源时不覆盖。无法恢复时保留原副本并报告路径。用户工作目录不参与替换。
-
-`asr.py`在运行期间持有自身只读文件句柄，Windows据此拒绝父目录改名；不创建锁文件，不枚举系统进程。旧版入口没有保护，更新调用者必须核对原任务已结束，`--tasks-finished`表达这项核对而非强制终止。依赖锁变化由更新回执报告，再走已有bootstrap流程，按实际错误处理已有环境冲突。资源更新不热替换正在执行的代码，也不自动迁移任务协议。
 
 ## 版本与分支
 

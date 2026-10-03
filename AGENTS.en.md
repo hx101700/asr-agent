@@ -19,7 +19,6 @@ These instructions govern the source repository. To resume work, read [doc/READM
 - Runtime commands use the absolute path to the Skill's `scripts/asr.py` and explicitly supply `--workspace`. Credential repair reuses the verified native BL command in [error guidance](skills/asr-transcription/references/errors.md#鉴权失败与重新配置), scoped to the current workspace and default Profile. Environments, BL, credentials, staged inputs, and task records belong in the workspace. Keep Skill files read-only during execution.
 - Read API Keys from the private runtime `.env`; bootstrap copies an empty template only. The page lets users enter or update a Key and saves it to this fixed file when they check and preview the settings. Console mode uses BL configuration saved in the same workspace. Credentials never go into the Skill.
 - The repository contains Skill source. Maintenance does not automatically install it into user-level or project-level Skill discovery directories.
-- When the user supplies a ZIP and requests an update, use this Skill's [update branch](skills/asr-transcription/references/update.md). Run the standalone `update_skill.py` from the extracted new package after verifying tasks have ended; replace installation resources together and preserve the workspace. The running entry holds a read-only file handle that prevents directory replacement on Windows. Older entries lack this protection; do not claim to detect every old process automatically.
 
 ## Implementation principles
 

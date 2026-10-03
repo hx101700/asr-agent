@@ -1,6 +1,6 @@
 # 代码审查
 
-日期：2026-10-04。本轮重新从入口到具体实现阅读全文，并分别检查前端交互、后端记录和文件操作、安装更新、Skill指令及UML。用独立复现确认问题后修改，再运行回归；没有把已有检测脚本的通过当作源码审查。实际结果见[ACCEPTANCE](ACCEPTANCE.md)，历史修正通过Git追溯。
+日期：2026-10-04。本轮在移除ZIP自更新功能后，重新阅读全文，沿安装、认证、网页配置、转写和文档交付核对调用关系，再检查Skill指令、文档与UML。测试用于验证阅读所得结论，实际结果见[ACCEPTANCE](ACCEPTANCE.md)，历史修正通过Git追溯。
 
 ## 阅读覆盖
 
@@ -8,31 +8,28 @@ Python 代码路径相对于 `skills/asr-transcription/`；前端与开发配置
 
 | 范围 | 完整阅读的文件 |
 | --- | --- |
-| 入口与共享定义 | scripts/asr.py、update_skill.py；scripts/asr_runtime下的__init__.py、__main__.py、models.py、error_catalog.json |
+| 入口与共享定义 | scripts/asr.py；scripts/asr_runtime下的__init__.py、__main__.py、models.py、error_catalog.json |
 | 应用用例 | application下的__init__、bootstrap、diagnostics、inputs、rules、session、transcription、delivery |
 | 本机能力 | utils下的__init__、environment、installation、auth、bailian、files、job_files、results、media、hotwords、documents、directory_picker、_directory_dialog、i18n |
 | 网页 | web.py；frontend下的App.vue、main.ts、useTranscription.ts、model.ts、api.ts、types.ts、preferences.ts、i18n.ts、style.css、index.html，以及UploadField、KeyDisplay、ReviewPanel、HotwordEditor组件 |
 | 技能与依赖 | SKILL.md、agents/openai.yaml、assets/env.example、references全部；scripts/requirements.txt、bailian/package.json和package-lock.json全部锁项 |
-| 开发与交付 | scripts/build_zip.py、probe_bl.py、console-browser.cts及其构建产物；前端package/lock、vite/tsconfig配置和Python静态检查配置；README/AGENTS双语、doc文档、全部11份UML源稿与图、Release说明；相关运行、权限、媒体、文档、HTTP、更新、前端和打包测试 |
+| 开发与交付 | scripts/build_zip.py、probe_bl.py、console-browser.cts及其构建产物；前端package/lock、vite/tsconfig配置和Python静态检查配置；README/AGENTS双语、doc文档、全部10份UML源稿与图、Release说明；相关运行、权限、媒体、文档、HTTP、前端和打包测试 |
 
 第三方BL及Python依赖按锁定版本使用。本审查核对其公开接口、安装边界和实际调用，不把对项目源码的审查称为第三方全部代码审计。
 
-## 本次发现与处理
+## 本次变更与核对
 
 | 位置 | 问题与处理 |
 | --- | --- |
-| `documents.publish_document` / `files.write_json_atomic` | 固定临时文件名会让同时导出或写记录的两个调用互相覆盖，出现文件已生成但回执失败。改用同目录的独立临时文件，仍替换固定目标并清理自身临时文件；没有增加导出锁或队列 |
-| `Session.description` / `useTranscription.restoreForm` | 撤回已完成但HTTP响应中断后，刷新会丢失恢复入口。现有会话缓存通过GET返回，页面启动和点击修改共用恢复函数；不重复撤回，也不持久化未保存编辑 |
-| `App.vue` / `i18n.ts` | 多行上下文错误在窄窗口与提示文字重叠；保存页还会在转写开始后静态声称音频未上传。使用Element Plus原生inline-message布局，保存页改为引导到Codex查看进度 |
-| `HotwordEditor.vue` | 删除第二页的行会因数组变化退回第一页。删除无条件重置的监听，只在页数缩小时限制当前页；校验失败仍主动定位错误行 |
-| `update_skill.update_skill` | 两次目录改名之间的KeyboardInterrupt未进入旧回滚分支，可能留下空安装位置。统一异常和中断恢复边界，仅安装位置空缺时恢复旧副本；已接管或恢复受阻时保留原副本并说明路径 |
-| 更新器依赖比较 | any生成器在Python锁变化时提前返回，漏读缺少的BL锁。先完整读取两种依赖锁，再归并变化结果；缺失时在替换前报错 |
-| 旧接口与无调用者字段 | 音频登记仍带通用kind、上传查找仍允许热词、错误字段仍使用hotwords_upload_id；前端还保留全局行级错误列表及无消费者的返回字段。改为uploaded_audio和hotword_rows，删除这些旧分支与重复展示 |
-| 文档与UML | 纠正关闭浏览器等同结束服务、保存回执等同实时状态、重复调用无条件返回旧状态、浏览器测试只能用合成数据，以及更新检查保证任意ZIP完整可用等不准确说明；同步受影响的四张图 |
+| Skill范围 | 删除ZIP更新触发、脚本及按需说明，入口只保留新录音、凭据配置和已有任务处理 |
+| Python入口 | 删除为安装目录替换而持有的文件句柄，直接调用现有main；原安装和业务入口继续共用Runtime |
+| 发行边界 | 固定清单删除两项更新资源；专用测试和更新时序图整份删除，未保留空模块或替代更新入口 |
+| 文档 | 删除操作指南、开发规则、发布说明中的更新路径；验证记录改为当前实际结果，历史通过Git查看 |
+| 输入协议说明 | DEVELOPMENT表中“添加文件”泛指热词与音频，却统一写成返回upload_id；改为“添加音频”。热词导入返回可编辑行并清理临时Excel，沿用已有的准确说明 |
 
-改动沿用既有会话、执行占用、原子文件替换和Element Plus组件。没有新增依赖、云端调用层、后台轮询、任务状态或兼容分支。旧热词接口的删除由实际消费者范围确定；历史任务保留真实模型标签仍是必要的数据含义。
+改动沿用既有会话、执行占用、原子文件替换和Element Plus组件。没有新增依赖、云端调用层、后台轮询、任务状态或兼容分支。历史任务保留真实模型标签仍是必要的数据含义。
 
-标准发行ZIP由固定清单构建并逐文件核对。更新器只核对名称、入口、路径、CRC及依赖锁；将标准包重新封装并删除其它运行模块时，更新器可能接受但安装后无法运行。该范围明确为不支持的输入，没有为每个模块追加一次性检查或另建包验证框架。
+本轮对业务后端和前端的独立重读未发现新的确定性功能错误，也没有证据支持进一步删除其状态或校验。保留的10份UML源稿及PNG已逐一对照当前接口，源图含义一致；文件占用只出现在已删除的更新图中，其余图无需重绘。这个结论限定于已阅读的代码和本机验证范围，真实云端与人工验收边界另行记录。
 
 ## 职责判断
 
@@ -81,9 +78,7 @@ Vue 组件负责呈现和浏览器操作，useTranscription编排页面用例，
 
 ## Skill 指令审查
 
-本轮按本机skill-creator指导核对指令与实现，并读取当前[OpenAI Skill文档](https://learn.chatgpt.com/docs/build-skills)及[脚本使用建议](https://developers.openai.com/plugins/build/skills)。当前结构包含必需的SKILL.md及name/description，scripts、references、assets按用途组织；agents/openai.yaml是可选展示元数据，隐式调用保持默认开启。
-
-格式符合要求与分发方式分别判断：当前官方推荐用[Plugin](https://developers.openai.com/plugins/build/plugins)分发可复用Skill。Codex自动发现本地Skill变化不等于从远端自动下载新版，也不代表运行进程热更新。本机官方skill-installer的`_copy_skill`在目标存在时拒绝安装，没有覆盖更新参数。项目的update_skill.py服务于用户明确要求的ZIP更新和活动任务保护，是本项目工具而非OpenAI标准机制；本轮保持既定ZIP范围，未引入Plugin或另一套包管理。
+本轮按本机skill-creator指导及已核实的[OpenAI Skill文档](https://learn.chatgpt.com/docs/build-skills)、[脚本使用建议](https://developers.openai.com/plugins/build/skills)核对指令与实现。当前结构包含必需的SKILL.md及name/description，scripts、references、assets按用途组织；agents/openai.yaml是可选展示元数据，隐式调用保持默认开启。
 
 参考方向限定为带本机脚本或外部CLI的任务型Skill：
 

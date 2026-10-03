@@ -13,7 +13,7 @@ MemoFlow aims to turn recordings into meeting minutes that follow your preferred
 
 After saving your settings, return to Codex and send “continue.” You can return to editing before transcription starts. If the response to a withdrawal request is interrupted, refreshing the original page restores the confirmed settings still held by the same service. Later unsaved edits are not retained.
 
-This update fixes hotword pagination jumping after a deletion, overlapping error messages in narrow windows, temporary file collisions during local export, and recovery after an interrupted update. The page, Skill instructions, and developer diagrams have also been checked against the implementation.
+This update fixes hotword pagination jumping after a deletion, overlapping error messages in narrow windows, and temporary file collisions during local export. The page, Skill instructions, and developer diagrams have also been checked against the implementation.
 
 ### Get started
 
@@ -21,7 +21,7 @@ Create an Alibaba Cloud account and complete the platform's identity verificatio
 
 > Extract the ZIP, read its SKILL.md, and help me install and configure asr-transcription.
 
-Once installed, ask Codex to transcribe a recording, then add your file and settings on the page it opens. Existing users can send the new ZIP to Codex and ask it to update the Skill. Finish running operations first; the update replaces tool resources while preserving credentials, recordings, and results in the workspace.
+Once installed, ask Codex to transcribe a recording, then add your file and settings on the page it opens.
 
 This preview supports Windows 10/11 x64 and requires Python 3.12 x64, Node.js 18.17+, and npm. Recognition uses the Beijing region and may incur charges. Personalized minutes and learning from feedback are planned for a later stage.
 
