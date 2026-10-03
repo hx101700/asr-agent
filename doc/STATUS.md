@@ -26,8 +26,10 @@ MemoFlow第一阶段由独立的`asr-transcription` Skill完成单个录音的�
 
 ## 用户工作与测试边界
 
-用户测试工作目录及`.runtime/browser-startup-case/work`含用户录音和设置，保持原样；用户级Skill副本不自动覆盖。README.md的用户本地修改保留且不暂存。本轮测试与临时渲染材料位于`.runtime/`，不进入Git或ZIP。
+用户测试工作目录及`.runtime/browser-startup-case/work`含用户录音和设置，保持原样；用户级Skill副本不自动覆盖。README.md的用户本地修改保留且不暂存。本轮独立桌面验证目录和临时渲染材料已清理，未进入Git或ZIP。
 
 ## 交付状态
 
-本轮尚未发布。登录UML源稿与PNG已同步；待构建ZIP并更新同一[v0.1.0预览](https://github.com/hx101700/memoflow/releases/tag/v0.1.0)。版本号与master保持不变；旧包不包含本轮修复，用户级Skill副本也尚未更新。
+修复提交`fc9786c`已推送dev，登录UML源稿与PNG已同步，同一[v0.1.0预览](https://github.com/hx101700/memoflow/releases/tag/v0.1.0)及双语说明已更新。master保持`6c83711`，版本号不变。
+
+公开ZIP包含44个Skill运行资源、285972字节，SHA-256为`26254e9493c4f78f9720dfa26116bde8aa2701b3452fcb5fdba131af4e4e0380`。固定清单、CRC、源码逐文件比对及匿名公开下载核对通过；远端源码树132个文件与修复提交一致。远端仍为一个Release、一个标签和一个ZIP附件；用户级Skill安装副本尚未更新。
