@@ -7,6 +7,7 @@ from unittest.mock import patch
 from asr_runtime import BAILIAN_VERSION
 from asr_runtime.application.bootstrap import bootstrap
 from asr_runtime.utils.environment import SetupError, locked_python_versions, run_process
+from asr_runtime.utils.installation import PIP_SHA256, PIP_VERSION, PYTHON_INDEXES
 from tests.support import RuntimeTestCase
 
 
@@ -28,11 +29,15 @@ class BootstrapTests(RuntimeTestCase):
             ("check_node", (self.runtime.root / "node.exe", "v24.19.0")),
             ("npm_entry", self.runtime.root / "npm-cli.js"),
             ("verify_bl_installation", None),
+            ("rank_python_indexes", list(PYTHON_INDEXES)),
         ):
             patcher = patch(f"asr_runtime.application.bootstrap.{name}", return_value=value)
             patcher.start()
             self.addCleanup(patcher.stop)
         self.expected = locked_python_versions(self.runtime)
+        installer = patch("asr_runtime.application.bootstrap.run_installer", return_value=0)
+        self.install = installer.start()
+        self.addCleanup(installer.stop)
 
     def test_complete_environment_skips_pip_and_npm_install(self):
         """验证完整环境跳过pip和npm安装。"""
@@ -43,6 +48,7 @@ class BootstrapTests(RuntimeTestCase):
         self.assertEqual(report["status"], "already_installed")
         self.assertEqual(run.call_count, 1)
         self.assertNotIn("pip", run.call_args.args[1])
+        self.install.assert_not_called()
 
     def test_python_version_check_ignores_workspace_sysconfig(self):
         """验证真实版本检查使用标准库并保留工作区同名源码。"""
@@ -64,11 +70,11 @@ class BootstrapTests(RuntimeTestCase):
         """验证缺少pip时两条安装命令都使用隔离模式。"""
         self.runtime.path(".venv/Lib/site-packages/pip").rmdir()
         with patch("asr_runtime.application.bootstrap.installed_python_versions", side_effect=[None, self.expected]), \
-             patch("asr_runtime.application.bootstrap.run_process", return_value=subprocess.CompletedProcess([], 0, "", "")) as run:
+             patch("asr_runtime.application.bootstrap.run_process", return_value=subprocess.CompletedProcess([], 0, PIP_VERSION, "")):
             bootstrap(self.runtime)
-        commands = [call.args[1] for call in run.call_args_list]
-        self.assertEqual(commands[1][1:4], ["-I", "-m", "ensurepip"])
-        self.assertEqual(commands[2][1:4], ["-I", "-m", "pip"])
+        commands = [call.args[1] for call in self.install.call_args_list]
+        self.assertEqual(commands[0][1:4], ["-I", "-m", "ensurepip"])
+        self.assertTrue(all(command[1:4] == ["-I", "-m", "pip"] for command in commands[1:]))
 
     def test_conflicting_bl_is_rejected_before_python_mutation(self):
         """验证BL版本冲突在修改Python环境前停止。"""
@@ -90,59 +96,92 @@ class BootstrapTests(RuntimeTestCase):
     def test_python_install_is_followed_by_dependency_check(self):
         """验证Python安装完成后检查实际依赖。"""
         with patch("asr_runtime.application.bootstrap.installed_python_versions", side_effect=[None, self.expected]) as inspect, \
-             patch("asr_runtime.application.bootstrap.run_process", return_value=subprocess.CompletedProcess([], 0, "", "")) as run:
+             patch("asr_runtime.application.bootstrap.run_process", return_value=subprocess.CompletedProcess([], 0, PIP_VERSION, "")):
             bootstrap(self.runtime)
         self.assertEqual(inspect.call_count, 2)
-        install_args = run.call_args_list[1].args[1]
+        download_args = self.install.call_args_list[0].args[1]
+        self.assertIn("--require-hashes", download_args)
+        self.assertEqual(download_args[download_args.index("--resume-retries") + 1], "5")
+        self.assertEqual(download_args[download_args.index("--timeout") + 1], "120")
+        self.assertEqual(download_args[download_args.index("--index-url") + 1], PYTHON_INDEXES[0].index_url)
+        install_args = self.install.call_args_list[1].args[1]
+        self.assertIn("--no-index", install_args)
         self.assertIn("--require-hashes", install_args)
-        self.assertEqual(install_args[install_args.index("--retries") + 1], "0")
-        self.assertEqual(install_args[install_args.index("--timeout") + 1], "120")
-        self.assertEqual(install_args[install_args.index("--index-url") + 1],
-                         "https://mirrors.aliyun.com/pypi/simple/")
-        self.assertEqual(run.call_count, 2)
+        self.assertEqual(self.install.call_count, 2)
 
     def test_pip_success_without_working_dependencies_is_not_success(self):
         """验证pip成功但依赖检查失败时返回安装错误。"""
         with patch("asr_runtime.application.bootstrap.installed_python_versions", return_value=None), \
-             patch("asr_runtime.application.bootstrap.run_process", return_value=subprocess.CompletedProcess([], 0, "", "")) as run:
+             patch("asr_runtime.application.bootstrap.run_process", return_value=subprocess.CompletedProcess([], 0, PIP_VERSION, "")):
             with self.assertRaisesRegex(SetupError, "依赖校验失败"):
                 bootstrap(self.runtime)
-        self.assertEqual(run.call_count, 2)
+        self.assertEqual(self.install.call_count, 2)
 
-    def test_pip_failure_stops_without_retry_or_npm_install(self):
-        """验证pip失败后结束安装流程且调用次数为一。"""
-        outputs = [subprocess.CompletedProcess([], 0, "", ""),
-                   subprocess.CompletedProcess([], 1, "synthetic install failure", "")]
+    def test_both_download_sources_failing_stops_before_install(self):
+        """验证两个来源均失败后停止下载，不开始本机安装或BL安装。"""
+        self.install.return_value = 1
         with patch("asr_runtime.application.bootstrap.installed_python_versions", return_value=None), \
-             patch("asr_runtime.application.bootstrap.run_process", side_effect=outputs) as run:
-            with self.assertRaisesRegex(SetupError, "Python依赖安装失败"):
+             patch("asr_runtime.application.bootstrap.run_process", return_value=subprocess.CompletedProcess([], 0, PIP_VERSION, "")):
+            with self.assertRaisesRegex(SetupError, "已尝试两个来源"):
                 bootstrap(self.runtime)
-        self.assertEqual(run.call_count, 2)
-        self.assertEqual(self.runtime.path(".runtime/python-install.log").read_text(encoding="utf-8"),
-                         "synthetic install failure")
+        commands = [call.args[1] for call in self.install.call_args_list]
+        self.assertEqual(len(commands), 2)
+        self.assertTrue(all("download" in command for command in commands))
+        log = self.runtime.path(".runtime/python-install.log").read_text(encoding="utf-8")
+        self.assertTrue(all(index.name in log for index in PYTHON_INDEXES))
 
-    def test_installs_hash_locked_mirror_dependencies_and_native_npm_lock(self):
-        """验证通过镜像及摘要锁安装Python和npm依赖。"""
+    def test_failed_first_source_uses_second_then_installs_offline(self) -> None:
+        """验证首选源失败后只切换一次，下载完成后使用本机文件安装。"""
+        self.install.side_effect = [1, 0, 0]
+        with patch("asr_runtime.application.bootstrap.installed_python_versions", side_effect=[None, self.expected]), \
+             patch("asr_runtime.application.bootstrap.run_process", return_value=subprocess.CompletedProcess([], 0, PIP_VERSION, "")):
+            bootstrap(self.runtime)
+        commands = [call.args[1] for call in self.install.call_args_list]
+        for command, index in zip(commands[:2], PYTHON_INDEXES):
+            self.assertEqual(command[command.index("--index-url") + 1], index.index_url)
+        self.assertIn("--no-index", commands[2])
+        self.assertNotIn("--index-url", commands[2])
+
+    def test_local_install_failure_does_not_download_again(self) -> None:
+        """验证文件已下载但本机安装失败时直接报告，避免重复换源。"""
+        self.install.side_effect = [0, 1]
+        with patch("asr_runtime.application.bootstrap.installed_python_versions", return_value=None), \
+             patch("asr_runtime.application.bootstrap.run_process", return_value=subprocess.CompletedProcess([], 0, PIP_VERSION, "")):
+            with self.assertRaisesRegex(SetupError, "本机安装失败"):
+                bootstrap(self.runtime)
+        self.assertEqual(self.install.call_count, 2)
+
+    def test_bundled_pip_is_upgraded_from_a_hash_locked_wheel(self) -> None:
+        """验证旧pip先获取锁定工具包，再用新版公开参数下载业务依赖。"""
+        with patch("asr_runtime.application.bootstrap.installed_python_versions", side_effect=[None, self.expected]), \
+             patch("asr_runtime.application.bootstrap.run_process", return_value=subprocess.CompletedProcess([], 0, "23.2.1", "")):
+            bootstrap(self.runtime)
+        commands = [call.args[1] for call in self.install.call_args_list]
+        self.assertEqual(len(commands), 4)
+        self.assertTrue(commands[0][-1].endswith("#sha256=" + PIP_SHA256))
+        self.assertNotIn("--resume-retries", commands[0])
+        self.assertTrue(commands[1][-1].startswith("file:///"))
+        self.assertTrue(commands[1][-1].endswith("#sha256=" + PIP_SHA256))
+        self.assertIn("--resume-retries", commands[2])
+
+    def test_installs_locked_python_wheels_and_native_npm_lock(self):
+        """验证Python经锁定下载后在本机安装，npm复用现有依赖锁。"""
         shutil.rmtree(self.runtime.bl_directory)
         node = self.runtime.root / "node.exe"
         npm = self.runtime.root / "npm-cli.js"
         python = self.runtime.path(".venv/Scripts/python.exe")
         calls = []
 
-        def run(_runtime, argv, timeout=60, **_kwargs):
+        def run(_runtime, argv, _log):
             """记录安装命令并模拟对应依赖落盘。"""
-            calls.append((argv, timeout))
-            if argv[0] == str(python) and "sysconfig" in " ".join(argv):
-                return subprocess.CompletedProcess(argv, 0, "", "")
-            if "--version" in argv:
-                return subprocess.CompletedProcess(argv, 0, f"bl {BAILIAN_VERSION}\n", "")
+            calls.append(argv)
             if "ci" in argv:
                 entry = self.runtime.bl_entry
                 entry.parent.mkdir(parents=True, exist_ok=True)
                 entry.touch()
                 manifest = entry.parents[1] / "package.json"
                 manifest.write_text(json.dumps({"version": BAILIAN_VERSION}), encoding="utf-8")
-            return subprocess.CompletedProcess(argv, 0, "", "")
+            return 0
 
         with patch("asr_runtime.application.bootstrap.check_python"), \
              patch("asr_runtime.application.bootstrap.check_node", return_value=(node, "v24.0.0")), \
@@ -154,21 +193,21 @@ class BootstrapTests(RuntimeTestCase):
              )), \
              patch("asr_runtime.application.bootstrap.installed_python_versions", side_effect=[None, self.expected]), \
              patch("asr_runtime.application.bootstrap.verify_bl_installation") as verify, \
-             patch("asr_runtime.application.bootstrap.run_process", side_effect=run):
+             patch("asr_runtime.application.bootstrap.run_process", return_value=subprocess.CompletedProcess([], 0, PIP_VERSION, "")), \
+             patch("asr_runtime.application.bootstrap.run_installer", side_effect=run):
             result = bootstrap(self.runtime)
 
         self.assertEqual(result["status"], "installed")
         verify.assert_called_once_with(self.runtime)
-        pip = next(argv for argv, _ in calls if "--require-hashes" in argv)
+        pip = next(argv for argv in calls if "download" in argv)
         self.assertIn("--require-hashes", pip)
         self.assertIn("--retries", pip)
-        self.assertEqual(pip[pip.index("--retries") + 1], "0")
-        self.assertEqual(pip[pip.index("--index-url") + 1], "https://mirrors.aliyun.com/pypi/simple/")
-        npm_command = next(argv for argv, _ in calls if "ci" in argv)
+        self.assertEqual(pip[pip.index("--retries") + 1], "2")
+        self.assertEqual(pip[pip.index("--index-url") + 1], PYTHON_INDEXES[0].index_url)
+        npm_command = next(argv for argv in calls if "ci" in argv)
         self.assertEqual(npm_command[:3], [str(node), str(npm), "ci"])
         self.assertIn("--prefix", npm_command)
         self.assertIn("--fetch-retries=0", npm_command)
-        self.assertEqual(next(timeout for argv, timeout in calls if "ci" in argv), None)
 
     def test_existing_nonempty_destination_stops_without_retry(self):
         """验证非空BL目标目录保留原内容并拒绝安装。"""

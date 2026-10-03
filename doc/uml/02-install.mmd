@@ -3,6 +3,7 @@ actor U as 用户
 participant C as Codex＋Skill
 participant E as Python CLI入口
 participant B as bootstrap（函数模块）
+participant I as installation（函数模块）
 participant R as Runtime对象
 participant M as 本机检查与安装子进程
 participant S as Skill只读资源
@@ -31,15 +32,38 @@ else 前置条件满足
     B->>F: 检查或创建.asr-transcription/.venv
     B->>M: 用python -I核对venv平台与已装依赖版本
     opt Python依赖与锁不一致
-        B->>M: python -I执行ensurepip与pip install<br/>--require-hashes --only-binary
-        Note over M,F: 阿里云PyPI镜像；依赖装入私有.venv<br/>失败返回实际原因，不重试或换源
-        M->>F: 安装Python依赖，核对加载与版本
+        B->>I: run_installer：必要时执行ensurepip
+        I->>M: 工作区Python -I准备pip
+        B->>I: rank_python_indexes()
+        Note over I,M: 并行读取同一锁定wheel的至多256KiB前缀<br/>约5秒采样，按吞吐排序；采样不落盘
+        I-->>B: PyPI与阿里云的优先顺序
+        opt 当前pip不是26.2.1
+            B->>B: _download_python_packages(installer=True)
+            B->>I: run_installer：按来源顺序下载锁定pip wheel
+            I->>M: pip download；固定URL和SHA256
+            M->>F: 保存完整pip wheel
+            B->>I: run_installer：从本机wheel安装pip
+            I->>M: pip install --no-index；固定文件摘要
+            M->>F: 更新私有venv的pip
+        end
+        B->>B: _download_python_packages(installer=False)
+        B->>I: run_installer：按来源顺序下载业务依赖
+        I->>M: pip download --require-hashes<br/>--retries 2 --resume-retries 5 --timeout 120
+        Note over I,M: 每源最多启动一次下载，失败后换另一源<br/>续传由pip执行；持续有进度时等待，无安装总时限
+        M->>F: 保存完整wheel到私有.runtime/wheels
+        B->>I: run_installer：从已下载wheel安装
+        I->>M: pip install --no-index --find-links<br/>--require-hashes
+        M->>F: 安装Python依赖
+        B->>M: 检查依赖实际加载与版本
+        Note over B,F: 下载最终失败或本机安装失败时抛出SetupError<br/>保留日志与完整wheel；不开始BL安装
     end
     opt BL尚未安装
         B->>S: 读取scripts/bailian的package与lock
         B->>F: 复制到.asr-transcription/.tools/bailian
-        B->>M: npm ci安装锁定BL；验证入口与版本
+        B->>I: run_installer：npm ci安装锁定BL
+        I->>M: 单次npm ci
         M->>F: 保存BL及依赖
+        B->>M: verify_bl_installation()验证入口与版本
     end
     opt 私有.env不存在
         B->>S: 读取assets/env.example
@@ -49,4 +73,5 @@ else 前置条件满足
     E-->>C: JSON安装回执
 end
 Note over B,F: 环境准备保留既有Key和任务<br/>安装后的命令使用工作目录venv与同一--workspace<br/>Python安装和检查使用隔离模式，从指定环境加载依赖
-Note over E,S: Skill内scripts/asr.py、scripts/asr_runtime/__main__.py<br/>application/bootstrap.py；utils/environment.py、bailian.py
+Note over I,F: run_installer逐行写本机日志及stderr进度<br/>stdout保留最终JSON；中断时回收本次安装子进程
+Note over E,S: Skill内scripts/asr.py、scripts/asr_runtime/__main__.py<br/>application/bootstrap.py；utils/installation.py、environment.py、bailian.py

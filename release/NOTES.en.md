@@ -10,7 +10,7 @@ MemoFlow is being built to turn recordings into meeting minutes that follow your
 - Use Console login or enter your API key on the page. Checking your settings saves the key to your workspace. The official BL CLI performs recognition.
 - Keep the original JSON and all three documents, with local re-export for existing tasks.
 
-This update provides a clear error when an Excel hotword list uses a chart sheet, keeps Word font sizes consistent for complex scripts such as Arabic, and fixes a status-query error caused by a damaged export record.
+During initial setup, the installer compares file download speeds from PyPI and the Aliyun mirror and starts with the faster source. pip attempts to recover interrupted downloads, then the installer switches sources if recovery fails. Complete downloads can be reused, and progress stays visible throughout setup.
 
 ### Installation and file storage
 

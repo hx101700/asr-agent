@@ -11,7 +11,7 @@ description: 将本地录音转写为带时间戳的 Word、Excel 和 Markdown�
 
 - `SKILL_DIR` 是本文件所在目录；入口为 `SKILL_DIR/scripts/asr.py`。调用时使用该入口的绝对路径，工作目录不决定资源位置。
 - `WORKSPACE` 是用户当前任务的工作目录，须为 Skill 安装目录之外的现有目录；与用户明确约定后，所有命令使用同一个 `--workspace WORKSPACE`。环境和数据写入 `WORKSPACE/.asr-transcription`，默认结果写入 `WORKSPACE/transcriptions`。保存位置也须在 Skill 目录之外。
-- 首次使用按 [运行准备](references/usage.md#运行准备)安装本机依赖。复用可用环境；环境故障用 `doctor` 排查，工作目录的 Python 无法启动时改用首次准备所用的 CPython 3.12。安装失败停止并说明原因。
+- 首次使用按 [运行准备](references/usage.md#运行准备)安装本机依赖。复用可用环境；安装器会测速选源并由pip有限恢复中断下载，进度输出到stderr，stdout保留最终JSON。持续有进度时等待同一进程，不因总耗时较长而结束下载，也不在安装器之外追加重试循环。最终安装失败时保留日志并说明原因。环境故障用 `doctor` 排查，工作目录的 Python 无法启动时改用首次准备所用的 CPython 3.12。
 
 准备命令（使用 Windows x64 Python 3.12）：
 

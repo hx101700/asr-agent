@@ -82,6 +82,7 @@ Python 运行模块位于 `skills/asr-transcription/scripts/asr_runtime/`。多�
 | `application/transcription.py` | 编排一次执行、已知结果与重新导出 |
 | `application/delivery.py` | 顺序调用三格式 writer 并汇总交付状态 |
 | `utils/environment.py` / `auth.py` | 提供 Runtime、子进程环境、依赖检查及本机凭据读取 |
+| `utils/installation.py` | 固定安装工具与来源、比较文件采样速度、持续记录安装进度并回收子进程 |
 | `utils/bailian.py` | 映射公开 CLI 参数，启动 BL，转交登录链接并解释脱敏错误 |
 | `utils/files.py` / `job_files.py` | 文件身份、原子状态写入、配置发布及任务目录协议 |
 | `utils/hotwords.py` / `media.py` | Excel 模板与读取，音频探测与单声道副本 |
@@ -179,6 +180,16 @@ results 解析原始 JSON 后，三个 writer 共享 Transcript。delivery 顺�
 JSON 与文档保存根默认均为 `<workspace>/transcriptions/`，可分别通过原生窗口选择。结果原文、时间戳、结构检查与识别质量、Office 视觉效果分别验收。
 
 ## 构建与维护
+
+### 运行依赖准备
+
+`bootstrap`仅在业务依赖缺失或版本不匹配时准备下载。`rank_python_indexes()`并行采样PyPI与阿里云镜像上同一个锁定pip wheel的前缀，按收到字节与耗时排序；这不是全程速度保证。安装工具pip 26.2.1的文件路径与摘要直接维护在`utils/installation.py`，业务依赖仍以`requirements.txt`为来源。
+
+安装器先通过现有pip下载并安装锁定的新pip，再由新版pip下载业务依赖。每阶段按排序后的两个来源各启动至多一次下载；连接重试与中断恢复使用pip公开选项。已下载的完整wheel保存在私有`.runtime/wheels`，全部下载成功后才用`--no-index`进行本机安装。SHA校验由pip承担；不自行拼接断点、不修改摘要，也不在本机安装失败后重复切源。
+
+`run_installer()`为pip/npm长进程持续转发stderr进度并写日志，stdout保留CLI最终JSON；安装没有总耗时限制。`run_process()`继续服务版本、平台等短检查。两者复用同一个隔离子进程环境；安装进程中断时回收自身子进程。BL的npm安装保持单次尝试，云端转写策略保持不变。
+
+### 前端与发行包
 
 前端由 Vite 在开发阶段构建到 Skill 的 `scripts/asr_runtime/static/`，固定输出 `index.html`、`app.js` 和 `app.css`，并提供 `favicon.svg` 与 `THIRD_PARTY_LICENSES.txt`。Python 本机服务直接提供这些产物，用户安装和使用时无需安装前端构建依赖。源码在 `frontend/`，锁定的 Vue、Element Plus、Vite、TypeScript 及检查工具在仓库根 `package.json`、`package-lock.json`；构建行为见 [Vite 官方说明](https://vite.dev/guide/build.html)。
 

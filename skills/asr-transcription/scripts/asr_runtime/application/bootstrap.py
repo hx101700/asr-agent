@@ -2,7 +2,9 @@
 
 import json
 import shutil
+import sys
 import venv
+from typing import TextIO
 
 from .. import BAILIAN_VERSION
 from ..utils.bailian import installed_bl_version, verify_bl_installation
@@ -16,6 +18,65 @@ from ..utils.environment import (
     npm_entry,
     run_process,
 )
+from ..utils.installation import (
+    PIP_SHA256, PIP_VERSION, PIP_WHEEL_PATH, PythonIndex,
+    rank_python_indexes, run_installer,
+)
+
+
+def _download_python_packages(
+    runtime: Runtime, indexes: list[PythonIndex], log: TextIO, *, installer: bool,
+) -> None:
+    """按测速顺序下载锁定包，每个来源最多启动一次pip下载。"""
+    label = "pip安装工具" if installer else "Python依赖"
+    for index in indexes:
+        message = f"正在从{index.name}下载{label}。"
+        print(message, file=sys.stderr, flush=True)
+        log.write(f"\n{message}\n")
+        arguments = [str(runtime.path(".venv/Scripts/python.exe")), "-I", "-m", "pip",
+                     "download", "--require-hashes", "--only-binary=:all:", "--no-cache-dir",
+                     "--retries", "2", "--timeout", "120",
+                     "--dest", str(runtime.path(".runtime/wheels"))]
+        if installer:
+            # 此时运行的是ensurepip提供的版本，只使用其已有公开参数。
+            arguments += ["--no-index", "--no-deps", "--progress-bar", "on",
+                          index.wheel_base_url + PIP_WHEEL_PATH + "#sha256=" + PIP_SHA256]
+        else:
+            arguments += ["--resume-retries", "5", "--progress-bar", "raw",
+                          "--index-url", index.index_url,
+                          "-r", str(runtime.resource("scripts/requirements.txt"))]
+        if run_installer(runtime, arguments, log) == 0:
+            return
+    raise SetupError(f"{label}下载失败，已尝试两个来源；本地日志：{log.name}")
+
+
+def _install_python_dependencies(runtime: Runtime) -> None:
+    """选择下载来源、准备支持续传的pip并从本机wheel安装依赖。"""
+    python = str(runtime.path(".venv/Scripts/python.exe"))
+    pip = [python, "-I", "-m", "pip"]
+    log_path = runtime.path(".runtime/python-install.log")
+    with log_path.open("w", encoding="utf-8") as log:
+        if not runtime.path(".venv/Lib/site-packages/pip").is_dir():
+            if run_installer(runtime, [python, "-I", "-m", "ensurepip", "--default-pip"], log):
+                raise SetupError(f"无法准备pip；本地日志：{log_path}")
+        version = run_process(runtime, [python, "-I", "-c",
+                              "from importlib.metadata import version; print(version('pip'))"])
+        if version.returncode:
+            raise SetupError("无法读取工作区pip版本，请检查虚拟环境。")
+        print("正在比较PyPI与阿里云镜像的文件下载速度。", file=sys.stderr, flush=True)
+        indexes = rank_python_indexes()
+        if version.stdout.strip() != PIP_VERSION:
+            _download_python_packages(runtime, indexes, log, installer=True)
+            wheel = runtime.path(".runtime/wheels/" + PIP_WHEEL_PATH.rsplit("/", 1)[1])
+            if run_installer(runtime, pip + ["install", "--no-index", "--no-deps", "--require-hashes",
+                             "--no-cache-dir", wheel.as_uri() + "#sha256=" + PIP_SHA256], log):
+                raise SetupError(f"pip本机安装失败；本地日志：{log_path}")
+        _download_python_packages(runtime, indexes, log, installer=False)
+        if run_installer(runtime, pip + ["install", "--no-index", "--require-hashes",
+                         "--only-binary=:all:", "--no-cache-dir",
+                         "--find-links", str(runtime.path(".runtime/wheels")),
+                         "-r", str(runtime.resource("scripts/requirements.txt"))], log):
+            raise SetupError(f"Python依赖本机安装失败；本地日志：{log_path}")
 
 
 def bootstrap(runtime: Runtime) -> dict[str, str]:
@@ -64,20 +125,7 @@ def bootstrap(runtime: Runtime) -> dict[str, str]:
     if checked.returncode:
         raise SetupError("工作区虚拟环境无法启动或不是Windows x64的CPython 3.12，未覆盖。")
     if installed_python_versions(runtime, expected) != expected:
-        if not (environment / "Lib/site-packages/pip").is_dir():
-            result = run_process(runtime, [str(python), "-I", "-m", "ensurepip", "--default-pip"])
-            if result.returncode:
-                raise SetupError("无法在工作区虚拟环境中准备pip，未自动重试。")
-        result = run_process(runtime, [
-            str(python), "-I", "-m", "pip", "install", "--require-hashes", "--only-binary=:all:",
-            "--no-cache-dir", "--retries", "0", "--timeout", "120",
-            "--index-url", "https://mirrors.aliyun.com/pypi/simple/",
-            "-r", str(runtime.resource("scripts/requirements.txt")),
-        ], timeout=None)
-        if result.returncode:
-            log = runtime.path(".runtime/python-install.log")
-            log.write_text(result.stdout + result.stderr, encoding="utf-8")
-            raise SetupError(f"Python依赖安装失败，未重试；本地日志：{log}")
+        _install_python_dependencies(runtime)
         if installed_python_versions(runtime, expected) != expected:
             raise SetupError("pip结束但Python依赖校验失败，未自动重试。")
 
@@ -86,17 +134,13 @@ def bootstrap(runtime: Runtime) -> dict[str, str]:
         for name in ("package.json", "package-lock.json"):
             shutil.copyfile(source / name, destination / name)
 
-        result = run_process(
-            runtime,
-            [str(node), str(npm), "ci", "--prefix", str(destination), "--ignore-scripts", "--no-audit",
-             "--no-fund", "--fetch-retries=0"],
-            timeout=None,
-        )
-        if result.returncode:
-            # 第三方安装输出仅落在本地日志，不直接带入聊天。
-            log = runtime.path(".runtime/bootstrap.log")
-            log.write_text(result.stdout + result.stderr, encoding="utf-8")
-            raise SetupError(f"npm安装失败，未自动重试；本地日志：{log}")
+        log_path = runtime.path(".runtime/bootstrap.log")
+        with log_path.open("w", encoding="utf-8") as log:
+            exit_code = run_installer(runtime,
+                [str(node), str(npm), "ci", "--prefix", str(destination), "--ignore-scripts", "--no-audit",
+                 "--no-fund", "--fetch-retries=0"], log)
+        if exit_code:
+            raise SetupError(f"npm安装失败，未自动重试；本地日志：{log_path}")
         verify_bl_installation(runtime)
 
     key_file = runtime.path(".env")

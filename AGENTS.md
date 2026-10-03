@@ -46,7 +46,7 @@
 - 项目版本号仅在通过验收并发布到 `master` 时变更。`dev` 上的开发、修复和文档提交沿用当前版本；当前为 `0.1.0`。本阶段经用户授权更新现有预览包时，仍使用 `v0.1.0`，不新增版本号。正式发布时同步根 `package.json`、`package-lock.json`、标签和发布说明；依赖版本按其各自锁文件维护。
 - 固定发行清单位于 `scripts/build_zip.py`。ZIP 直接包含 Skill 文件，不包含仓库 README、AGENTS、开发文档、测试、UML、运行环境或用户数据。新增运行文件时同步清单和包边界检查。
 - 前端通过 Vite 构建到 Skill 的 `scripts/asr_runtime/static/`，核心产物为 `index.html`、`app.js` 和 `app.css`，同时交付 `favicon.svg` 与第三方许可说明。发行包使用构建产物；Vue/TypeScript 源码、开发配置、构建依赖及 `node_modules` 保留在开发仓库。
-- Python 依赖由 Skill 中 `scripts/requirements.txt` 锁定版本与摘要；BL 锁在 `scripts/bailian/`。下载失败报告实际原因，不自动重试、换源或修改锁。
+- Python 依赖由 Skill 中 `scripts/requirements.txt` 锁定版本与摘要；安装工具 pip 26.2.1 的文件与摘要固定在 `utils/installation.py`，BL 锁在 `scripts/bailian/`。安装前比较 PyPI 与阿里云镜像的文件前缀吞吐；每个下载阶段按来源顺序各启动至多一次 `pip download`，连接重试2次、业务依赖的中断恢复最多5次由 pip 完成，仍失败才切换另一源。完整 wheel 保存在工作目录，安装阶段仅使用本机文件。保留摘要校验，不扩展为云端转写重试；npm 失败仍停止。
 - Python 安装与依赖检查子进程使用 `-I`，从指定虚拟环境加载依赖；用户工作目录中的同名模块不参与检查或安装。
 - 开发探针 `scripts/probe_bl.py` 不进入发行包，只使用固定虚构 URL；BL 合约测试使用 `127.0.0.1` 模拟服务与合成凭据。本机测试不等于真实云端验收。
 - 测试与改动相称；实际结果写 [ACCEPTANCE](doc/ACCEPTANCE.md)，状态写 [STATUS](doc/STATUS.md)，限制写 [ISSUES](doc/ISSUES.md)，重要决策写 [DEVLOG](doc/DEVLOG.md)。

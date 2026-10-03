@@ -26,6 +26,7 @@ REQUIRED_FILES = (
     "scripts/asr_runtime/application/rules.py",
     "scripts/asr_runtime/utils/__init__.py",
     "scripts/asr_runtime/utils/environment.py",
+    "scripts/asr_runtime/utils/installation.py",
     "scripts/asr_runtime/utils/auth.py",
     "scripts/asr_runtime/utils/bailian.py",
     "scripts/asr_runtime/utils/media.py",

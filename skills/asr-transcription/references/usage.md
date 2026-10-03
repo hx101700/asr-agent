@@ -18,7 +18,9 @@ python -S -X utf8 $scriptPath --workspace $workspaceDir bootstrap
 $pythonPath = Join-Path $workspaceDir '.asr-transcription/.venv/Scripts/python.exe'
 ```
 
-bootstrap从Skill中的Python/npm依赖锁安装到工作目录的`.asr-transcription`，回执提供安装状态及`key_file`。已有可用环境直接复用，已有Key文件保留。安装期间没有新输出不代表失败，等待同一次进程结束；失败按实际回执处理，不自动重试、换源或改锁。
+bootstrap从Skill中的Python/npm依赖锁安装到工作目录的`.asr-transcription`，回执提供安装状态及`key_file`。已有可用环境直接复用，已有Key文件保留。安装进度持续输出到stderr并同步写入本机日志；stdout输出最终JSON。正常下载没有总耗时上限，等待同一次进程结束。
+
+需要下载Python依赖时，先比较官方PyPI和阿里云镜像的文件前缀速度，优先使用较快来源，并准备锁定的pip 26.2.1。pip自行恢复中断下载，单个业务依赖最多恢复5次；该来源最终失败后，自动尝试另一个来源一次。已完整下载的wheel保存在`.asr-transcription/.runtime/wheels`供后续安装复用，换源不跨进程续接未完成的文件。两个来源都失败时停止并保留`python-install.log`，不要在Codex中额外循环重跑或改动摘要。
 
 需要诊断环境时运行：
 
@@ -28,7 +30,7 @@ bootstrap从Skill中的Python/npm依赖锁安装到工作目录的`.asr-transcri
 
 工作目录的虚拟环境解释器缺失或无法运行时，使用首次准备环境的 CPython 3.12 执行 `python -S -X utf8 $scriptPath --workspace $workspaceDir doctor`。诊断只报告问题，修复按实际回执处理。
 
-Python依赖使用HTTPS阿里云PyPI镜像，BL由npm安装，均校验固定依赖锁。Skill不附带Python、Node、wheel或已安装依赖，不修改系统PATH或全局包。
+Python依赖从HTTPS PyPI或阿里云镜像下载并校验摘要，然后从本机wheel安装。BL由npm按锁文件安装，失败停止。Skill不附带Python、Node、wheel或已安装依赖，不修改系统PATH或全局包。
 
 ## 认证与运行
 
