@@ -29,7 +29,7 @@ class RuntimeTestCase(unittest.TestCase):
         workspace.mkdir()
         skill_root = self.temporary_root / "skill"
         for relative in ("scripts/requirements.txt", "scripts/bailian/package.json",
-                         "scripts/bailian/package-lock.json", "assets/env.example"):
+                         "scripts/bailian/package-lock.json", "scripts/bailian/console-browser.cjs", "assets/env.example"):
             destination = skill_root / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(SKILL_ROOT / relative, destination)

@@ -33,7 +33,7 @@ description: 将单个录音转为带时间戳的 Word、Excel 和 Markdown。�
 | `auth_mode=api_key` | 工具在执行时读取网页保存的 Key，直接进入执行准备。 |
 | 控制台模式，凭据已配置且没有已知鉴权失败 | 复用当前工作目录已有的模型凭据；已被BL拒绝时转到[凭据修复](references/errors.md#鉴权失败与重新配置)。 |
 | 控制台模式，凭据状态未知 | 调用一次 `console-status`，读取 `configured`。 |
-| 控制台模式：缺少模型凭据，或用户要求重新登录 | 运行 `login`，按[控制台登录](references/usage.md#控制台登录)在系统默认浏览器授权。保留登录会话，结束当前回复，提示完成后发送“继续”。 |
+| 控制台模式：缺少模型凭据，或用户要求重新登录 | 首次启动`login`就使用正常桌面执行权限；Codex执行工具支持时设置`sandbox_permissions=require_escalated`，不先以默认受限权限试开。按[控制台登录](references/usage.md#控制台登录)完成系统浏览器授权，保留会话并提示完成后发送“继续”。 |
 
 `login`最终回执已包含BL状态查询结果，直接读取 `configured`；它表示本机模型凭据存在，不代表在线模型调用已验证。BL授权页由系统浏览器打开，Codex不另开。需要用户操作时保留原会话，继续后读取原结果。
 

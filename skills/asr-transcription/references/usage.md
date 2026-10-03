@@ -38,15 +38,15 @@ Python依赖从HTTPS PyPI或阿里云镜像下载并校验摘要，然后从本�
 
 ### 控制台登录
 
-网页保持“使用指定API Key”未勾选。首次配置运行以下命令，并保持同一进程等待授权。登录会启动系统默认浏览器；在受限执行环境中，通过执行工具的权限机制让命令运行于正常Windows交互桌面。普通终端可直接执行。
+网页保持“使用指定API Key”未勾选。首次配置运行以下命令，并保持同一进程等待授权。登录会启动系统默认浏览器：Codex支持`sandbox_permissions`的执行工具应从第一次调用就传`require_escalated`及登录用途说明。已打开本机配置页不表示默认受限进程可以启动Chrome；程序会在受限令牌中停止，避免启动BL和浏览器。普通Windows交互终端可直接执行。
 
 ```powershell
 & $pythonPath -X utf8 $scriptPath --workspace $workspaceDir login
 ```
 
-用户在系统默认浏览器完成官方授权，Codex不另开授权页，也不通过computer-use验证页面。BL 2.1.0在Windows打开链接时存在参数引用问题：若输出完整备用链接，工具会把它交给同一系统浏览器，使用最后打开的完整链接页面。原login进程持续等待回调并保存凭据，Codex可结束当前回复并提示用户操作完成后发送“继续”。登录链接只用于打开页面，不贴入聊天或另存日志。
+登录适配将BL的完整授权URL交给系统浏览器一次，保留BL原会话、回调与凭据保存。用户完成授权后发送“继续”；Codex保留进程并结束当前回复，不另开页面，也不通过computer-use验证页面。登录链接不贴入聊天或另存日志。
 
-`WAITING_FOR_LOGIN`是启动提示。收到“继续”后读取原login会话的最终回执；其中已经包含BL状态查询结果，以`configured=true`判断模型凭据存在。登录15分钟超时、失败或`configured=false`时说明结果并停止，不重复发起授权。
+`WAITING_FOR_LOGIN`是启动提示。收到“继续”后读取原login会话的最终回执；其中已经包含BL状态查询结果，以`configured=true`判断模型凭据存在。失败、BL会话结束且缺少凭据时说明结果并停止，不重复发起授权。BL自身的会话有效期见[固定版本依据](model.md#windows登录转交)，项目不额外设置登录等待上限。
 
 复用的是当前工作目录 `.asr-transcription/.state/bailian` 中的 BL 模型凭据。其他目录或系统级 BL 登录不代表这个工作目录已经配置。状态不明时运行`console-status`：`configured=true`表示模型 Key 存在；只有`console_configured=true`而`configured=false`时，先处理缺少模型凭据的提示。该命令只查询本机配置，云端鉴权由实际 BL 调用完成。账号准备见[阿里云官方指引](https://help.aliyun.com/zh/model-studio/first-api-call-to-qwen)。
 

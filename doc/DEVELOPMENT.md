@@ -145,7 +145,9 @@ Python 的 TypedDict 描述已有 JSON 字段和允许的状态，数据在运�
 
 bootstrap 从 Skill 的 `assets/env.example` 复制空模板到私有运行目录 `.env`，保留已存在的文件。网页允许用户填写或修改 `DASHSCOPE_API_KEY`，在“检查并预览”时保存到该固定文件。Key 模式复用非空与内部空白检查，执行时读取并注入 BL 环境。控制台模式复用工作目录内的 BL 配置，首次或明确重新登录时才调用 `login`。
 
-BL登录只通过系统默认浏览器授权，执行工具需提供正常Windows交互桌面权限。`_communicate_login()`同时读取BL输出和错误流；收到官方备用URL后，`_open_console_fallback()`校验并使用`os.startfile`打开完整链接，Codex不另开授权页。BL等待原会话回调并保存凭据，进程结束后使用公开`auth status`确认模型Key存在；固定BL版本的闲置超时也可能退出0，因此这次状态读取有实际用途。
+BL登录从首次调用就使用正常桌面执行权限。`check_login_execution_context()`在BL启动前拒绝Windows受限令牌；它只识别已观察到的问题执行路径，不检测全部桌面或Chrome状态。
+
+固定BL 2.1.0将Windows登录URL传给cmd/start，未引用的`&`会产生截断页。仅为console登录预加载`console-browser.cjs`，拦下这一个已核实的开页调用，让BL输出原会话的完整URL；`_communicate_login()`读取两条管道，`_open_login_url()`验证后使用系统URL处理器打开一次。BL包文件不修改，授权会话、回调和凭据保存仍由BL负责。Python不额外设置登录总时限；BL原生会话到期或结束后，使用公开auth status检查模型Key存在。
 
 Python 安装、虚拟环境核对与依赖加载检查使用 `-I` 隔离模式，从指定虚拟环境加载包，避免工作目录中的同名 Python 文件参与安装或检查。执行命令所需的路径来自 Runtime，用户选定的保存目录只用于输出。
 
@@ -224,10 +226,13 @@ npm ci
 npm run check:web
 npm run test:web
 npm run build:web
+npm run build:login
 npm run test:browser
 ```
 
 `build:web` 先执行类型检查再构建。`test:browser` 使用开发依赖 Playwright、本机 Edge 和真实 Python 本机服务；测试只使用合成数据，完成后清理自己的工作目录。Python 静态检查工具与配置也仅用于开发，具体命令见 [ACCEPTANCE](ACCEPTANCE.md)。
+
+`build:login`用现有TypeScript编译器将`scripts/console-browser.cts`生成到Skill的`scripts/bailian/console-browser.cjs`。只有该运行产物进入ZIP；TypeScript开发源码保留在仓库。更新BL版本时重新核对上游浏览器能力与该适配，采用上游修复后删除适配。
 
 `scripts/build_zip.py` 以固定逐文件清单构建 `asr-transcription.zip`，归档根直接为 Skill 内容。包只含 SKILL、展示 metadata、运行代码、前端构建资源、运行依赖锁、参考说明、空配置模板和 LICENSE。仓库 README、AGENTS、开发文档、UML、测试、开发探针、TypeScript/Vue 源码、构建工具、node_modules、运行环境和用户数据都不进入包。
 

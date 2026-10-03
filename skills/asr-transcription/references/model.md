@@ -76,7 +76,9 @@ BL可能跳过失败子项、写空数组，或在没有子结果时不写文件
 
 2026-10-03再次核对固定源码及本机2.1.0发布包：[local-server.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/shared/local-server.ts)在Windows调用cmd/start传入URL，&needapikey参数存在被拆开的引用问题。[login-console.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/login-console.ts)在打开失败时输出完整备用链接，保持原回调服务至授权完成或15分钟超时；该版本未提供已核实的auth login禁用浏览器选项。
 
-本项目校验BL备用URL后用`os.startfile`交给系统默认浏览器，保留BL原授权会话、回调与凭据保存行为。登录命令按执行工具权限机制运行于正常Windows交互桌面，Codex不另外打开授权页。该固定版本可能先打开参数不完整的页面，再转交完整链接；仅使用最后的完整链接页面。
+本项目仅在Windows控制台登录时使用Node预加载适配：拦下上述已知的`cmd/start`登录开页调用，使BL进入其完整URL输出分支；Python验证URL后通过`os.startfile`打开一次。BL包文件保持原样，授权state、回调、凭据保存和原生15分钟会话计时均由BL负责；Python不再叠加登录总等待上限。开发源为`scripts/console-browser.cts`，发行产物为Skill内`scripts/bailian/console-browser.cjs`。适配仅覆盖该固定版本已核实的浏览器调用，不扩展为通用Node拦截器。
+
+实际用户对话的首次login使用默认受限权限，重试才使用require_escalated。Windows进程令牌对照读取得到受限执行为true、正常桌面为false；程序在启动BL前用[IsTokenRestricted](https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-istokenrestricted)阻止已观察到的问题路径。此API检查限制SID列表，不是对所有桌面可用性或Chrome内部状态的检测。
 
 ### 后续调用与凭据修复
 

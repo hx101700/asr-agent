@@ -13,7 +13,7 @@ from urllib.parse import parse_qs, urlsplit
 from .. import BAILIAN_VERSION, MODEL
 from ..models import ErrorReport, JobConfig
 from .auth import bailian_environment
-from .environment import Runtime, SetupError, find_node, run_process
+from .environment import Runtime, SetupError, check_login_execution_context, find_node, run_process
 
 BEIJING_BASE_URL = "https://dashscope.aliyuncs.com"
 WAIT_SECONDS = 3600
@@ -55,7 +55,10 @@ def bl_command(runtime: Runtime, arguments: list[str]) -> list[str]:
     if installed_bl_version(runtime) != BAILIAN_VERSION or not runtime.bl_entry.is_file():
         raise SetupError(f"需要工作区BL {BAILIAN_VERSION}，请先运行bootstrap。")
     # --quiet是已核实的禁止命令结束后自动全局升级的路径；不猜造环境开关。
-    return [str(find_node()), str(runtime.bl_entry), *arguments, "--quiet"]
+    command = [str(find_node())]
+    if os.name == "nt" and arguments[:2] == ["auth", "login"] and "--console" in arguments:
+        command.extend(["--require", str(runtime.resource("scripts/bailian/console-browser.cjs"))])
+    return [*command, str(runtime.bl_entry), *arguments, "--quiet"]
 
 
 def verify_bl_installation(runtime: Runtime) -> None:
@@ -174,7 +177,7 @@ def explain_cli_error(returncode: int, stderr: str, private_values: list[str]) -
     }
 
 
-def _open_console_fallback(url: str) -> None:
+def _open_login_url(url: str) -> None:
     """校验BL输出的官方登录URL，并交给系统浏览器打开。"""
     try:
         parsed = urlsplit(url)
@@ -192,20 +195,20 @@ def _open_console_fallback(url: str) -> None:
     if not valid:
         raise SetupError("BL返回的登录链接不符合已核实的官方格式，本次登录已停止。")
     try:
-        # BL 2.1.0的cmd/start会拆开&needapikey；ShellExecute不经过cmd。
+        # 登录适配已将BL的开页动作交到此处，ShellExecute完整接收URL。
         os.startfile(url)
     except OSError as exc:
         raise SetupError("无法打开BL提供的完整登录页面，本次登录已停止，未重试。") from exc
 
 
-def _communicate_login(process: subprocess.Popen[str], timeout: float) -> tuple[None, str]:
-    """等待BL登录回调，同时读取备用链接和错误输出。"""
+def _communicate_login(process: subprocess.Popen[str], timeout: float | None) -> tuple[None, str]:
+    """等待BL登录回调，同时读取完整链接和错误输出。"""
     # _run_bl在console_login路径固定创建两个文本管道。
     output = cast(IO[str], process.stdout)
     error_output = cast(IO[str], process.stderr)
 
     def read_links() -> None:
-        """读取登录输出并打开首个有效的官方备用链接。"""
+        """读取BL登录链接并向系统浏览器发出一次打开请求。"""
         opened = False
         try:
             with output:
@@ -215,7 +218,7 @@ def _communicate_login(process: subprocess.Popen[str], timeout: float) -> tuple[
                         if process.poll() is not None:
                             raise SetupError("BL登录进程已结束，本次链接已不可继续使用；未重新发起登录。")
                         opened = True
-                        _open_console_fallback(line)
+                        _open_login_url(line)
         except (SetupError, OSError):
             if process.poll() is None:
                 process.kill()
@@ -240,7 +243,7 @@ def _communicate_login(process: subprocess.Popen[str], timeout: float) -> tuple[
 
 
 def _run_bl(runtime: Runtime, command: PreparedCommand,
-            private_values: list[str], *, timeout: float, capture_stdout: bool = False,
+            private_values: list[str], *, timeout: float | None, capture_stdout: bool = False,
             console_login: bool = False) -> str:
     """执行BL命令并管理进程回收与错误报告。"""
     private_values = [*private_values, command.env.get("DASHSCOPE_API_KEY", "")]
@@ -306,9 +309,11 @@ def console_status(runtime: Runtime) -> dict[str, str | bool]:
 
 def login_console(runtime: Runtime) -> dict[str, str | bool]:
     """发起官方控制台登录，并用BL本地状态确认凭据是否保存。"""
+    check_login_execution_context()
     runtime.prepare()
     command = prepare_command(runtime, ["auth", "login", "--console", "--console-site", "domestic",
                                         "--config", "default", "--output", "json"], "console")
-    _run_bl(runtime, command, [], timeout=15 * 60 + 30, console_login=True)
+    print(json.dumps({"status": "WAITING_FOR_LOGIN", "message": "请在系统默认浏览器完成百炼授权，完成后回到Codex发送“继续”。"}, ensure_ascii=False), flush=True)
+    _run_bl(runtime, command, [], timeout=None, console_login=True)
     # BL登录空等超时也可能退出0，必须再核对公开的本地状态命令。
     return console_status(runtime)

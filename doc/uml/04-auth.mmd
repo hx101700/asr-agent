@@ -56,15 +56,14 @@ else 使用控制台配置
         Note over C,B: 由BL原生命令更新配置<br/>随后login才会请求模型Key<br/>旧任务保持停止，新转写需用户明确提出
     end
     opt 首次配置或主动重新登录
-        C->>P: 按执行工具权限机制在正常Windows桌面启动<br/>Skill/scripts/asr.py --workspace 用户目录 login
+        C->>P: 首次调用即申请正常桌面权限<br/>Codex支持时使用require_escalated<br/>Skill/scripts/asr.py --workspace 用户目录 login
         P->>K: login_console(runtime)
-        K->>B: bl auth login --console
-        B->>A: 建立官方授权会话，尝试系统浏览器打开
-        opt BL输出Windows备用URL
-            B-->>K: 原会话的完整官方登录URL
-            K->>K: _open_console_fallback()校验URL
-            K->>A: 用系统默认浏览器打开完整URL
-        end
+        K->>K: environment.check_login_execution_context()<br/>受限令牌在启动BL前返回错误
+        K->>B: Node预加载console-browser.cjs<br/>bl auth login --console
+        B->>B: BL建立授权会话和回调<br/>适配拦下已知cmd/start开页调用
+        B-->>K: BL输出原会话的完整官方登录URL
+        K->>K: _open_login_url()校验URL
+        K->>A: 系统URL处理器打开一次完整URL
         U->>A: 完成登录授权
         Note over C,B: login持续等待BL回调，Codex可交还用户操作<br/>用户发送“继续”后读取原会话结果<br/>BL结果判断凭据是否保存；超时或失败时停止
         A-->>B: 原BL授权会话的回调
@@ -86,4 +85,4 @@ Note over K,A: Python转交BL输出的官方URL<br/>授权会话、回调及凭�
 Note over U,C: 授权只使用系统默认浏览器<br/>Codex不另开授权页<br/>也不通过computer-use检查页面
 Note over C,B: configured表示模型Key存在；console_configured表示控制台凭据存在<br/>均为本地状态；不同于网页event=configured
 Note over B,F: ASR使用模型API Key；控制台令牌与模型Key分别使用<br/>实际请求由BL及云端判断鉴权结果<br/>指定Key失效时由用户在网页更新.env
-Note over C,F: 前端路径相对仓库根：frontend/App.vue、useTranscription.ts、components/KeyDisplay.vue<br/>Python路径相对Skill：scripts/asr_runtime/application/session.py::api_key_display、save_api_key<br/>utils/auth.py::read_api_key、write_api_key、bailian_environment<br/>utils/bailian.py::prepare_command、login_console、console_status
+Note over C,F: 前端路径相对仓库根：frontend/App.vue、useTranscription.ts、components/KeyDisplay.vue<br/>Python路径相对Skill：scripts/asr_runtime/application/session.py::api_key_display、save_api_key<br/>utils/auth.py::read_api_key、write_api_key、bailian_environment<br/>utils/bailian.py::prepare_command、login_console、console_status、_open_login_url<br/>utils/environment.py::check_login_execution_context<br/>Node适配源码相对仓库根：scripts/console-browser.cts<br/>编译产物相对Skill：scripts/bailian/console-browser.cjs

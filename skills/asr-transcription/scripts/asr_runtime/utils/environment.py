@@ -1,6 +1,8 @@
 """管理Skill资源、工作区运行路径和子进程环境。"""
 
 import json
+import ctypes
+from ctypes import wintypes
 import os
 import re
 import shutil
@@ -18,6 +20,33 @@ class SetupError(Exception):
     def __init__(self, message: str) -> None:
         """按当前界面语言提供配置与运行环境提示。"""
         super().__init__(translate(message))
+
+
+def check_login_execution_context() -> None:
+    """拒绝在Windows受限令牌中启动浏览器登录。"""
+    if os.name != "nt":
+        return
+    security = ctypes.WinDLL("advapi32", use_last_error=True)
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.GetCurrentProcess.restype = wintypes.HANDLE
+    security.OpenProcessToken.argtypes = [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)]
+    security.OpenProcessToken.restype = wintypes.BOOL
+    security.IsTokenRestricted.argtypes = [wintypes.HANDLE]
+    security.IsTokenRestricted.restype = wintypes.BOOL
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    token = wintypes.HANDLE()
+    token_query = 0x0008
+    if not security.OpenProcessToken(kernel.GetCurrentProcess(), token_query, ctypes.byref(token)):
+        raise SetupError("无法读取Windows进程权限，未启动登录。")
+    try:
+        ctypes.set_last_error(0)
+        restricted = security.IsTokenRestricted(token)
+        if not restricted and ctypes.get_last_error():
+            raise SetupError("无法读取Windows进程权限，未启动登录。")
+        if restricted:
+            raise SetupError("浏览器登录需要正常Windows桌面执行权限；请通过执行工具的权限机制重新运行login（Codex使用require_escalated）。本次未启动BL或浏览器。")
+    finally:
+        kernel.CloseHandle(token)
 
 
 @dataclass(frozen=True)

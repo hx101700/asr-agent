@@ -1,50 +1,50 @@
 # 验证记录
 
-日期：2026-10-03。本轮以人工源码复核和Skill指令优化为主。此前完整回归和独立联网安装的实际结果保存在[上一轮记录](https://github.com/hx101700/memoflow/blob/52d5d91/doc/ACCEPTANCE.md)，不重复计为本轮执行。
+日期：2026-10-03。本轮验证Windows首次控制台登录和重复授权页面修复。此前网页、独立安装、Skill格式及文档导出验证保存在[上一轮记录](https://github.com/hx101700/memoflow/blob/4a788c1c19c21f8b0004b3c56c88c463c697dc46/doc/ACCEPTANCE.md)，不重复计为本轮执行。
 
-## 人工审查依据
+## 故障证据
 
-全文阅读运行Python与前端实现，并沿用户操作追踪调用；固定BL登录、状态、凭据解析和配置写入代码，以及python-docx核心元数据setter用于核对外部边界。没有以旧自动检测脚本或上轮结论替代源码分析。
+用户对话“我需要将语音转写，你有工具吗”的原始工具记录显示，19:52:42的首次login使用默认受限权限，19:54:56重试相同命令时增加了`require_escalated`。对照读取当前Windows进程令牌，默认执行的`IsTokenRestricted`为true，正常桌面执行为false。没有获取Chrome内部崩溃转储，这些证据只定位到两次执行条件的差异。
 
-发现合法长文件名的Word失败链：上传允许255字符；标题追加“ 录音转写”后可达256；python-docx的core_properties.title拒绝超过255。使用实际write_docx和一段本机固定文本最小复现，得到`exceeded 255 char limit for property`。删除可选元数据赋值后，完整正文标题回读通过。
+固定BL 2.1.0源码的Windows开页使用`cmd /c start`，完整URL中的`&needapikey=true`被cmd解释；BL随后输出完整URL，由项目旧入口再次打开。原回归只检查后一次打开，未覆盖此前的BL原生调用。本轮通过真实BL与浏览器替身验证整个调用边界。
 
-Skill参考官方格式及OpenAI的transcribe、gh-fix-ci范例，仅借鉴触发范围、脚本入口、外部CLI边界和按需引用；没有采用其模型、默认参数或不适用的审批/重试步骤。来源和具体取舍在[REVIEW](REVIEW.md)。
-
-## 本轮已执行检查
+## 已执行检查
 
 | 检查 | 实际结果 |
 | --- | --- |
-| Word最小复现 | 修正前实际调用失败；修正后新增长文件名回归通过，正文标题256字符完整保留 |
-| 文档、交付、打包 | `unittest tests.test_documents tests.test_delivery tests.test_package`：46项通过 |
+| 受限命令实际执行 | login在启动BL与浏览器前退出1，提示使用执行工具的正常桌面权限；没有输出WAITING_FOR_LOGIN |
+| 固定BL登录合约 | BL原生cmd开页未执行；Python仅取得一个包含needapikey=true的完整URL；测试向BL原生回调发送合成凭据，由BL保存并结束进程 |
+| Node适配边界 | 仅拦截固定形态的Windows官方控制台开页，其他execFile调用保留；测试通过 |
+| 登录、BL、打包针对性回归 | `unittest tests.test_console_login tests.test_bailian tests.test_package`：47项通过，无跳过 |
+| Python完整回归 | `unittest discover -s tests -t .`：318项通过，无跳过，约90秒 |
 | Python类型 | mypy严格检查29个源码文件通过 |
-| 前端单元 | 38项通过，包含无音频保存Key、失败保留输入、避免重复保存及后续检查复用 |
-| 前端构建 | Vue类型检查与Vite构建通过 |
-| Edge本机集成 | 1项通过；合成Key第一次保存被模拟拒绝，用户动作再次保存成功；此前无音频上传、预览/确认请求和任务目录，后续完整配置保持正常 |
-| BL原生命令 | 用固定BL 2.1.0在新隔离目录设置合成模型Key与console token，再运行config set空Key；auth status确认仅模型Key消失、console保留。Python参数数组及实际PowerShell命令均通过 |
-| Skill格式 | 官方quick_validate通过；格式验证用于补充检查，不代替行为审查 |
-| Skill情境推演 | 新录音、已有任务、成功交付、两种鉴权失败及不应触发的文字纪要请求；发现只换Key原先需录音的缺口，修正后独立复评确认无需创建任务。此项为只读决策评审 |
-| UML | 图04用Mermaid 11.12.0重绘并查看，官方包摘要已校验，说明框与画布边界核对通过 |
+| 登录适配编译 | `npm run build:login`通过，使用现有TypeScript生成发行所需CJS资源 |
+| 登录UML | Mermaid 11.12.0官方包摘要核对通过；图04已重绘并查看，文字和说明框在画布内，无裁切 |
+| 补丁格式 | `git diff --check`通过 |
 
-Node工具首次受限运行出现spawn EPERM，按执行工具权限机制重跑通过；没有因此改动产品业务或测试断言。
+真实BL合约使用本机回调与合成凭据，没有打开真实浏览器、使用真实录音或调用云端识别。前端未修改，本轮没有重复运行前端构建及浏览器交互回归。
+
+## 桌面验证
+
+在`.runtime/login-desktop-check`新建隔离工作目录，只复制已安装的固定BL包，使用开发环境Python和本轮Skill源码，以正常桌面权限启动一次login。没有复制用户凭据；这不是重新联网安装ZIP的验收。
+
+进程先返回WAITING_FOR_LOGIN，结束时回执为`configured=false`、`console_configured=false`，没有保存凭据。未收到用户对本次窗口数量及红叉异常的确认；实际Chrome表现与人工授权尚未验证通过。未自动重复发起登录。
 
 ## 复现入口
 
-开发环境依赖准备完毕后：
+开发依赖与`.runtime/skill-contract-workspace`中的固定BL/pip准备完毕后：
 
 ```powershell
-.venv\Scripts\python.exe -B -X utf8 -m unittest tests.test_documents tests.test_delivery tests.test_package
+npm run build:login
+.venv\Scripts\python.exe -B -X utf8 -m unittest tests.test_console_login tests.test_bailian tests.test_package
+.venv\Scripts\python.exe -B -X utf8 -m unittest discover -s tests -t .
 .venv\Scripts\python.exe -B -X utf8 -m mypy --config-file mypy.ini
-npm run test:web
-npm run build:web
-npm run test:browser
 ```
 
-完整Python回归仍可用`unittest discover -s tests -t .`；BL/pip合约需要先在`.runtime/skill-contract-workspace`准备锁定环境。最新全量运行证据见上轮记录，本轮仅重跑与改动相关的检查。
+真实桌面login须由宿主工具使用正常桌面执行权限。授权完成后读取原进程的最终回执，不另开页面；本机凭据存在仍不等同于云端模型调用验证。
 
 ## 发行与限制
 
-已发布ZIP为43个Skill文件、284228字节，SHA-256：`b993414b7554f2183d62c15a2d94d40b74a045c9c6b1569b53aa3326da56c22c`。固定清单、CRC和源码逐文件字节比对通过；公开地址匿名下载与本地包逐字节一致。开发文档、UML、测试、安装环境、录音、凭据与结果不入包。
+本轮尚未发布；待ZIP清单、内容核对完成后，更新同一v0.1.0预览。固定发行清单新增一个编译后的登录适配资源，共44个文件；TypeScript开发源、测试、UML、安装环境、录音、凭据和结果均不入包。
 
-实现提交`8da34db`已推送dev；远端完整源码树130个文件与本地提交一致。同一v0.1.0预览及双语说明已更新，核对为一个Release、一个标签和一个ZIP附件；master保持`6c83711`。发布验证记录单独提交，README用户修改保留在工作区。
-
-本轮没有读取真实凭据、使用真实录音或调用云端识别。保存Key只说明本机文件已更新，BL本机状态不代表云端权限验证；真实登录、识别准确率和Office逐页视觉不计为本轮通过。
+不更改用户原工作目录、用户级Skill安装或README本地修改。master和版本号保持原值；更新安装副本后的完整新对话验收、真实云端识别及Office逐页视觉仍需单独验证。

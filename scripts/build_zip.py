@@ -13,6 +13,7 @@ REQUIRED_FILES = (
     "references/usage.md", "references/errors.md", "references/model.md",
     "scripts/asr.py", "scripts/requirements.txt",
     "scripts/bailian/package.json", "scripts/bailian/package-lock.json",
+    "scripts/bailian/console-browser.cjs",
     "scripts/asr_runtime/__init__.py", "scripts/asr_runtime/__main__.py",
     "scripts/asr_runtime/models.py", "scripts/asr_runtime/web.py",
     "scripts/asr_runtime/error_catalog.json",
