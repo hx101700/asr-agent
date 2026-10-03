@@ -29,8 +29,8 @@ Skill 位于 `skills/asr-transcription/`，入口为 `scripts/asr.py`，执行�
 
 ## 分支与发布
 
-开发分支为 `dev`，项目版本保持 `0.1.0`。本轮按用户要求更新同一个 v0.1.0 开发预览；发布结果在远端核对后补充，`master`保持不变。
+开发分支为 `dev`，项目版本保持 `0.1.0`。网页启动修正已推送，源码提交为`7192c2d4ec13dd3a2cedaa4031395b8562cfa0f6`。现有[v0.1.0开发预览](https://github.com/hx101700/memoflow/releases/tag/v0.1.0)已更新附件和中英文发布说明，远端仍只有一个标签和一个Release，`master`保持不变。
 
-待发布ZIP：`dist/asr-transcription.zip`，43个文件、274650字节，SHA-256：`03756c1cd8a0f645713bc399f30a250f5ccde22c2944f92fb63bff460ee6f706`。仅包含Skill运行所需文件；开发文档、UML、测试、运行环境及用户数据不入包。
+已发布ZIP：`dist/asr-transcription.zip`，43个文件、274650字节，SHA-256：`03756c1cd8a0f645713bc399f30a250f5ccde22c2944f92fb63bff460ee6f706`。公开下载与本机包逐字节一致，远端完整Git树与本机提交一致。仅包含Skill运行所需文件；开发文档、UML、测试、运行环境及用户数据不入包。
 
 原Windows红色错误弹窗的具体错误码未保留，原因仍未确认。已验证的修复范围是网页启动指引、回执语义，以及通过宿主浏览器打开页面。后续完整使用、BL授权和真实识别按用户需求单独验收。
