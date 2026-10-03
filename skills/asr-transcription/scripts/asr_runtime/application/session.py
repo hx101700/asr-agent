@@ -358,7 +358,7 @@ class Session:
                 # 与transcribe竞争同一个一次执行占用；先开始执行的任务保持原样。
                 execution = reserve_execution(self.runtime, config["job_id"])
             except FileExistsError as exc:
-                raise ValidationError("此任务已进入执行流程，无法修改这份设置。请等待当前任务结束后再新建任务。", "confirmation") from exc
+                raise ValidationError("这份设置已不能修改。请回到 Codex 查看任务状态；如需调整，请重新配置。", "confirmation") from exc
             save_record(execution, {
                 "job_id": config["job_id"], "status": "STOPPED", "execution_authorized": False,
                 "cloud_outcome": "not_started", "updated_at": datetime.now(timezone.utc).isoformat(),

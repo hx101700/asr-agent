@@ -159,13 +159,17 @@ Python 安装、虚拟环境核对与依赖加载检查使用 `-I` 隔离模式�
 
 网页通过受保护的 `POST /api/api-key` 读取已有 Key，缺失时返回空值；通过 `POST /api/save-api-key` 保存输入。`KeyDisplay.vue` 使用局部状态绑定密码输入框，与可提交表单分开。独立“保存 API Key”和“检查并预览”复用同一凭据保存逻辑：前者只更新本机凭据，后者先检查表单、按需保存Key、再请求配置预览。保存阶段使用 `auth.status=saving`，暂停认证方式与Key编辑。切换认证方式、配置保存成功或组件关闭时清空控件。Key不进入任务配置、浏览器持久存储、日志或聊天。
 
+Key保存错误独立于配置预览错误处理，不因其他表单输入的revision变化而丢弃。仅修改Key时，用户看到页面保存成功后回Codex发送“完成”或“继续”，据此结束本次serve；不等待`event=configured`、另查`api-key-status`或启动转写。
+
 `console-status`复用BL本机状态，`api-key-status`只读.env；在线有效性由实际BL请求判定。明确鉴权失败后的修复依据见[错误说明](../skills/asr-transcription/references/errors.md#鉴权失败与重新配置)，使用现有网页或当前工作目录的BL原生命令；修复不自动重传已失败任务。
 
 `recognition_arguments` 集中映射选项。热词用 JSON 序列化形成单个参数值，上下文使用单个 `--context=<原文>`，避免以 `--` 开头的文本被 BL 误识别为命令选项。`prepare_command` 构造一次 argv、核对一次 Windows 命令长度并读取执行 Key；进程使用 `shell=False`。来源与限制见 [model.md](../skills/asr-transcription/references/model.md)。
 
 ## 生命周期与状态
 
-Session 短锁保护上传登记与发布，文件字节接收在锁外完成，同类上传不能并发。HTTP上传仍区分audio和hotwords；只有音频登记到uploads，由`uploaded_audio(identifier)`查找。Excel导入完成或失败时清理其临时副本。目录窗口在独立子进程中运行，取消使用选择器自己的信号，没有用户选择总时限。正常服务退出清理未确认音频副本，保留已确认音频。关闭浏览器不等于关闭服务。
+Session 短锁保护上传登记与发布，文件字节接收在锁外完成，同类上传不能并发。HTTP上传仍区分audio和hotwords；只有音频登记到uploads，由`uploaded_audio(identifier)`查找。Excel导入完成或失败时清理其临时副本。目录窗口在独立子进程中运行，取消使用选择器自己的信号，没有用户选择总时限。
+
+正常关闭服务时，`LocalServer.server_close()`先调用`Session.cleanup()`设置关闭标记、取消目录选择并清理未确认音频，保留已确认音频；再在finally中调用基类关闭监听并等待非daemon请求线程结束。仍在接收的上传通过关闭检查或已有的10秒socket读写超时结束等待，由自身finally清理`.part`文件。10秒是网络等待超时，不是整个关闭流程的总时限。关闭浏览器不等于关闭服务。
 
 目录选择与取消共享页面生成的`picker_id`。上次位置或默认位置不是可用目录时，窗口从当前工作目录打开，用户可重新选择保存位置。
 

@@ -13,7 +13,7 @@ MemoFlow aims to turn recordings into meeting minutes that follow your preferred
 
 After saving your settings, return to Codex and send “continue.” You can return to editing before transcription starts. If the response to a withdrawal request is interrupted, refreshing the original page restores the confirmed settings still held by the same service. Later unsaved edits are not retained.
 
-This update fixes hotword pagination jumping after a deletion, overlapping error messages in narrow windows, and temporary file collisions during local export. The page, Skill instructions, and developer diagrams have also been checked against the implementation.
+If you change other settings while your API key is being saved, any error from saving the key now remains visible. To change only your key, save it on the page, then return to Codex and send “done” after the success message. Normal service shutdown also waits for current uploads to clean up their temporary files. Tasks whose settings can no longer be changed direct you back to Codex to check their status.
 
 ### Get started
 

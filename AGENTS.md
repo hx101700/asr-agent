@@ -36,6 +36,7 @@
 - BL登录从首次调用就使用正常桌面执行权限；Codex支持时设置`sandbox_permissions=require_escalated`。受限令牌在启动BL前被拒绝。固定版本的Windows开页适配仅转交完整URL，由系统浏览器打开一次；授权会话、回调与凭据保存仍由BL负责。
 - 网页接收本机文件字节并保存确认快照，保存设置后由同一 `serve` 进程向 Codex 返回 `job_id`。网页保存不启动 BL。
 - 用户填写网页或完成授权时，Codex保留持久进程并结束当前回复；网页提示保存后发送“继续”，收到后读取原会话回执。登录结果由BL回执/本地状态判断，不再问用户是否授权成功；不增加后台轮询、HTTP检测或任务状态。
+- 正常关闭网页服务时先清理Session并取消目录窗口，再由ThreadingHTTPServer等待请求线程收尾；上传的finally负责清理自己的临时文件。
 - 预览建立音频 SHA 基线并保存热词词典；确认复用快照，只核对音频 size/mtime。执行前核对音频完整摘要；后续不重读原 Excel。
 - 热词通过Excel导入或网页直接填写，导入保留行号及错误原值并清理临时文件。规则由`validate_hotword_rows`与`build_vocabulary`统一应用；前端使用Element Plus表格展示、编辑及标红，不另写一套业务校验。
 - 已保存且尚未执行的设置可通过`Session.reopen()`撤回。它与转写竞争同一个执行占用，成功后旧编号记为`STOPPED/LOCAL_CONFIG_REOPENED`，恢复表单、重新确认生成新编号。同一服务的`description().reopened`可恢复仍有效的撤回快照，后续未保存编辑不持久化。Codex按最新配置事件继续；已开始的任务保持原样。

@@ -159,4 +159,15 @@ Note over H,S: 行级检查可返回issues供表格修改<br/>其他字段或文
 Note over C,H: 本机配置页先于BL授权页<br/>保存后按auth_mode和已有凭据决定是否login
 Note over W,S: 输入变化使旧预览失效；确认结果未知时网页持续冻结<br/>关闭网页不关闭serve；服务正常退出保留已确认音频并清理临时副本
 Note over I,F: 默认根：工作目录/transcriptions<br/>JSON与成品分别选择保存根<br/>Excel只作导入，预览使用编辑行，执行使用词典快照
+opt 交付完成、取消或失败收尾时正常结束serve
+    C->>H: 结束本次serve
+    H->>S: LocalServer.server_close()先调用cleanup()
+    S->>S: 设置_closed关闭标记
+    S->>P: close()取消仍在等待的目录选择
+    S->>F: 保留已确认音频，清理未确认副本
+    S-->>H: cleanup完成或抛出异常
+    H->>H: finally调用基类server_close()<br/>关闭监听并等待非daemon请求线程结束
+    Note over H,F: 活动上传检测关闭或经过已有10秒网络读写超时后<br/>由上传自身finally清理.part并完成请求<br/>10秒不是整个关闭流程的总时限
+    H-->>C: 本次serve进程结束
+end
 Note over C,F: 前端相对仓库根：frontend/App.vue、useTranscription.ts、components/HotwordEditor.vue、model.ts、api.ts<br/>Python相对Skill：scripts/asr_runtime/web.py；application/session.py::upload、check_hotwords、validate、confirm、reopen<br/>application/inputs.py::import_hotwords、validate_audio；application/rules.py::validate_hotword_rows、validate_context<br/>application/transcription.py::transcribe、job_status；utils/job_files.py::reserve_execution、save_record、publish_config

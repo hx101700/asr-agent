@@ -27,6 +27,7 @@ class LocalServer(ThreadingHTTPServer):
     """提供带配置会话的本机HTTP服务。"""
 
     allow_reuse_address = False
+    daemon_threads = False
     session: Session
 
     def server_bind(self) -> None:
@@ -37,9 +38,11 @@ class LocalServer(ThreadingHTTPServer):
         super().server_bind()
 
     def server_close(self) -> None:
-        """关闭监听并清理本次会话，取消仍在等待的目录窗口。"""
-        super().server_close()
-        self.session.cleanup()
+        """通知会话关闭，再释放监听并等待请求线程完成清理。"""
+        try:
+            self.session.cleanup()
+        finally:
+            super().server_close()
 
 
 def create_server(runtime: Runtime, port: int = 0) -> LocalServer:

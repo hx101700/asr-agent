@@ -403,6 +403,37 @@ test("检查保存Key期间修改表单会停止旧校验，重新检查复用�
   assert.equal(page.calls.filter(call => call.path === "/api/save-api-key").length, 1);
 });
 
+test("保存Key期间修改其他设置不隐藏凭据保存失败，修正后可继续检查", async () => {
+  const pending = deferred<Endpoints["/api/save-api-key"]>();
+  const page = harness({ "/api/save-api-key": () => pending.promise });
+  await addAudio(page);
+  await page.actions.setAuthMode(true);
+  page.view.apiKey = "fixture invalid key";
+  page.actions.keyChanged();
+  const checking = page.actions.validate();
+  page.form.diarizationEnabled = false;
+  page.actions.changed();
+  pending.reject(new UiError("Key含有空白，请修正。", "auth_mode", 422));
+  await checking;
+  assert.equal(page.model.phase, "editing");
+  assert.equal(page.model.auth.status, "failed");
+  assert.equal(page.error.value?.field, "auth_mode");
+  assert.equal(page.error.value?.message, "Key含有空白，请修正。");
+  assert.equal(page.view.focus, "auth_mode");
+  assert.equal(page.view.apiKey, "fixture invalid key");
+  assert.equal(page.form.diarizationEnabled, false);
+  assert.equal(page.calls.filter(call => call.path === "/api/save-api-key").length, 1);
+  assert.equal(page.calls.filter(call => call.path === "/api/validate").length, 0);
+  page.view.apiKey = "fixture-corrected-key";
+  page.actions.keyChanged();
+  page.handlers["/api/save-api-key"] = () => ({ ok: true });
+  await page.actions.validate();
+  assert.equal(page.model.phase, "review");
+  assert.equal(lastConfig(page).diarization_enabled, false);
+  assert.equal(page.calls.filter(call => call.path === "/api/save-api-key").length, 2);
+  assert.equal(page.calls.filter(call => call.path === "/api/validate").length, 1);
+});
+
 test("空Key阻止检查；切回控制台后可继续", async () => {
   const page = harness();
   await addAudio(page);

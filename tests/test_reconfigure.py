@@ -47,16 +47,18 @@ class ReconfigureTests(WebFixture):
         self.assertTrue(Path(config["audio"]["path"]).exists())
         self.assertEqual(job_status(self.runtime, old_id)["status"], "STOPPED")
 
-    def test_started_task_keeps_its_receipt_and_execution_record(self):
-        """验证任务开始后返回修改被拒绝，原任务状态和页面回执保留。"""
+    def test_occupied_task_keeps_its_receipt_and_execution_record(self):
+        """验证已占用任务的各阶段都拒绝修改并保留原记录与回执。"""
         execution = reserve_execution(self.runtime, self.receipt["job_id"])
-        report = {"job_id": self.receipt["job_id"], "status": "RUNNING", "cloud_outcome": "unknown"}
-        save_record(execution, report)
-        before = (execution / "status.json").read_bytes()
-        with self.assertRaisesRegex(ValidationError, "已进入执行流程"):
-            self.session.reopen(self.receipt["job_id"])
-        self.assertEqual(self.session.receipt, self.receipt)
-        self.assertEqual((execution / "status.json").read_bytes(), before)
+        for status in ("PREPARING", "RUNNING", "STOPPED", "JSON_READY"):
+            with self.subTest(status=status):
+                report = {"job_id": self.receipt["job_id"], "status": status, "cloud_outcome": "unknown"}
+                save_record(execution, report)
+                before = (execution / "status.json").read_bytes()
+                with self.assertRaisesRegex(ValidationError, "回到 Codex 查看任务状态"):
+                    self.session.reopen(self.receipt["job_id"])
+                self.assertEqual(self.session.receipt, self.receipt)
+                self.assertEqual((execution / "status.json").read_bytes(), before)
 
     def test_reopen_can_restore_again_when_first_response_was_lost(self):
         """验证撤回已生效而响应丢失时，同一编号可再次取得恢复数据。"""

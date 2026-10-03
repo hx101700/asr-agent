@@ -26,7 +26,7 @@ _ENGLISH: dict[str, str] = {
     "当前会话已关闭。": "This session has closed. Open a new transcription page from Codex.",
     "设置已保存，请先点击“修改设置”返回表单。": "Settings have been saved. Select Modify settings to return to the form.",
     "此页面没有可修改的已保存设置，请重新打开当前配置页。": "This page has no saved settings to edit. Reopen the current configuration page.",
-    "此任务已进入执行流程，无法修改这份设置。请等待当前任务结束后再新建任务。": "This task has entered execution and its settings can no longer be changed. Wait for it to finish before starting a new task.",
+    "这份设置已不能修改。请回到 Codex 查看任务状态；如需调整，请重新配置。": "These settings can no longer be changed. Return to Codex to check the task status. To make changes, configure a new task.",
     "文件仍在添加，请稍候。": "The file is still being added. Wait for it to finish.",
     "未知的保存位置。": "The output location is invalid.",
     "无法读取 .env 文件。": "The .env file could not be read. Check that it exists and is accessible.",

@@ -6,7 +6,7 @@ asr-transcription 的安装、认证、网页操作、文件要求及重新导�
 - 界面设置：在页面右上角切换中文/English和主题，音频语言在转写设置中另行选择。
 - 热词：在网页表格直接填写，或导入Excel；错误行标红。重复词的所有相关行都需处理，确认后只保留一行；权重错误单独提示。上下文检查会保留原文并指出具体问题。
 - 填错设置：保存后点击“修改设置”，撤回尚未执行的旧编号并恢复原输入；重新保存后告诉Codex“继续”。撤回响应中断时可刷新原页面，在同一服务的缓存仍有效时恢复原确认内容；恢复后新增的未保存编辑不会保留。
-- 只更换Key：在网页选择“使用指定 API Key”，填写后点击“保存 API Key”，无需添加录音；鉴权失败按[凭据修复](../skills/asr-transcription/references/errors.md#鉴权失败与重新配置)处理。
+- 只更换Key：在网页选择“使用指定 API Key”，填写后点击“保存 API Key”，无需添加录音。看到保存成功后回Codex发送“完成”或“继续”，让它结束本次网页服务；鉴权失败按[凭据修复](../skills/asr-transcription/references/errors.md#鉴权失败与重新配置)处理。
 - 保存位置：点击“选择文件夹”更换目录；原位置不存在或被文件占用时，窗口从当前工作目录打开。
 - 操作失败：根据 [errors.md](../skills/asr-transcription/references/errors.md)保留回执、定位阶段并处理问题。
 - 查询参数依据：参阅 [model.md](../skills/asr-transcription/references/model.md)中的官方来源。

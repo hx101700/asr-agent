@@ -288,14 +288,21 @@ export function useTranscription(api: Api, view: ViewEffects, t: Translate, make
       } catch (reason) { fail(reason); return; }
       const revision = model.revision;
       model.phase = "validating";
-      try {
-        if (form.useApiKey && model.auth.status !== "ready") {
+      if (form.useApiKey && model.auth.status !== "ready") {
+        try {
           const saved = await persistApiKey();
           if (!saved || revision !== model.revision) {
             model.phase = "editing";
             return;
           }
+        } catch (reason) {
+          // Key保存期间凭据不可改动，其他表单变化不能使本次凭据错误过期。
+          model.phase = "editing";
+          fail(reason);
+          return;
         }
+      }
+      try {
         const result = await api.request("/api/validate", config);
         if (receiveValidation(model, revision, result, config)) {
           Object.assign(model.hotwords, { issues: [], warnings: [], checked: form.hotwordsEnabled, count: result.summary.enhancement.count });
