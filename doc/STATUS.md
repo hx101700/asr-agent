@@ -34,4 +34,4 @@ Skill 源码为 `skills/asr-transcription/`，入口是 `scripts/asr.py`，内�
 
 ## 交付状态
 
-开发分支为 `dev`，版本保持 `0.1.0`，`master`不合并。本轮代码、文档、图稿和验证已完成，待更新同一 [v0.1.0预览](https://github.com/hx101700/memoflow/releases/tag/v0.1.0)。候选ZIP为43个文件、279753字节，SHA-256为`55c20cac17bb9b0dba5e91be86ff4a20778bcdd25980e399ecc1d41798d33c39`；清单、源码字节及解压入口检查通过。ZIP只包含Skill运行资源，清单由 `scripts/build_zip.py` 管理。
+开发分支为 `dev`，版本保持 `0.1.0`，`master`保持`6c83711`。实现提交`96eda6e`已推送，代码、文档、图稿和同一 [v0.1.0预览](https://github.com/hx101700/memoflow/releases/tag/v0.1.0)已更新。公开ZIP为43个文件、279753字节，SHA-256为`55c20cac17bb9b0dba5e91be86ff4a20778bcdd25980e399ecc1d41798d33c39`；清单、源码字节、解压入口及匿名下载比对通过。远端保留一个Release、一个标签和一个ZIP附件。ZIP只包含Skill运行资源，清单由 `scripts/build_zip.py` 管理。
