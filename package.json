@@ -10,6 +10,7 @@
     "test:browser": "tsx --test tests/test_browser.ts"
   },
   "dependencies": {
+    "@element-plus/icons-vue": "2.3.2",
     "element-plus": "2.14.7",
     "vue": "3.5.43"
   },

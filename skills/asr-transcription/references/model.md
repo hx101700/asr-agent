@@ -19,7 +19,7 @@ API资料核验基线：2026-09-29。CLI固定2.1.0，对照源码提交`8bbbbc7
 | A10 | [CLI安装与鉴权](https://docs.bailian.console.aliyun.com/zh/model-studio/cli/installation) | 控制台授权与本地状态 |
 | A13 | [CLI语音识别](https://help.aliyun.com/zh/model-studio/cli/speech) | 公开recognize与out参数 |
 | W01 | [CreateProcessW](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw) | Windows命令行长度 |
-| W02 | [cmd](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/cmd)、[os.startfile](https://docs.python.org/3.12/library/os.html#os.startfile) | 登录链接转交 |
+| W02 | [cmd](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/cmd)、[os.startfile](https://docs.python.org/3.12/library/os.html#os.startfile) | BL系统浏览器调用与完整链接转交 |
 | M01 | [PyAV18.1.0安装](https://github.com/PyAV-Org/PyAV/blob/v18.1.0/docs/overview/installation.rst) | wheel包含FFmpeg库 |
 | M02 | [AudioResampler](https://github.com/PyAV-Org/PyAV/blob/v18.1.0/av/audio/resampler.py) | 声道变换、flush |
 | C01 | [python-dotenv](https://bbc2.github.io/python-dotenv/) | 只解析指定.env且不展开变量 |
@@ -73,7 +73,9 @@ BL可能跳过失败子项、写空数组，或在没有子结果时不写文件
 
 ### Windows登录转交
 
-2.1.0的[local-server.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/shared/local-server.ts)用cmd/start传入未正确引用的URL，&needapikey参数会被拆开。BL失败后输出完整备用链接并保持原回调服务；本项目验证URL格式后用os.startfile打开一次，不修改BL源码、不建立第二个授权会话。这是针对固定版本链接引用问题的转交处理。
+2026-10-03再次核对固定源码及本机2.1.0发布包：[local-server.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/shared/local-server.ts)在Windows调用cmd/start传入URL，&needapikey参数存在被拆开的引用问题。[login-console.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/login-console.ts)在打开失败时输出完整备用链接，保持原回调服务至授权完成或15分钟超时；该版本未提供已核实的auth login禁用浏览器选项。
+
+本项目校验BL备用URL后用`os.startfile`交给系统默认浏览器，保留BL原授权会话、回调与凭据保存行为。登录命令按执行工具权限机制运行于正常Windows交互桌面，Codex不另外打开授权页。该固定版本可能先打开参数不完整的页面，再转交完整链接；仅使用最后的完整链接页面。
 
 ### 更新与安装副作用
 

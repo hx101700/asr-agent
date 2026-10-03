@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref } from "vue";
-import { ElInput } from "element-plus";
+import { ElFormItem, ElInput } from "element-plus";
 import type { Translate } from "../i18n";
 
 defineProps<{ loading: boolean; disabled: boolean; t: Translate }>();
@@ -19,7 +19,8 @@ defineExpose({ setValue, getValue });
 </script>
 
 <template>
-  <label class="field-label" for="api-key-value">DASHSCOPE_API_KEY</label>
-  <ElInput id="api-key-value" v-model="value" type="password" show-password
-    autocomplete="off" :disabled="disabled" :placeholder="loading ? t('loadingKey') : t('enterKey')" @input="emit('changed')" />
+  <ElFormItem label="DASHSCOPE_API_KEY" for="api-key-value">
+    <ElInput id="api-key-value" v-model="value" type="password" show-password
+      autocomplete="off" :disabled="disabled" :placeholder="loading ? t('loadingKey') : t('enterKey')" @input="emit('changed')" />
+  </ElFormItem>
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ElUpload, ElProgress, ElTag } from "element-plus";
+import { ElIcon, ElUpload, ElProgress, ElTag } from "element-plus";
 import type { UploadFile } from "element-plus";
+import { Document, Headset } from "@element-plus/icons-vue";
 import { fileSize, type Translate } from "../i18n";
 import type { UploadKind, UploadState } from "../types";
 
@@ -23,9 +24,7 @@ function exceeded(files: File[]): void {
     <ElUpload drag :auto-upload="false" :show-file-list="false" :file-list="[]" :limit="1"
       :disabled="disabled" :accept="accept" :on-change="selected" :on-exceed="exceeded"
       :aria-label="t(kind === 'audio' ? 'chooseAudio' : 'chooseHotwords')">
-      <svg class="upload-icon" viewBox="0 0 48 48" fill="none" aria-hidden="true">
-        <path d="M11 31v7h26v-7M24 31V10m-8 8 8-8 8 8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+      <ElIcon class="upload-icon" :size="28" aria-hidden="true"><component :is="kind === 'audio' ? Headset : Document" /></ElIcon>
       <div class="upload-title">{{ t(kind === 'audio' ? (upload.status === 'ready' ? 'replaceAudio' : 'chooseAudio') : (upload.status === 'ready' ? 'replaceHotwords' : 'chooseHotwords')) }}</div>
       <div class="subtle">{{ t('drag') }}</div>
     </ElUpload>

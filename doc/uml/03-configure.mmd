@@ -22,8 +22,8 @@ opt 使用宿主浏览器工具
     C->>B: 用回执中的完整URL打开页面
 end
 B->>W: 加载页面和静态资源
-C->>B: 通过浏览器工具查看实际页面
-Note over U,C: 无法查看时由用户确认页面是否显示<br/>监听或请求成功不能代替页面可见性
+Note over U,C: 按回执报告启动或打开请求结果，立即让用户操作<br/>正常路径不依赖computer-use或页面自动检查<br/>打开报错或用户反馈异常时再排查同一服务
+Note over C,H: Codex保留serve会话并结束当前回复<br/>页面提示保存后发送“继续”<br/>收到后读取原会话的configured回执
 Note over W,H: App.vue与Element Plus呈现界面<br/>useTranscription编排，model处理纯状态，api发送HTTP<br/>令牌保留在接口闭包；请求携带Accept-Language
 W->>H: actions.start()经api.ts请求GET /api/session
 H->>S: description()

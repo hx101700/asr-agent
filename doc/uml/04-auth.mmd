@@ -42,16 +42,17 @@ alt 使用指定API Key
 else 使用控制台配置
     Note over C,P: 状态不明时按需console-status；已知配置可直接复用<br/>首次配置或主动重新登录时调用login
     opt 首次配置或主动重新登录
-        C->>P: Skill/scripts/asr.py --workspace 用户目录 login
+        C->>P: 按执行工具权限机制在正常Windows桌面启动<br/>Skill/scripts/asr.py --workspace 用户目录 login
         P->>K: login_console(runtime)
         K->>B: bl auth login --console
-        B->>A: 建立官方授权会话
+        B->>A: 建立官方授权会话，尝试系统浏览器打开
         opt BL输出Windows备用URL
             B-->>K: 原会话的完整官方登录URL
             K->>K: _open_console_fallback()校验URL
-            K->>A: 用系统打开完整URL一次
+            K->>A: 用系统默认浏览器打开完整URL
         end
         U->>A: 完成登录授权
+        Note over C,B: login持续等待BL回调，Codex可交还用户操作<br/>用户发送“继续”后读取原会话结果<br/>BL结果判断凭据是否保存；超时或失败时停止
         A-->>B: 原BL授权会话的回调
         B->>F: 保存工作目录/.asr-transcription/.state/bailian凭据
         B-->>K: 登录进程结束
@@ -68,5 +69,6 @@ else 使用控制台配置
     B->>F: 使用当前工作目录的BL模型凭据
 end
 Note over K,A: Python转交BL输出的官方URL<br/>授权会话、回调及凭据保存由BL负责
+Note over U,C: 授权只使用系统默认浏览器<br/>Codex不另开授权页，也不通过computer-use检查页面
 Note over C,B: configured表示模型Key存在；console_configured表示控制台凭据存在<br/>均为本地状态；不同于网页event=configured
 Note over C,F: 前端路径相对仓库根：frontend/useTranscription.ts、components/KeyDisplay.vue<br/>Python路径相对Skill：scripts/asr_runtime/application/session.py::api_key_display、save_api_key<br/>utils/auth.py::read_api_key、write_api_key、bailian_environment<br/>utils/bailian.py::prepare_command、login_console、console_status

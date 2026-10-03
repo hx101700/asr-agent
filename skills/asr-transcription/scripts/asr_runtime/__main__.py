@@ -51,7 +51,7 @@ def main(argv: list[str] | None = None) -> int:
             report = job_status(runtime, args.job)
         else:
             if args.command == "login":
-                print(json.dumps({"status": "WAITING_FOR_LOGIN", "message": "请在最后打开的阿里云官方页面完成授权。Windows可能先出现一个缺少参数的页面，程序会接收BL的完整备用链接并打开一次。最多等待15分钟；未打开时可按Ctrl+C停止。"}, ensure_ascii=False), flush=True)
+                print(json.dumps({"status": "WAITING_FOR_LOGIN", "message": "请在系统默认浏览器的阿里云授权页完成登录。此命令需要正常Windows交互桌面；BL提供备用链接时，以最后打开的完整链接页面为准。最多等待15分钟。"}, ensure_ascii=False), flush=True)
             actions: dict[str, Callable[[Runtime], Mapping[str, object]]] = {
                 "doctor": doctor, "bootstrap": bootstrap, "api-key-status": api_key_status,
                 "console-status": console_status, "login": login_console,

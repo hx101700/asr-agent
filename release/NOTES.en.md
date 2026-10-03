@@ -12,7 +12,11 @@ MemoFlow is being built to turn recordings into meeting minutes that follow your
 
 During initial setup, the installer compares file download speeds from PyPI and the Aliyun mirror and starts with the faster source. pip attempts to recover interrupted downloads, then the installer switches sources if recovery fails. Complete downloads can be reused, and progress stays visible throughout setup.
 
-Tell Codex “Please transcribe a recording” to open the configuration page, then click “Add audio” to choose a file. This preview improves how Codex checks and reports whether the page has opened. If it has not appeared, Codex helps you open the page from the running service.
+Tell Codex “Please transcribe a recording” to open the configuration page, then click “Choose an audio file” to add your recording. You can proceed as soon as the page opens, without waiting for extra browser checks. Save your settings, then follow the page's reminder to return to Codex and send “continue.”
+
+The refreshed interface pairs blue accents with neutral surfaces and consistent icons to distinguish primary actions from supporting controls. Hover feedback and concise tooltips clarify available actions. Enable hotwords and select “Download template” beside “Hotword list” to get the Excel workbook. Controls remain readable in both Light and Dark modes.
+
+Model Studio Console login uses your system default browser. Codex does not open a separate authorization page.
 
 ### Installation and file storage
 

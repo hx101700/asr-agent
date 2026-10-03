@@ -101,11 +101,21 @@ Python 的 TypedDict 描述已有 JSON 字段和允许的状态，数据在运�
 
 ## 页面与界面偏好
 
-`serve`持续运行并输出`event=listening`、URL、PID及`browser_request`。`skipped`表示由宿主浏览器工具打开；`requested`表示系统接受打开请求；`failed`表示返回失败或抛出浏览器异常。浏览器失败时仍保持HTTP服务供调用方打开同一URL；启动输出失败时关闭服务器。是否实际显示页面，由浏览器工具状态或用户反馈确认。
+`serve`持续运行并输出`event=listening`、URL、PID及`browser_request`。`skipped`表示由宿主打开链接；`requested`表示系统接受打开请求；`failed`表示返回失败或抛出浏览器异常。浏览器失败时仍保持HTTP服务供调用方打开同一URL；启动输出失败时关闭服务器。
 
-有浏览器工具时，Codex使用`serve --no-browser`并打开返回的完整URL；只有系统浏览器可用时才调用默认打开方式。新转写从配置页的文件选择器开始。本机配置页与BL的阿里云授权页是两个阶段：确认配置后再按认证方式和已有凭据决定是否执行login。
+有宿主打开链接能力时，Codex使用`serve --no-browser`并打开完整URL一次，随后立即让用户操作；只有系统浏览器可用时才调用默认打开方式。正常路径不加载computer-use、不枚举浏览器、不额外验证页面。发生打开错误或用户反馈异常时才检查同一服务。新转写从配置页的文件选择器开始，本机配置页与BL授权页分属配置和认证两个阶段。
 
-`App.vue` 组合 Element Plus 控件及三个视图组件。`useTranscription()` 保存页面用例所需的响应式状态，`model.ts` 计算操作权限、构造配置并处理预览与回执；`ReviewPanel.vue` 从同一表单或已检查快照派生摘要。`ViewEffects` 将焦点、模板下载和 Key 控件读写留在视图侧。
+用户填写页面或完成授权时，Skill保留持久进程句柄并结束当前回复。页面明确提示保存后发送“继续”；收到后读取同一serve的`configured`回执，或同一login结束后的BL结果，衔接下一步。登录结果以BL回执/本地状态判断，不要求用户口头确认成功。该交接沿用既有进程与回执，不增加HTTP探针、后台任务或状态字段。
+
+页面使用Element Plus组件及其默认蓝色强调色，搭配灰白黑页面背景。优先使用组件公开参数和插槽：卡片用`ElCard`，摘要用`ElDescriptions`，保存结果用`ElResult`，说明折叠用`ElCollapse`，核对区滚动用`ElScrollbar`。图标直接使用`@element-plus/icons-vue`，精度增强用靶心、热词上传用文档、词表用书本。
+
+`style.css`负责页面布局、响应式适配和少量主题配置：区分控件与卡片底色，将警告映射为红色，标记需要修正的字段。悬停、聚焦、禁用等交互沿用Element Plus默认行为。调整第三方组件前先确认公开参数是否满足具体需求，避免维护重复的组件外观或行为。
+
+顶部标识MemoFlow，正文只保留一个录音转写标题。主按钮用于检查与保存，辅助操作使用文字按钮。热词模板在开启热词后的区域内下载，`ElTooltip`提供提示，点击才执行下载。
+
+开启热词后，展开区提供带下载图标的“下载模板”入口；复用`actions.downloadTemplate`、`GET /api/hotwords-template`和`hotwords_template()`，由浏览器保存Excel工作簿。浅深色的文字按钮保持与背景可区分，避免用主按钮样式突出辅助下载操作。
+
+`App.vue`组合Element Plus控件及上传、密钥、摘要组件。`useTranscription()` 保存页面用例所需的响应式状态，`model.ts` 计算操作权限、构造配置并处理预览与回执；`ReviewPanel.vue` 从同一表单或已检查快照派生摘要。`ViewEffects` 将焦点、模板下载和 Key 控件读写留在视图侧。
 
 `main.ts` 从启动 URL 取得会话令牌后清理地址栏，并把令牌保留在 `createApi()` 的闭包中。HTTP 请求携带当前界面语言，后端以 `language_scope()` 为每次请求设置语言；公共校验提示和已登记的本机消息按该语言返回，CLI 默认使用中文。语音识别的语言参数仍由转写设置决定。
 
@@ -132,6 +142,8 @@ Python 的 TypedDict 描述已有 JSON 字段和允许的状态，数据在运�
 ## 凭据与参数
 
 bootstrap 从 Skill 的 `assets/env.example` 复制空模板到私有运行目录 `.env`，保留已存在的文件。网页允许用户填写或修改 `DASHSCOPE_API_KEY`，在“检查并预览”时保存到该固定文件。Key 模式复用非空与内部空白检查，执行时读取并注入 BL 环境。控制台模式复用工作目录内的 BL 配置，首次或明确重新登录时才调用 `login`。
+
+BL登录只通过系统默认浏览器授权，执行工具需提供正常Windows交互桌面权限。`_communicate_login()`同时读取BL输出和错误流；收到官方备用URL后，`_open_console_fallback()`校验并使用`os.startfile`打开完整链接，Codex不另开授权页。BL等待原会话回调并保存凭据，进程结束后使用公开`auth status`确认模型Key存在。
 
 Python 安装、虚拟环境核对与依赖加载检查使用 `-I` 隔离模式，从指定虚拟环境加载包，避免工作目录中的同名 Python 文件参与安装或检查。执行命令所需的路径来自 Runtime，用户选定的保存目录只用于输出。
 

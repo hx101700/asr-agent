@@ -54,7 +54,7 @@ Suggested file: doc/images/02-accuracy-enhancement.png
 Caption: Provide hotwords and context for recognition. Use public terms and publishable examples.
 -->
 
-Review and save the settings. Codex guides authentication for your chosen method. Once you confirm transcription, Codex calls BL, generates the three documents, and reports their locations for your review and correction. Transcription sends the recording and enabled enhancement content to Model Studio and may incur charges.
+Review and save the settings, then return to Codex and send “continue.” Codex guides authentication for your chosen method. If Console authorization is needed, complete it in your system default browser, then send “continue” so Codex can read BL's result. Once you confirm transcription, Codex calls BL, generates the three documents, and reports their locations for your review and correction. Transcription sends the recording and enabled enhancement content to Model Studio and may incur charges.
 
 **Stage two (planned)** will create meeting minutes from reviewed transcripts, document examples, and formatting requirements, then use corrections you confirm to improve later results. Preference storage and feedback adoption will be designed in that stage. The current Skill delivers transcripts for review.
 
