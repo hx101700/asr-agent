@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from "vue";
-import { ElAlert, ElButton, ElCard, ElCollapse, ElCollapseItem, ElConfigProvider, ElDescriptions, ElDescriptionsItem, ElDivider, ElForm, ElFormItem, ElIcon, ElInput, ElMessage, ElOption, ElResult, ElSelect, ElStep, ElSteps, ElSwitch, ElTag, ElTooltip } from "element-plus";
-import { Aim, ChatLineSquare, Check, Download, FolderOpened, Headset, Key, Monitor, Moon, Reading, Setting, Sunny, View } from "@element-plus/icons-vue";
+import { ElAlert, ElButton, ElCard, ElCollapse, ElCollapseItem, ElConfigProvider, ElDescriptions, ElDescriptionsItem, ElDivider, ElForm, ElFormItem, ElIcon, ElInput, ElMessage, ElOption, ElResult, ElSelect, ElStep, ElSteps, ElSwitch, ElTag } from "element-plus";
+import { Aim, ChatLineSquare, Check, Edit, FolderOpened, Headset, Key, Monitor, Moon, Reading, Setting, Sunny, View } from "@element-plus/icons-vue";
 import en from "element-plus/es/locale/lang/en";
 import zhCn from "element-plus/es/locale/lang/zh-cn";
 import { availability } from "./model";
@@ -12,17 +12,23 @@ import type { Api, DirectoryKind, Language } from "./types";
 import KeyDisplay from "./components/KeyDisplay.vue";
 import ReviewPanel from "./components/ReviewPanel.vue";
 import UploadField from "./components/UploadField.vue";
+import HotwordEditor from "./components/HotwordEditor.vue";
 
 const props = defineProps<{ connect: (language: () => Language, t: Translate) => Api }>();
 const { language, theme, t } = usePreferences();
 const keyDisplay = ref<InstanceType<typeof KeyDisplay>>();
-const aliases: Record<string, string> = { audio_path: "audio_upload_id", hotwords_path: "hotwords_upload_id" };
+const hotwordEditor = ref<InstanceType<typeof HotwordEditor>>();
+const aliases: Record<string, string> = { audio_path: "audio_upload_id" };
 
 // 在控件完成渲染后定位错误字段或当前操作区域。
 async function focus(target: string): Promise<void> {
   await nextTick();
   const region = document.getElementById(aliases[target] ?? target) ?? document.getElementById("error-panel");
   if (!region) return;
+  if (target === "hotword_rows" && hotwordEditor.value) {
+    await hotwordEditor.value?.focusRow();
+    return;
+  }
   const control = Array.from(region.querySelectorAll<HTMLElement>(
     'input:not(:disabled), textarea:not(:disabled), button:not(:disabled), [role="button"][tabindex="0"]',
   )).find(element => element.getClientRects().length > 0);
@@ -113,7 +119,7 @@ onMounted(actions.start);
       </ElSteps>
       <ElAlert v-if="model.phase !== 'saved'" :title="t('beforeStart')" type="info" :closable="false" show-icon class="intro-note" />
       <ElAlert v-if="model.statusMessage" :title="t(model.statusMessage)" type="info" :closable="false" show-icon class="page-notice" />
-      <ElAlert v-if="error" id="error-panel" tabindex="-1" class="page-notice" :title="error.message" type="error" :closable="false" show-icon>
+      <ElAlert v-if="error && !['hotword_rows', 'context'].includes(error.field ?? '')" id="error-panel" tabindex="-1" class="page-notice" :title="error.message" type="error" :closable="false" show-icon>
         <ul v-if="error.details.length" class="error-details">
           <li v-for="(detail, index) in error.details" :key="index">
             <strong v-if="detail.row">{{ t('row', { row: detail.row }) }} · </strong>
@@ -132,13 +138,17 @@ onMounted(actions.start);
           <ElDescriptionsItem :label="t('jsonLocation')">{{ model.receipt.json_directory }}</ElDescriptionsItem>
           <ElDescriptionsItem :label="t('documentLocation')">{{ model.receipt.document_directory }}</ElDescriptionsItem>
         </ElDescriptions>
+        <div class="receipt-actions">
+          <ElButton :icon="Edit" :loading="model.reopening" :disabled="!available.reopen" @click="actions.reopen">{{ t('reopenSettings') }}</ElButton>
+          <p class="helper">{{ t('reopenHelp') }}</p>
+        </div>
       </ElCard>
 
       <div v-else-if="model.session" class="workspace">
         <ElForm id="config-fields" :disabled="!available.editable" label-position="top" class="form-column" tabindex="-1" @submit.prevent="actions.validate">
           <ElCard id="audio_upload_id" shadow="never" header-class="section-heading" :class="{ 'needs-attention': invalid('audio_upload_id') }" tabindex="-1">
             <template #header><ElIcon class="section-icon" :size="20" aria-hidden="true"><Headset /></ElIcon><h2>{{ t('audioHeading') }}</h2><span class="section-aside">{{ t('oneFile') }}</span></template>
-            <UploadField kind="audio" :upload="model.uploads.audio" :disabled="!available.upload.audio" :accept="model.session.audio_suffixes.join(',')" :t="t" @select="actions.upload('audio', $event)" />
+            <UploadField :upload="model.uploads.audio" :disabled="!available.upload.audio" :accept="model.session.audio_suffixes.join(',')" :t="t" @select="actions.upload('audio', $event)" />
             <p v-if="invalid('audio_upload_id')" class="field-error">{{ error?.message }}</p>
             <ElCollapse class="format-help">
               <ElCollapseItem :title="t('formatLimits')" name="formats"><p>{{ t('audioLimits', {
@@ -179,17 +189,13 @@ onMounted(actions.start);
                 <div><label for="hotwords-enabled"><ElIcon :size="16" aria-hidden="true"><Reading /></ElIcon>{{ t('hotwords') }}</label><p>{{ t('hotwordsHelp') }}</p></div>
                 <ElSwitch id="hotwords-enabled" v-model="form.hotwordsEnabled" :aria-label="t('hotwords')" @change="actions.changed()" />
               </div>
-              <div v-if="form.hotwordsEnabled" id="hotwords_upload_id" class="expanded-option" :class="{ 'needs-attention': invalid('hotwords_upload_id') }" tabindex="-1">
-                <div class="label-action">
-                  <span class="field-label">{{ t('hotwordFile') }}</span>
-                  <ElTooltip :content="t('templateHint')" :show-after="300" :trigger="['hover', 'focus']" :disabled="!available.template" placement="top" effect="light">
-                    <ElButton text size="small" :icon="Download" :disabled="!available.template" :loading="model.downloadingTemplate" @click="actions.downloadTemplate">{{ t('template') }}</ElButton>
-                  </ElTooltip>
-                </div>
-                <UploadField kind="hotwords" :upload="model.uploads.hotwords" :disabled="!available.upload.hotwords" accept=".xlsx" :t="t" @select="actions.upload('hotwords', $event)" />
-                <p class="helper">{{ t('hotwordLimit', { size: model.session.limits.hotwords_bytes / 1_000_000 }) }}</p>
-                <p class="helper">{{ t('hotwordHelp', { count: model.session.limits.hotwords_count }) }}</p>
-                <p v-if="invalid('hotwords_upload_id')" class="field-error">{{ error?.message }}</p>
+              <div v-if="form.hotwordsEnabled" id="hotword_rows" class="expanded-option" :class="{ 'needs-attention': invalid('hotword_rows') }" tabindex="-1">
+                <HotwordEditor ref="hotwordEditor" :rows="form.hotwordRows" :validation="model.hotwords" :upload="model.uploads.hotwords"
+                  :disabled="!available.editHotwords" :template-disabled="!available.template" :downloading="model.downloadingTemplate"
+                  :message="fieldMessage('hotword_rows')" :limit="model.session.limits.hotwords_count"
+                  :file-limit="model.session.limits.hotwords_bytes / 1_000_000" :t="t"
+                  @upload="actions.upload('hotwords', $event)" @download="actions.downloadTemplate" @add="actions.addHotword"
+                  @remove="actions.removeHotword" @change="actions.changeHotword" @check="actions.checkHotwords" />
               </div>
             </div>
             <ElDivider />
@@ -202,6 +208,7 @@ onMounted(actions.start);
                 <ElFormItem :label="t('reference')" for="context-text" :error="fieldMessage('context')">
                   <ElInput id="context-text" v-model="form.context" type="textarea" :autosize="{ minRows: 4, maxRows: 10 }" :placeholder="t('contextPlaceholder')" @input="actions.changed()" />
                 </ElFormItem>
+                <ul v-if="invalid('context') && error?.details.length" class="field-error error-details"><li v-for="(detail, index) in error.details" :key="index">{{ detail.message }}</li></ul>
                 <div class="textarea-footer"><p class="helper">{{ t('contextHint', { count: model.session.limits.context_chars }) }}</p><span :class="{ 'field-error': contextLength > model.session.limits.context_chars }">{{ contextLength }} / {{ model.session.limits.context_chars }}</span></div>
               </div>
             </div>

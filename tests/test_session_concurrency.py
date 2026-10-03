@@ -7,6 +7,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
+from openpyxl import Workbook
+
 from asr_runtime.application.session import Session
 from asr_runtime.application.rules import ValidationError
 from asr_runtime.application.inputs import validate_audio
@@ -44,7 +46,7 @@ class SessionConcurrencyTests(RuntimeTestCase):
         self.payload = {
             "auth_mode": "console", "audio_upload_id": uploaded["upload_id"],
             "diarization_enabled": True, "enhancement_mode": "none",
-            "hotwords_upload_id": "", "context": "",
+            "hotword_rows": [], "context": "",
             "json_directory": "default", "document_directory": "default",
         }
 
@@ -106,23 +108,29 @@ class SessionConcurrencyTests(RuntimeTestCase):
     def test_audio_and_hotwords_can_receive_independently(self):
         """验证音频和热词可以独立接收。"""
         audio = PausedInput(self.audio)
-        hotwords = PausedInput(b"synthetic Excel bytes; no parsing in upload")
+        workbook = Workbook()
+        workbook.active.append(["text", "weight"])
+        workbook.active.append(["fixture", 4])
+        content = io.BytesIO()
+        workbook.save(content)
+        workbook.close()
+        hotwords = PausedInput(content.getvalue())
         with ThreadPoolExecutor(max_workers=2) as pool:
             audio_upload = pool.submit(self.session.upload, "audio", "replacement.wav", audio, len(self.audio))
             try:
                 self.assertTrue(audio.read_started.wait(timeout=2))
                 words_upload = pool.submit(self.session.upload, "hotwords", "words.xlsx", hotwords, len(hotwords.getvalue()))
                 self.assertTrue(hotwords.read_started.wait(timeout=2))
-                # 音频还在接收时，热词已经可以独立发布完整副本。
+                # 音频还在接收时，词表已可独立导入供用户编辑。
                 hotwords.release.set()
                 words_result = words_upload.result(timeout=1)
-                self.assertEqual(self.session.uploaded(words_result["upload_id"], "hotwords")["name"], "words.xlsx")
+                self.assertEqual(words_result["rows"], [{"row": 2, "text": "fixture", "weight": 4}])
                 self.assertFalse(audio_upload.done())
             finally:
                 audio.release.set()
                 hotwords.release.set()
             self.assertTrue(audio_upload.result(timeout=2)["ok"])
-        self.assertEqual({entry["kind"] for entry in self.session.uploads.values()}, {"audio", "hotwords"})
+        self.assertEqual({entry["kind"] for entry in self.session.uploads.values()}, {"audio"})
 
     def test_pending_upload_rejects_validation_and_confirmation(self):
         """验证上传进行中拒绝预览和确认。"""

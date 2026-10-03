@@ -6,6 +6,7 @@ from typing import Literal, NotRequired, TypedDict
 
 AuthMode = Literal["console", "api_key"]
 EnhancementMode = Literal["none", "hotwords", "context", "both"]
+MAX_HOTWORD_ROWS = 10_000
 
 
 class FileStat(TypedDict):
@@ -49,6 +50,27 @@ class HotwordIssue(TypedDict):
     row: int
     field: str
     message: str
+
+
+HotwordValue = str | int | float | bool | None
+HotwordField = Literal["text", "weight"]
+
+
+class HotwordRow(TypedDict):
+    """保留可编辑的单元格值、原行号及待改写的Excel单元格类型。"""
+
+    row: int
+    text: HotwordValue
+    weight: HotwordValue
+    invalid_fields: NotRequired[list[HotwordField]]
+
+
+class HotwordImport(TypedDict):
+    """返回Excel导入后的可编辑行、单元格问题及读取提示。"""
+
+    rows: list[HotwordRow]
+    issues: list[HotwordIssue]
+    warnings: list[str]
 
 
 class HotwordConfig(TypedDict):
@@ -202,11 +224,3 @@ class Transcript:
         """提取结果规模和内容摘要，供执行记录核对来源。"""
         return {"audio_tracks": self.audio_tracks, "sentences": len(self.sentences),
                 "json_bytes": self.json_bytes, "sha256": self.sha256}
-
-
-@dataclass(frozen=True)
-class HotwordRow:
-    number: int
-    text: object
-    weight: object
-    has_formula: bool

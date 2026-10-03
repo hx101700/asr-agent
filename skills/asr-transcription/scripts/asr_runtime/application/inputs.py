@@ -4,13 +4,13 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import cast
 
-from ..models import AudioMetadata, AudioRecord, HotwordConfig
+from ..models import AudioMetadata, AudioRecord, HotwordImport, HotwordIssue
 
-from ..utils.files import FileError, check_file_unchanged, file_fingerprint, resolve_input
+from ..utils.files import FileError, file_fingerprint, resolve_input
 from ..utils.hotwords import HotwordFileError, read_hotwords
 from ..utils.i18n import translate
 from ..utils.media import MediaError, probe_audio
-from .rules import AUDIO_SUFFIXES, ValidationError, build_vocabulary, check_audio_limits
+from .rules import AUDIO_SUFFIXES, ValidationError, check_audio_limits, validate_hotword_rows
 
 
 def validate_audio(input_root: Path, path: str | Path, diarization: object) -> AudioRecord:
@@ -54,20 +54,16 @@ def validate_audio(input_root: Path, path: str | Path, diarization: object) -> A
         raise ValidationError("无法读取音频，请检查文件是否损坏及格式是否支持。", field) from exc
 
 
-def load_hotwords(input_root: Path, path: str | Path) -> HotwordConfig:
-    """读取并校验热词Excel，返回即时词典和导入提示。"""
-    field = "hotwords_path"
+def import_hotwords(path: Path) -> HotwordImport:
+    """导入Excel并保留错误单元格，供用户在网页表格中修正。"""
     try:
-        source = resolve_input(input_root, path, {".xlsx"})
-        before = source.stat()
-        rows, warnings = read_hotwords(source)
-        result = build_vocabulary(rows)
-        result["warnings"] = warnings + result["warnings"]
-        check_file_unchanged(source, {"size_bytes": before.st_size, "mtime_ns": before.st_mtime_ns})
-        return result
+        rows, warnings = read_hotwords(path)
     except HotwordFileError as exc:
-        raise ValidationError(str(exc), field, exc.details) from exc
-    except FileError as exc:
-        raise ValidationError(str(exc), field) from exc
-    except OSError as exc:
-        raise ValidationError("无法读取热词Excel，请检查文件是否损坏或仍在写入。", field) from exc
+        raise ValidationError(str(exc), "hotword_rows", exc.details) from exc
+    issues: list[HotwordIssue] = []
+    try:
+        vocabulary = validate_hotword_rows(rows)
+        warnings.extend(vocabulary["warnings"])
+    except ValidationError as exc:
+        issues = exc.details
+    return {"rows": rows, "issues": issues, "warnings": warnings}

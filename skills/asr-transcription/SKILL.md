@@ -1,6 +1,6 @@
 ---
 name: asr-transcription
-description: 将单个录音转为带时间戳的 Word、Excel 和 Markdown。用于录音转文字、该转写工具的凭据配置或已有任务重导；不用于改写现有文字纪要。
+description: 将单个录音转为带时间戳的 Word、Excel 和 Markdown。用于录音转文字、凭据配置、已有任务重导，或用用户提供的 ZIP 更新此 Skill；不用于改写现有文字纪要。
 ---
 
 # 录音转写
@@ -12,10 +12,11 @@ description: 将单个录音转为带时间戳的 Word、Excel 和 Markdown。�
 - **新录音**：按下方“准备运行”和“新录音”操作，先打开网页，由用户选择录音，按需在密码框填写Key。
 - **已有任务**：用户要查看状态或重新生成文档时，使用原工作目录及确切 `job_id`，直接进入“已有任务”。只询问当前上下文缺少的目录或编号。
 - **只调整凭据**：使用原工作目录，按[凭据修复](references/errors.md#鉴权失败与重新配置)处理；指定Key可在网页单独保存，保持任务与录音不变。
+- **更新此 Skill**：用户提供新 ZIP 并要求更新时，按[更新说明](references/update.md)处理安装资源；先核对相关任务已结束，再整体替换，保留工作目录。
 
 ## 准备运行
 
-`SKILL_DIR` 是本文件所在目录，`ENTRY` 是其中 `scripts/asr.py` 的绝对路径。`WORKSPACE` 使用本次已约定的目录，否则使用当前 Codex 任务目录并告知用户；目录不可用或位于 Skill 内时才另选。所有命令固定使用 `--workspace WORKSPACE`。
+`SKILL_DIR` 是本文件所在目录，`ENTRY` 是其中 `scripts/asr.py` 的绝对路径。`WORKSPACE` 使用本次已约定的目录，否则使用当前 Codex 任务目录并告知用户；目录不可用或位于 Skill 内时才另选。所有 `asr.py` 命令固定使用 `--workspace WORKSPACE`。
 
 环境与凭据位于 `WORKSPACE/.asr-transcription`，默认输出为 `WORKSPACE/transcriptions`。后续命令使用 `WORKSPACE/.asr-transcription/.venv/Scripts/python.exe` 执行 `ENTRY`，路径按执行工具的参数规则引用。
 
@@ -24,8 +25,8 @@ description: 将单个录音转为带时间戳的 Word、Excel 和 Markdown。�
 ## 新录音
 
 1. **打开页面。** 用持久进程工具启动 `serve` 并保存会话句柄。有宿主打开链接能力时加 `--no-browser`，收到 `event=listening` 后打开完整 `url` 一次；否则使用普通 `serve`。原生目录窗口需要正常 Windows 交互桌面，按执行工具的权限机制启动。报告实际的启动或打开请求结果，正常路径不使用 computer-use 或页面自动检查。
-2. **交给用户配置。** 让用户在网页添加录音、按需填写热词和上下文、选择认证方式与保存位置，核对后保存。提示“保存后回到这里发送‘继续’”，结束当前回复并保留 `serve`。
-3. **取得确认与认证。** 用户继续后读取原会话的 `event=configured`，使用其 `job_id`、`auth_mode` 和保存位置。尚未保存时让用户继续填写；已保存但回执丢失时，按[回执恢复](references/errors.md#保存回执恢复)处理。认证按下表选择。
+2. **交给用户配置。** 让用户在网页添加录音、按需导入 Excel 或直接编辑热词表、填写上下文、选择认证方式与保存位置，核对后保存。错误会在对应行或输入处说明，修改后重新检查。提示“保存后回到这里发送‘继续’”，结束当前回复并保留 `serve`。
+3. **取得确认与认证。** 用户继续后读取原会话的最新配置事件，使用 `event=configured` 中的 `job_id`、`auth_mode` 和保存位置。`event=configuration_reopened` 表示用户已撤回该编号，等待新的保存回执。尚未保存时让用户继续填写；已保存但回执丢失时，按[回执恢复](references/errors.md#保存回执恢复)处理。认证按下表选择。
 4. **执行一次。** 现有授权覆盖本次录音、增强内容、百炼北京及费用时，运行 `transcribe --job JOB_ID --authorize-upload`；缺少授权时再询问。该命令包含识别和三种文档生成，等待同一执行进程结束，按回执交付。
 
 | 认证情况 | 动作 |
@@ -36,6 +37,8 @@ description: 将单个录音转为带时间戳的 Word、Excel 和 Markdown。�
 | 控制台模式：缺少模型凭据，或用户要求重新登录 | 首次启动`login`就使用正常桌面执行权限；Codex执行工具支持时设置`sandbox_permissions=require_escalated`，不先以默认受限权限试开。按[控制台登录](references/usage.md#控制台登录)完成系统浏览器授权，保留会话并提示完成后发送“继续”。 |
 
 `login`最终回执已包含BL状态查询结果，直接读取 `configured`；它表示本机模型凭据存在，不代表在线模型调用已验证。BL授权页由系统浏览器打开，Codex不另开。需要用户操作时保留原会话，继续后读取原结果。
+
+用户说设置填错时，引导在原页面点击“修改设置”；页面已关闭时才重新打开同一链接。尚未执行的任务会撤回，原输入恢复到表单，重新检查和保存后使用新编号。任务已进入执行流程时，页面会拒绝覆盖；按实际执行结果处理，不能删除占用重跑。原网页服务已结束则新开页面配置，不声称能恢复未保存编辑。
 
 ## 已有任务
 

@@ -25,7 +25,7 @@ Codex 读取 Skill，选择工作目录、执行工具并解释回执。网页�
 ```text
 frontend/                     # 开发时维护的 Vue / TypeScript 前端
 ├── App.vue                   # 页面与交互区域
-├── components/               # 上传、凭据输入与核对面板
+├── components/               # 上传、热词编辑、凭据输入与核对面板
 ├── useTranscription.ts       # 页面用例编排
 ├── api.ts / model.ts         # HTTP 与纯状态规则
 ├── types.ts                  # 前端输入和回执协议
@@ -36,10 +36,11 @@ skills/asr-transcription/       # 独立安装的 Skill，运行时只读
 ├── agents/openai.yaml         # Codex 展示信息
 ├── scripts/
 │   ├── asr.py                 # CLI 入口
+│   ├── update_skill.py        # 用户明确提供ZIP时更新安装资源
 │   ├── requirements.txt       # Python 固定版本与摘要
 │   ├── bailian/               # BL npm 依赖锁
 │   └── asr_runtime/           # Python 模块与网页
-├── references/                # 按需读取的操作、模型、错误说明
+├── references/                # 按需读取的操作、模型、错误与更新说明
 ├── assets/env.example         # 空 Key 配置模板
 └── LICENSE
 
@@ -77,7 +78,7 @@ Python 运行模块位于 `skills/asr-transcription/scripts/asr_runtime/`。多�
 | --- | --- |
 | `__main__.py` / `web.py` | 分派 CLI 与 HTTP 请求，创建 Runtime，输出回执 |
 | `application/bootstrap.py` / `diagnostics.py` | 根据 Skill 的依赖锁准备工作目录环境，检查本机运行条件 |
-| `application/session.py` | 管理本次网页上传、保存目录、预览、确认与清理 |
+| `application/session.py` | 管理本次网页上传、热词导入、保存目录、预览、确认、撤回与清理 |
 | `application/inputs.py` / `rules.py` | 读取输入事实、应用模型规则；rules 不执行 I/O |
 | `application/transcription.py` | 编排一次执行、已知结果与重新导出 |
 | `application/delivery.py` | 顺序调用三格式 writer 并汇总交付状态 |
@@ -90,7 +91,7 @@ Python 运行模块位于 `skills/asr-transcription/scripts/asr_runtime/`。多�
 | `utils/directory_picker.py` / `_directory_dialog.py` | 原生目录窗口子进程、选择、取消与回收 |
 | `models.py` | 媒体与转写 dataclass，以及配置、执行、导出的 TypedDict 协议 |
 | `utils/i18n.py` | 按当前 HTTP 请求语言查找本机提示，结束后恢复语言上下文 |
-| `frontend/App.vue` / `components/` | 页面、Element Plus 控件及上传、Key 输入、核对信息组件 |
+| `frontend/App.vue` / `components/` | 页面、Element Plus 控件及音频上传、热词编辑、Key输入、核对信息组件 |
 | `frontend/useTranscription.ts` / `model.ts` | 页面用例编排与纯状态规则，管理上传、预览、保存及操作可用性 |
 | `frontend/api.ts` / `types.ts` | HTTP 传输和端点输入、回执类型 |
 | `frontend/preferences.ts` / `i18n.ts` | 界面语言、系统/浅色/深色主题及中英文显示文案 |
@@ -105,13 +106,17 @@ Python 的 TypedDict 描述已有 JSON 字段和允许的状态，数据在运�
 
 有宿主打开链接能力时，Codex使用`serve --no-browser`并打开完整URL一次，随后立即让用户操作；只有系统浏览器可用时才调用默认打开方式。正常路径不加载computer-use、不枚举浏览器、不额外验证页面。发生打开错误或用户反馈异常时才检查同一服务。新转写从配置页的文件选择器开始，本机配置页与BL授权页分属配置和认证两个阶段。
 
-用户填写页面或完成授权时，Skill保留持久进程句柄并结束当前回复。页面明确提示保存后发送“继续”；收到后读取同一serve的`configured`回执，或同一login结束后的BL结果，衔接下一步。登录结果以BL回执/本地状态判断，不要求用户口头确认成功。该交接沿用既有进程与回执，不增加HTTP探针、后台任务或状态字段。
+用户填写页面或完成授权时，Skill保留持久进程句柄并结束当前回复。页面提示保存后发送“继续”；收到后读取同一serve的最新配置事件，或同一login结束后的BL结果，衔接下一步。`configured`提供当前编号，`configuration_reopened`表示旧编号已撤回，应等用户重新保存。登录结果以BL回执/本地状态判断，不要求用户口头确认成功。
 
-页面使用Element Plus组件及其默认蓝色强调色，搭配灰白黑页面背景。优先使用组件公开参数和插槽：卡片用`ElCard`，摘要用`ElDescriptions`，保存结果用`ElResult`，说明折叠用`ElCollapse`，核对区滚动用`ElScrollbar`。图标直接使用`@element-plus/icons-vue`，精度增强用靶心、热词上传用文档、词表用书本。
+热词编辑使用Element Plus的Table、Input、Upload和Pagination。导入Excel即解析为带原行号的`HotwordRow`，行级问题与原值一起返回，在对应单元格下说明并标红；用户也可直接新增行。Excel日期、错误值和真实公式通过`invalid_fields`保留格级问题，编辑对应格后解除该标记，普通字面量不执行公式。文件只作为导入来源，解析结束就删除本机临时副本，预览使用`hotword_rows`，执行仍使用确认后的vocabulary。
+
+`validate_hotword_rows`只核对JSON行协议，`build_vocabulary`统一处理词条规则；导入、“检查词表”和最终预览共用这条路径。表格每页50行，错误可定位到原行号。JSON请求上限512KiB用于容纳2000条词语及行号等编辑字段，这是本机传输限制。上下文按400个Unicode字符及可传输字符检查，保留原文并指出长度或字符位置；内容与录音是否相关没有可靠的本机语义判定。
+
+页面使用Element Plus组件及其默认蓝色强调色，搭配灰白黑页面背景。优先使用组件公开参数和插槽：卡片用`ElCard`，摘要用`ElDescriptions`，保存结果用`ElResult`，说明折叠用`ElCollapse`，核对区滚动用`ElScrollbar`。图标直接使用`@element-plus/icons-vue`，精度增强用靶心、Excel导入用上传、词表用书本。
 
 `style.css`负责页面布局、响应式适配和少量主题配置：区分控件与卡片底色，将警告映射为红色，标记需要修正的字段。悬停、聚焦、禁用等交互沿用Element Plus默认行为。调整第三方组件前先确认公开参数是否满足具体需求，避免维护重复的组件外观或行为。
 
-顶部标识MemoFlow，正文只保留一个录音转写标题。主按钮用于检查与保存，辅助操作使用文字按钮。热词模板在开启热词后的区域内下载，`ElTooltip`提供提示，点击才执行下载。
+顶部标识MemoFlow，正文只保留一个录音转写标题。主按钮用于检查与保存，辅助操作使用文字按钮。热词模板直接放在表格工具栏，点击执行下载。
 
 开启热词后，展开区提供带下载图标的“下载模板”入口；复用`actions.downloadTemplate`、`GET /api/hotwords-template`和`hotwords_template()`，由浏览器保存Excel工作簿。浅深色的文字按钮保持与背景可区分，避免用主按钮样式突出辅助下载操作。
 
@@ -132,7 +137,7 @@ Python 的 TypedDict 描述已有 JSON 字段和允许的状态，数据在运�
 | 阶段 | 检查与读取 | 产出 |
 | --- | --- | --- |
 | 添加文件 | 文件用途、文件名、大小和接收字节数 | 会话副本与 `upload_id` |
-| 预览 | 音频探测、SHA 基线、Excel 解析、选项及上下文规则、保存目录 | 内存 draft 与 `validation_id` |
+| 预览 | 编辑表格及上下文规则、音频探测与SHA基线、识别选项及保存目录 | 内存 draft 与 `validation_id` |
 | 确认 | 复用 draft，核对音频 size/mtime | `config.json`、`config.sha256` 与 `job_id` |
 | 执行 | 配置协议与摘要、音频实际大小与 SHA、执行时凭据 | 执行记录与原始 JSON |
 | 重导 | 配置、已保存成功记录、原始 JSON 摘要 | 固定任务目录的三种成品 |
@@ -159,7 +164,7 @@ Python 安装、虚拟环境核对与依赖加载检查使用 `-I` 隔离模式�
 
 ## 生命周期与状态
 
-Session 短锁保护上传登记与发布，文件字节接收在锁外完成，同类上传不能并发。目录窗口在独立子进程中运行，取消使用选择器自己的信号，没有用户选择总时限。正常服务退出清理未确认副本和 Excel 副本，保留已确认音频。关闭浏览器不等于关闭服务。
+Session 短锁保护上传登记与发布，文件字节接收在锁外完成，同类上传不能并发。Excel导入完成或失败时清理其临时副本。目录窗口在独立子进程中运行，取消使用选择器自己的信号，没有用户选择总时限。正常服务退出清理未确认音频副本，保留已确认音频。关闭浏览器不等于关闭服务。
 
 目录选择与取消共享页面生成的`picker_id`。上次位置或默认位置不是可用目录时，窗口从当前工作目录打开，用户可重新选择保存位置。
 
@@ -181,6 +186,10 @@ Session 短锁保护上传登记与发布，文件字节接收在锁外完成，
 | `record_error` | 执行记录保存失败，磁盘可能滞后于回执 |
 
 记录保存失败时保留当次已知事实；成功 JSON 记录写入失败则在导出前返回，已有 JSON 保留。当前没有记录恢复或补签摘要入口。`job-status` 只读本机执行与交付记录，不检查进程存活、不查询云端、不重新核验成品。
+
+已保存的配置通过`Session.reopen(job_id)`返回编辑。该操作复用`reserve_execution()`，与终端转写原子竞争同一个`execution`目录；只有尚未执行的任务可以撤回。撤回写入`STOPPED`和`LOCAL_CONFIG_REOPENED`，旧编号不能再启动BL；表单从本次内存Draft恢复，重新预览与确认产生新编号。已开始执行或已有执行结果时拒绝覆盖。这里复用一次执行约束，未引入第二套锁或任务取消协议。
+
+撤回成功后保留最近一次恢复回执，避免HTTP响应中断使页面无法再次取回原输入。同一编号可重复读取该回执；新的文件导入、目录选择或预览会使其失效。该回执只存在于当前Session内，不提供跨服务的草稿恢复。
 
 ## 文档交付
 
@@ -237,6 +246,12 @@ npm run test:browser
 `scripts/build_zip.py` 以固定逐文件清单构建 `asr-transcription.zip`，归档根直接为 Skill 内容。包只含 SKILL、展示 metadata、运行代码、前端构建资源、运行依赖锁、参考说明、空配置模板和 LICENSE。仓库 README、AGENTS、开发文档、UML、测试、开发探针、TypeScript/Vue 源码、构建工具、node_modules、运行环境和用户数据都不进入包。
 
 使用仓库中 `skills/asr-transcription/scripts/asr.py` 的绝对路径和明确工作目录准备运行环境；开发测试命令见 [ACCEPTANCE](ACCEPTANCE.md)。开发探针在仓库 `scripts/probe_bl.py`，固定虚构 URL，不进入 Skill。修改模块时沿当前职责定位消费者，同时维护清单、相称测试与相关 UML，实际结果再写验证记录。
+
+### 更新已安装的 Skill
+
+同一Skill包含按需更新入口，具体操作只维护在[update.md](../skills/asr-transcription/references/update.md)。`scripts/update_skill.py`使用标准库，从新包解压目录运行，接收明确的ZIP与安装目录。它在安装目录同卷暂存资源，核对Skill名称及发行路径，再整体改名替换；失败回滚，回滚受阻则保留原副本并报告路径。用户工作目录不参与替换。
+
+`asr.py`在运行期间持有自身只读文件句柄，Windows据此拒绝父目录改名；不创建锁文件，不枚举系统进程。旧版入口没有保护，更新调用者必须核对原任务已结束，`--tasks-finished`表达这项核对而非强制终止。依赖锁变化由更新回执报告，再走已有bootstrap流程，按实际错误处理已有环境冲突。资源更新不热替换正在执行的代码，也不自动迁移任务协议。
 
 ## 版本与分支
 

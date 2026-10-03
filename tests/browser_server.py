@@ -24,14 +24,19 @@ def main() -> None:
         stream.setsampwidth(2)
         stream.setframerate(16000)
         stream.writeframes(b"\0" * 64000)
-    for name, header in (("words.xlsx", ("text", "weight")), ("invalid.xlsx", ("wrong", "weight"))):
+    sheets = {
+        "words.xlsx": [("text", "weight"), ("Kubernetes", 4), ("Kubernetes", 4)],
+        "invalid.xlsx": [("wrong", "weight"), ("Kubernetes", 4)],
+        "invalid-rows.xlsx": [("text", "weight"), ("Kubernetes", 4), ("MemoFlow", 9), ("Kubernetes", 5)],
+        "paged.xlsx": [("text", "weight"), *[(f"Term{number}", 4) for number in range(60)], ("LastTerm", 8)],
+    }
+    for name, rows in sheets.items():
         workbook = Workbook()
         sheet = workbook.active
         assert sheet is not None
         sheet.title = "热词"
-        sheet.append(header)
-        sheet.append(("Kubernetes", 5))
-        sheet.append(("Kubernetes", 5))
+        for row in rows:
+            sheet.append(row)
         workbook.save(fixtures / name)
         workbook.close()
     server = create_server(Runtime(options.workspace, SKILL_ROOT))

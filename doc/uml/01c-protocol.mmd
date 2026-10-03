@@ -1,5 +1,11 @@
 classDiagram
 direction LR
+class Draft {
+  <<TypedDict>>
+  +str id
+  +JobConfig config
+  +dict~str,object~ form
+}
 class JobConfig {
   <<TypedDict>>
   +str job_id
@@ -59,14 +65,16 @@ class DocumentReport {
   +str message
   +str error_type
 }
+Draft --> JobConfig : 成功预览生成的配置
 JobConfig --> AudioRecord : 已预览音频
 JobConfig --> EnhancementConfig : 即时增强内容
 JobConfig ..> ConfirmationReceipt : Session.confirm保存后返回
 JobConfig ..> ExecutionReport : transcribe使用确认快照
 ExecutionReport --> DeliveryReport : JSON成功后附加交付结果
 DeliveryReport --> "0..3" DocumentReport : xlsx／docx／md
+note for Draft "application/session.py::Draft<br/>config是待确认快照；form保留含hotword_rows的原表单<br/>reopen仅恢复同一Session中的form与音频引用<br/>form只存会话内存，执行使用config中的vocabulary"
 note for JobConfig "scripts/asr_runtime/models.py<br/>TypedDict描述现有JSON协议；运行时仍为普通dict<br/>图中选择影响任务边界的字段，完整定义见源码<br/>API Key保存在工作目录/.asr-transcription/.env<br/>凭据独立于JobConfig"
 note for AudioRecord "name在基础音频检查后由Session补充<br/>metadata与fingerprint保存已检查事实<br/>执行阶段使用同一配置核对输入"
-note for ConfirmationReceipt "网页与Codex取得同一job_id和输出位置<br/>execution_started=false表示尚未调用BL<br/>图03展示回执的HTTP与stdout交付"
+note for ConfirmationReceipt "网页与Codex取得同一job_id和输出位置<br/>execution_started=false表示尚未调用BL<br/>reopen成功后此回执作废，重新确认生成新job_id<br/>图03展示回执的HTTP与stdout交付"
 note for ExecutionReport "status使用Literal约束允许状态，转换见图07<br/>result、error、record_error、delivery等为NotRequired<br/>字段可以缺失；结构与业务检查由读取边界负责"
 note for DocumentReport "READY携带path和bytes；FAILED携带公开说明和类型<br/>这些明细字段在代码中使用NotRequired<br/>OUTCOME_UNKNOWN交付回执可以缺少files"

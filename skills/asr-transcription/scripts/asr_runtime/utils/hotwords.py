@@ -1,6 +1,7 @@
 """读取热词Excel原始行并生成词表模板。"""
 
 import io
+import math
 import zipfile
 from pathlib import Path
 from typing import cast
@@ -11,7 +12,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 from openpyxl.worksheet.worksheet import Worksheet
 
-from ..models import HotwordIssue, HotwordRow
+from ..models import MAX_HOTWORD_ROWS, HotwordField, HotwordIssue, HotwordRow, HotwordValue
 from .i18n import translate
 
 
@@ -19,7 +20,6 @@ from .i18n import translate
 MAX_XLSX_BYTES = 5_000_000
 MAX_XLSX_UNCOMPRESSED_BYTES = 20 * 1024 * 1024
 MAX_XLSX_ENTRIES = 200
-MAX_WORKSHEET_ROWS = 10_001
 
 
 class HotwordFileError(ValueError):
@@ -62,7 +62,7 @@ def read_hotwords(path: Path) -> tuple[list[HotwordRow], list[str]]:
             raise HotwordFileError("多个工作表时请将待使用的工作表命名为“热词”。")
         if not isinstance(sheet, Worksheet):
             raise HotwordFileError("请使用普通工作表填写热词，不支持图表工作表。")
-        if sheet.max_row > MAX_WORKSHEET_ROWS or sheet.max_column > 2:
+        if sheet.max_row > MAX_HOTWORD_ROWS + 1 or sheet.max_column > 2:
             raise HotwordFileError("热词工作表仅支持两列、最多10001行（含表头和空行）。")
         header = [sheet.cell(1, number).value for number in (1, 2)]
         if header[0] not in ("text", "热词") or header[1] not in ("weight", "权重"):
@@ -73,9 +73,23 @@ def read_hotwords(path: Path) -> tuple[list[HotwordRow], list[str]]:
             warnings.append(translate("仅读取名为“热词”的工作表，其他工作表不参与此次转写。"))
         if header != ["text", "weight"]:
             warnings.append(translate("已按中文别名读取表头：热词对应text，权重对应weight。"))
-        rows = [HotwordRow(number, cells[0].value, cells[1].value,
-                           any(cell.data_type == "f" for cell in cells))
-                for number, cells in enumerate(sheet.iter_rows(min_row=2, max_col=2), start=2)]
+        rows: list[HotwordRow] = []
+        for number, cells in enumerate(sheet.iter_rows(min_row=2, max_col=2), start=2):
+            row: HotwordRow = {"row": number, "text": None, "weight": None}
+            invalid_fields: list[HotwordField] = []
+            for field, cell in zip(("text", "weight"), cells):
+                name = cast(HotwordField, field)
+                value = cell.value
+                # 公式、日期和Excel错误值保留可见内容，用户改写对应单元格后移除此类型标记。
+                if (cell.data_type in ("e", "f") or value is not None and not isinstance(value, (str, int, float, bool))
+                        or isinstance(value, float) and not math.isfinite(value)):
+                    row[name] = str(value)
+                    invalid_fields.append(name)
+                else:
+                    row[name] = cast(HotwordValue, value)
+            if invalid_fields:
+                row["invalid_fields"] = invalid_fields
+            rows.append(row)
         return rows, warnings
     except (OSError, zipfile.BadZipFile, InvalidFileException, ParseError,
             DefusedXmlException, KeyError, ValueError) as exc:

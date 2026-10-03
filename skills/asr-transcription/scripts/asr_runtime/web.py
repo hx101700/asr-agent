@@ -19,7 +19,8 @@ from .application.session import Session
 from .application.rules import ValidationError
 
 STATIC = Path(__file__).parent / "static"
-MAX_REQUEST_BYTES = 32 * 1024
+# JSON词表包含行号和编辑字段，需容纳模型支持的2000条词语。
+MAX_REQUEST_BYTES = 512 * 1024
 
 
 class LocalServer(ThreadingHTTPServer):
@@ -148,13 +149,18 @@ def create_server(runtime: Runtime, port: int = 0) -> LocalServer:
                     if self.headers.get("Transfer-Encoding") or self.headers.get_content_type() != "application/json":
                         raise ValidationError("请求必须为JSON。", "request")
                     length = int(self.headers.get("Content-Length", "0"))
-                    if not 0 < length <= MAX_REQUEST_BYTES:
-                        raise ValidationError("请求为空或超过本地大小限制。", "request")
+                    if length > MAX_REQUEST_BYTES:
+                        self.json(413, {"ok": False, "field": "form", "error": translate("表格或文本内容过大，请减少后重新检查。")})
+                        return
+                    if length <= 0:
+                        raise ValidationError("请求体不能为空。", "request")
                     payload = json.loads(self.rfile.read(length).decode("utf-8"))
                     if not isinstance(payload, dict):
                         raise ValidationError("请求格式不正确。", "request")
                     if path == "/api/validate":
                         self.json(200, session.validate(payload))
+                    elif path == "/api/validate-hotwords":
+                        self.json(200, session.check_hotwords(payload.get("rows")))
                     elif path == "/api/confirm":
                         receipt = session.confirm(payload.get("validation_id"))
                         try:
@@ -163,6 +169,13 @@ def create_server(runtime: Runtime, port: int = 0) -> LocalServer:
                         except OSError:
                             pass  # 输出通道断开不改变已保存事实，网页仍须收到成功回执。
                         self.json(200, receipt)
+                    elif path == "/api/reopen":
+                        restored = session.reopen(payload.get("job_id"))
+                        try:
+                            print(json.dumps({"event": "configuration_reopened", "job_id": payload["job_id"]}), flush=True)
+                        except OSError:
+                            pass
+                        self.json(200, restored)
                     elif path == "/api/api-key":
                         self.json(200, session.api_key_display())
                     elif path == "/api/save-api-key":

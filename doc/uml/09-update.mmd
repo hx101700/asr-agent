@@ -1,0 +1,43 @@
+sequenceDiagram
+actor U as 用户
+participant C as Codex／操作者
+participant T as update_skill（函数模块）
+participant E as 已运行的asr.py入口
+participant Z as 新发行ZIP
+participant D as 已安装Skill目录
+participant F as 同卷暂存目录
+U->>C: 提供新ZIP并要求更新已安装Skill
+C->>C: 核对已有任务／会话均已结束
+Note over C,E: 使用当前入口的任务在main执行期间持有asr.py只读句柄<br/>Windows据此阻止安装目录被改名<br/>旧入口没有该保护，须由人工或宿主已有会话核对<br/>更新器不枚举所有进程；--tasks-finished记录调用者确认
+C->>T: 从安装目录之外的新ZIP解压目录执行<br/>python -I scripts/update_skill.py --zip ZIP<br/>--skill-dir 已安装目录 --tasks-finished
+T->>T: 核对Windows、已结束确认、Skill名称和入口<br/>更新脚本及ZIP均在目标安装目录之外
+T->>F: 在Skill父目录创建本次临时目录及candidate
+T->>Z: _extract_package()读取新包
+Z-->>T: 普通发行文件；核对路径、重复项与Skill标识
+T->>F: 写入candidate中的完整新资源
+T->>D: 比较requirements.txt与BL package-lock.json
+D-->>T: dependencies_changed
+T->>D: skill_dir.rename(previous)
+alt 目录改名被占用句柄或权限阻止
+    D-->>T: PermissionError
+    T->>F: 清理本次暂存目录
+    T-->>C: 更新失败，原Skill保持原样
+else 原Skill已移入previous
+    T->>F: candidate.rename(skill_dir)
+    alt 新目录成功就位
+        T->>F: 清理临时目录及previous
+        F-->>T: 清理成功，或留下retained_backup
+        T-->>C: updated、dependencies_changed、retained_backup
+    else 新目录就位失败
+        T->>F: previous.rename(skill_dir)恢复原Skill
+        alt 回滚成功
+            T->>F: 清理本次暂存内容
+            T-->>C: 更新失败，原Skill已恢复
+        else 回滚也失败
+            T-->>C: 更新失败，报告保留的previous路径
+        end
+    end
+end
+Note over T,F: 暂存及目录改名在同卷完成，避免逐文件替换混用版本<br/>解包或依赖锁读取失败在改名之前清理暂存并停止<br/>清理失败可留下备份；不自动重新安装依赖
+Note over C,D: 更新器只接收ZIP和Skill安装位置<br/>不读取或改动用户工作目录中的凭据、任务、音频与结果<br/>新资源是否需要bootstrap由dependencies_changed提示
+Note over C,F: 路径相对Skill：scripts/update_skill.py::main、update_skill、_extract_package、_check_skill<br/>scripts/asr.py在main调用期间持有入口文件句柄；没有新增后台服务或锁文件

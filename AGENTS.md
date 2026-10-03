@@ -16,9 +16,10 @@
 - Skill 源码在 `skills/asr-transcription/`，由 `SKILL.md`、`agents/openai.yaml`、`scripts/`、`references/`、`assets/` 组成。
 - `scripts/asr.py` 是调用入口，`scripts/asr_runtime/` 是内部 Python 执行包；Skill 名称仍为 `asr-transcription`。
 - `Runtime(workspace, skill_root)` 区分用户工作目录与 Skill 资源。`resource()` 读取 Skill 文件；`path()` 定位 `<workspace>/.asr-transcription/` 内的运行文件；默认输出根为 `<workspace>/transcriptions/`。私有运行目录与 Skill 目录互不包含，`check_output_path()` 在选择和生成文件时保护 Skill 资源。
-- 本项目 CLI 命令使用 Skill 内 `scripts/asr.py` 的绝对路径，并显式传入 `--workspace`。凭据修复复用[错误说明](skills/asr-transcription/references/errors.md#鉴权失败与重新配置)中已核实的BL原生命令，限定当前工作目录与default Profile。依赖环境、BL 安装、凭据、暂存输入和任务记录写入工作目录，Skill 文件保持只读。
+- 运行命令使用 Skill 内 `scripts/asr.py` 的绝对路径，并显式传入 `--workspace`。凭据修复复用[错误说明](skills/asr-transcription/references/errors.md#鉴权失败与重新配置)中已核实的BL原生命令，限定当前工作目录与default Profile。依赖环境、BL 安装、凭据、暂存输入和任务记录写入工作目录，运行时 Skill 文件保持只读。
 - API Key 从私有运行目录 `.env` 读取；bootstrap 只复制空模板。网页允许用户填写或修改 Key，在“检查并预览”时保存到该固定文件。控制台模式使用 BL 在同一工作目录保存的配置。凭据不得写回 Skill。
 - 源码仓库包含 Skill 源文件，维护操作不自动安装到用户级或项目级 Skill 发现目录。
+- 用户明确提供ZIP要求更新时，复用同一Skill的[更新分支](skills/asr-transcription/references/update.md)。从新包解压目录运行独立`update_skill.py`，核对任务已结束后整体替换安装资源，保留工作目录。入口执行期间的只读文件句柄阻止Windows改名替换；旧版没有此保护，不宣称自动检测所有旧进程。
 
 ## 实现原则
 
@@ -37,6 +38,8 @@
 - 网页接收本机文件字节并保存确认快照，保存设置后由同一 `serve` 进程向 Codex 返回 `job_id`。网页保存不启动 BL。
 - 用户填写网页或完成授权时，Codex保留持久进程并结束当前回复；网页提示保存后发送“继续”，收到后读取原会话回执。登录结果由BL回执/本地状态判断，不再问用户是否授权成功；不增加后台轮询、HTTP检测或任务状态。
 - 预览建立音频 SHA 基线并保存热词词典；确认复用快照，只核对音频 size/mtime。执行前核对音频完整摘要；后续不重读原 Excel。
+- 热词通过Excel导入或网页直接填写，导入保留行号及错误原值并清理临时文件。规则由`validate_hotword_rows`与`build_vocabulary`统一应用；前端使用Element Plus表格展示、编辑及标红，不另写一套业务校验。
+- 已保存且尚未执行的设置可通过`Session.reopen()`撤回。它与转写竞争同一个执行占用，成功后旧编号记为`STOPPED/LOCAL_CONFIG_REOPENED`，恢复表单、重新确认生成新编号。Codex按最新配置事件继续；已开始的任务保持原样。
 - 用户授权覆盖本次音频及增强内容后，使用 `transcribe --job ID --authorize-upload`。每个任务只允许一次执行尝试，失败或结果未知时停止，不自动重试或删除执行占用。
 - 原始 JSON 有效使用 `JSON_READY` 表达；三种成品完成要求 `delivery.status=COMPLETE` 且 `documents_ready=true`。状态与错误说明在 [errors.md](skills/asr-transcription/references/errors.md)。
 - 重导读取确认配置、已保存成功记录及匹配的原始 JSON，在固定任务目录覆盖同名文档。各格式生成成功后替换目标，失败保留原目标及其他成功文件。手工修改先另存。

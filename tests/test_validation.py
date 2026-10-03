@@ -10,10 +10,12 @@ from openpyxl import Workbook
 from openpyxl.chart import BarChart, Reference
 
 from asr_runtime.models import AudioInfo
-from asr_runtime.application.rules import AUDIO_SUFFIXES, MAX_UPLOAD_BYTES, ValidationError, validate_context
+from asr_runtime.application.rules import (
+    AUDIO_SUFFIXES, MAX_UPLOAD_BYTES, ValidationError, validate_context, validate_hotword_rows,
+)
 from asr_runtime.utils.files import FileError, file_fingerprint, resolve_input
 from asr_runtime.utils.i18n import language_scope
-from asr_runtime.application.inputs import load_hotwords, validate_audio
+from asr_runtime.application.inputs import import_hotwords, validate_audio
 from tests.support import RuntimeTestCase
 
 
@@ -175,8 +177,9 @@ class ValidationTests(RuntimeTestCase):
                              headers=("热词", "权重"))
         before = path.read_bytes()
         with patch("asr_runtime.application.inputs.file_fingerprint", side_effect=AssertionError("热词导入不计算文件SHA")):
-            result = load_hotwords(self.runtime.root, path)
-        self.assertEqual(result["vocabulary"], {"语音实验室": 4, "hello world": 2})
+            result = import_hotwords(path)
+        self.assertEqual(validate_hotword_rows(result["rows"])["vocabulary"], {"语音实验室": 4, "hello world": 2})
+        self.assertEqual(result["issues"], [])
         self.assertIn("已忽略1个完全空白行。", result["warnings"])
         self.assertEqual(len(result["warnings"]), 3)
         self.assertEqual(path.read_bytes(), before)
@@ -185,63 +188,59 @@ class ValidationTests(RuntimeTestCase):
         """验证公式、冲突和非法内容按行报告。"""
         path = self.hotwords([
             ("first", 4), ("first", 3), ("=1+1", 4), (None, 2), ("word", True),
-            ("second", 2.5), ("third", "4"), (" 热词", 3), ("tab\tword", 2),
+            ("second", 2.5), ("third", "4.0"), (" 热词", 3), ("tab\tword", 2),
         ])
-        with self.assertRaises(ValidationError) as caught:
-            load_hotwords(self.runtime.root, path)
-        details = caught.exception.details
+        imported = import_hotwords(path)
+        details = imported["issues"]
         self.assertEqual({error["row"] for error in details}, set(range(3, 11)))
         self.assertTrue(all(set(error) == {"row", "field", "message"} for error in details))
-        self.assertEqual(caught.exception.field, "hotwords_path")
+        with self.assertRaises(ValidationError) as caught:
+            validate_hotword_rows(imported["rows"])
+        self.assertEqual(caught.exception.field, "hotword_rows")
+        self.assertEqual(caught.exception.details, details)
 
     def test_hotword_length_rules(self):
         """验证中英文热词长度规则。"""
         valid = self.hotwords([("汉" * 15, 1), ("a b c d e f g", 5)])
-        self.assertEqual(load_hotwords(self.runtime.root, valid)["count"], 2)
+        self.assertEqual(validate_hotword_rows(import_hotwords(valid)["rows"])["count"], 2)
         invalid = self.hotwords([("汉" * 16, 1), ("a b c d e f g h", 5)])
-        with self.assertRaises(ValidationError) as caught:
-            load_hotwords(self.runtime.root, invalid)
-        self.assertEqual([error["row"] for error in caught.exception.details], [2, 3])
+        self.assertEqual([error["row"] for error in import_hotwords(invalid)["issues"]], [2, 3])
 
     def test_fixed_model_accepts_super_words_and_limits_their_count(self):
         """验证固定模型支持超级热词并限制其数量。"""
         path = self.hotwords([(f"term{i}", 50) for i in range(50)])
-        self.assertEqual(load_hotwords(self.runtime.root, path)["vocabulary"], {f"term{i}": 50 for i in range(50)})
+        self.assertEqual(validate_hotword_rows(import_hotwords(path)["rows"])["vocabulary"],
+                         {f"term{i}": 50 for i in range(50)})
         path = self.hotwords([(f"term{i}", 50) for i in range(51)])
-        with self.assertRaises(ValidationError) as caught:
-            load_hotwords(self.runtime.root, path)
-        self.assertEqual(caught.exception.details[0]["row"], 52)
+        self.assertEqual(import_hotwords(path)["issues"][0]["row"], 52)
 
     def test_hotword_count_limit(self):
         """验证即时热词总数量上限。"""
         path = self.hotwords([(f"term{i}", 4) for i in range(2000)])
-        self.assertEqual(load_hotwords(self.runtime.root, path)["count"], 2000)
+        self.assertEqual(validate_hotword_rows(import_hotwords(path)["rows"])["count"], 2000)
         path = self.hotwords([(f"term{i}", 4) for i in range(2001)])
-        with self.assertRaises(ValidationError) as caught:
-            load_hotwords(self.runtime.root, path)
-        self.assertEqual(caught.exception.details[0]["row"], 2002)
+        self.assertEqual(import_hotwords(path)["issues"][0]["row"], 2002)
 
-    def test_hotwords_rejects_invalid_header_empty_extra_columns_and_corrupt_file(self):
-        """验证异常表头、空表、多列和损坏词表被拒绝。"""
+    def test_hotwords_rejects_invalid_header_extra_columns_and_corrupt_file(self):
+        """验证异常表头、多列和损坏词表在导入时被拒绝。"""
         for headers, rows in [(("word", "weight"), [("hello", 4)]),
-                              (("text", "weight"), []),
                               (("text", "weight", "extra"), [("hello", 4, "x")])]:
             with self.subTest(headers=headers, row_count=len(rows)), self.assertRaises(ValidationError):
-                load_hotwords(self.runtime.root, self.hotwords(rows, headers=headers))
+                import_hotwords(self.hotwords(rows, headers=headers))
         path = self.data / "bad.xlsx"
         path.write_text("not a spreadsheet")
         with self.assertRaises(ValidationError):
-            load_hotwords(self.runtime.root, path)
+            import_hotwords(path)
 
     def test_hotwords_bounds_archive_size_and_decompressed_size(self):
         """验证词表原始大小与解压大小上限。"""
         path = self.hotwords([("test", 4)])
         with patch("asr_runtime.utils.hotwords.MAX_XLSX_BYTES", 1):
             with self.assertRaisesRegex(ValidationError, "文件上限"):
-                load_hotwords(self.runtime.root, path)
+                import_hotwords(path)
         with patch("asr_runtime.utils.hotwords.MAX_XLSX_UNCOMPRESSED_BYTES", 1):
             with self.assertRaisesRegex(ValidationError, "解压内容"):
-                load_hotwords(self.runtime.root, path)
+                import_hotwords(path)
 
     def test_hotwords_rejects_xml_entities(self):
         """验证Excel中的XML实体被拒绝。"""
@@ -258,7 +257,7 @@ class ValidationTests(RuntimeTestCase):
             for name, contents in entries.items():
                 modified.writestr(name, contents)
         with self.assertRaises(ValidationError):
-            load_hotwords(self.runtime.root, path)
+            import_hotwords(path)
         path.unlink()  # 解析被拒绝后，不依赖GC才释放Windows文件占用。
 
     def test_hotwords_rejects_ambiguous_sheets_and_discloses_explicit_selection(self):
@@ -269,14 +268,14 @@ class ValidationTests(RuntimeTestCase):
         workbook.create_sheet("two")
         workbook.save(path)
         with self.assertRaisesRegex(ValidationError, "多个工作表"):
-            load_hotwords(self.runtime.root, path)
+            import_hotwords(path)
         sheet = workbook.create_sheet("热词")
         sheet.append(["text", "weight"])
         sheet.append(["test", 4])
         workbook.save(path)
         workbook.close()
-        result = load_hotwords(self.runtime.root, path)
-        self.assertEqual(result["vocabulary"], {"test": 4})
+        result = import_hotwords(path)
+        self.assertEqual(validate_hotword_rows(result["rows"])["vocabulary"], {"test": 4})
         self.assertTrue(any("其他工作表" in warning for warning in result["warnings"]))
 
     def test_hotwords_rejects_chart_sheet_with_field_error_and_releases_file(self) -> None:
@@ -299,7 +298,7 @@ class ValidationTests(RuntimeTestCase):
         ):
             with self.subTest(language=language), language_scope(language):
                 with self.assertRaises(ValidationError) as caught:
-                    load_hotwords(self.runtime.root, path)
-                self.assertEqual(caught.exception.field, "hotwords_path")
+                    import_hotwords(path)
+                self.assertEqual(caught.exception.field, "hotword_rows")
                 self.assertEqual(str(caught.exception), message)
         path.unlink()  # Windows上仍被解析器占用的文件不能删除。

@@ -20,14 +20,19 @@ export interface SessionDescription {
 }
 export interface Configuration {
   auth_mode: "console" | "api_key"; audio_upload_id: string | null; diarization_enabled: boolean;
-  enhancement_mode: EnhancementMode; hotwords_upload_id: string | null; context: string;
+  enhancement_mode: EnhancementMode; hotword_rows: HotwordRow[]; context: string;
   language_hint: string | null; speaker_count: number | null;
   json_directory: string; document_directory: string;
 }
 export interface FormValues {
   useApiKey: boolean; diarizationEnabled: boolean; hotwordsEnabled: boolean; contextEnabled: boolean;
-  context: string; language: string; speaker: string;
+  context: string; language: string; speaker: string; hotwordRows: HotwordRow[];
 }
+export type CellValue = string | number | boolean | null;
+export type HotwordField = "text" | "weight";
+export interface HotwordRow { row: number; text: CellValue; weight: CellValue; invalid_fields?: HotwordField[] }
+export interface HotwordValidation { issues: ErrorDetail[]; warnings: string[]; count: number }
+export interface HotwordImport { name: string; size_bytes: number; rows: HotwordRow[]; issues: ErrorDetail[]; warnings: string[] }
 export interface Summary {
   auth_mode: "console" | "api_key";
   audio: { name: string; duration_seconds: number; size_bytes: number; format_name: string; channels: number; sample_rate: number };
@@ -42,8 +47,10 @@ export interface Model {
   phase: Phase; revision: number; preview: Preview | null; receipt: Receipt | null;
   session: SessionDescription | null; directories: Record<DirectoryKind, string>;
   uploads: Record<UploadKind, UploadState>;
+  hotwords: { issues: ErrorDetail[]; warnings: string[]; checking: boolean; checked: boolean; count: number };
+  reopening: boolean;
   auth: { revision: number; status: "idle" | "loading" | "saving" | "ready" | "dirty" | "failed" };
-  picker: Picker | null; downloadingTemplate: boolean; statusMessage: "changed" | "languageChanged" | "saveRejected" | "";
+  picker: Picker | null; downloadingTemplate: boolean; statusMessage: "changed" | "languageChanged" | "saveRejected" | "reopened" | "";
 }
 export interface ErrorDetail { row?: number; field?: string; message: string }
 export interface ErrorPayload { error?: string; ok?: boolean; field?: string; details?: ErrorDetail[] }
@@ -54,11 +61,13 @@ export interface Endpoints {
   "/api/api-key": { value: string };
   "/api/save-api-key": { ok: true };
   "/api/upload-audio": UploadResult;
-  "/api/upload-hotwords": UploadResult;
+  "/api/upload-hotwords": HotwordImport;
+  "/api/validate-hotwords": HotwordValidation;
   "/api/select-directory": DirectoryResult;
   "/api/cancel-directory": { ok: true };
   "/api/validate": ValidationResult;
   "/api/confirm": Receipt;
+  "/api/reopen": { ok: true; configuration: Configuration; audio: UploadResult };
 }
 export interface Api {
   request<K extends keyof Endpoints>(path: K, payload?: object, file?: File): Promise<Endpoints[K]>;

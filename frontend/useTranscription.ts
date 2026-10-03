@@ -1,8 +1,8 @@
-import { reactive, shallowRef } from "vue";
+import { nextTick, reactive, shallowRef } from "vue";
 import { UiError, uiError } from "./api";
 import { availability, checkRequiredInputs, configuration, createModel, invalidatePreview, receiveReceipt, receiveSaveError, receiveValidation } from "./model";
 import type { Translate } from "./i18n";
-import type { Api, DirectoryKind, FormValues, UploadKind } from "./types";
+import type { Api, DirectoryKind, FormValues, HotwordField, UploadKind } from "./types";
 
 export interface ViewEffects {
   focus(target: string): void;
@@ -15,12 +15,16 @@ export interface ViewEffects {
 export function useTranscription(api: Api, view: ViewEffects, t: Translate, makeRequestId: () => string = () => crypto.randomUUID()) {
   const model = reactive(createModel());
   const form = reactive<FormValues>({ useApiKey: false, diarizationEnabled: true, hotwordsEnabled: false,
-    contextEnabled: false, context: "", language: "", speaker: "" });
+    contextEnabled: false, context: "", language: "", speaker: "", hotwordRows: [] });
   const error = shallowRef<UiError | null>(null);
 
   // 保存可见错误并将焦点移到相应输入。
   function fail(reason: unknown, field?: string): void {
     error.value = uiError(reason, t("failed"), field);
+    if (error.value.field === "hotword_rows") {
+      model.hotwords.issues = error.value.details;
+      model.hotwords.checked = false;
+    }
     view.focus(error.value.field ?? "error-panel");
   }
 
@@ -106,10 +110,59 @@ export function useTranscription(api: Api, view: ViewEffects, t: Translate, make
       invalidatePreview(model);
     },
 
+    // 更新热词单元格并标记词表需要重新检查。
+    changeHotword(rowNumber: number, field: HotwordField, value: string): void {
+      if (!availability(model).editHotwords) return;
+      const row = form.hotwordRows.find(entry => entry.row === rowNumber);
+      if (!row) return;
+      row[field] = value;
+      if (row.invalid_fields) {
+        row.invalid_fields = row.invalid_fields.filter(invalid => invalid !== field);
+        if (!row.invalid_fields.length) delete row.invalid_fields;
+      }
+      model.hotwords.checked = false;
+      actions.changed();
+    },
+
+    // 在词表末尾添加带独立行号的可编辑词条。
+    addHotword(): void {
+      if (!availability(model).editHotwords) return;
+      const row = Math.max(0, ...form.hotwordRows.map(entry => entry.row)) + 1;
+      form.hotwordRows.push({ row, text: "", weight: 4 });
+      model.hotwords.checked = false;
+      actions.changed();
+    },
+
+    // 删除选定词条并保留其他词条的来源行号。
+    removeHotword(rowNumber: number): void {
+      if (!availability(model).editHotwords) return;
+      form.hotwordRows = form.hotwordRows.filter(entry => entry.row !== rowNumber);
+      model.hotwords.issues = model.hotwords.issues.filter(issue => issue.row !== rowNumber);
+      model.hotwords.checked = false;
+      actions.changed();
+    },
+
+    // 使用服务端同一套词表规则检查当前编辑内容。
+    async checkHotwords(): Promise<void> {
+      if (!availability(model).editHotwords) return;
+      error.value = null;
+      model.hotwords.checking = true;
+      const revision = model.revision;
+      try {
+        const result = await api.request("/api/validate-hotwords", { rows: form.hotwordRows });
+        if (revision !== model.revision) return;
+        Object.assign(model.hotwords, result, { checked: true });
+      } catch (reason) { fail(reason, "hotword_rows"); }
+      finally { model.hotwords.checking = false; }
+    },
+
     // 保留用户输入，并使上一种语言生成的预览与错误失效。
     languageChanged(): void {
       if (!availability(model).changeLanguage) return;
       error.value = null;
+      model.hotwords.issues = [];
+      model.hotwords.warnings = [];
+      model.hotwords.checked = false;
       if (model.preview) {
         invalidatePreview(model);
         model.statusMessage = "languageChanged";
@@ -124,7 +177,7 @@ export function useTranscription(api: Api, view: ViewEffects, t: Translate, make
       invalidatePreview(model);
       model.uploads[kind] = { status: "empty", id: null, name: "", size: 0 };
       const upload = model.uploads[kind];
-      const field = `${kind}_upload_id`;
+      const field = kind === "audio" ? "audio_upload_id" : "hotword_rows";
       try {
         if (files.length !== 1) throw new UiError(t("singleFile"), field);
         const file = files[0];
@@ -136,8 +189,16 @@ export function useTranscription(api: Api, view: ViewEffects, t: Translate, make
         if (file.size > limit) throw new UiError(t("tooLarge", { size: limit / 1_000_000 }), field);
         upload.status = "uploading";
         upload.name = file.name;
-        const result = await api.request(kind === "audio" ? "/api/upload-audio" : "/api/upload-hotwords", undefined, file);
-        Object.assign(upload, { status: "ready", id: result.upload_id, name: result.name, size: result.size_bytes });
+        if (kind === "audio") {
+          const result = await api.request("/api/upload-audio", undefined, file);
+          Object.assign(upload, { status: "ready", id: result.upload_id, name: result.name, size: result.size_bytes });
+        } else {
+          const result = await api.request("/api/upload-hotwords", undefined, file);
+          form.hotwordRows = result.rows;
+          Object.assign(model.hotwords, { issues: result.issues, warnings: result.warnings, checked: false, count: 0 });
+          Object.assign(upload, { status: "ready", name: result.name, size: result.size_bytes });
+          view.focus("hotword_rows");
+        }
       } catch (reason) {
         upload.status = "failed";
         fail(reason, field);
@@ -211,7 +272,10 @@ export function useTranscription(api: Api, view: ViewEffects, t: Translate, make
           }
         }
         const result = await api.request("/api/validate", config);
-        if (receiveValidation(model, revision, result, config)) view.focus("review");
+        if (receiveValidation(model, revision, result, config)) {
+          Object.assign(model.hotwords, { issues: [], warnings: [], checked: form.hotwordsEnabled, count: result.summary.enhancement.count });
+          view.focus("review");
+        }
       } catch (reason) {
         model.phase = "editing";
         if (revision === model.revision) fail(reason);
@@ -234,6 +298,35 @@ export function useTranscription(api: Api, view: ViewEffects, t: Translate, make
         receiveSaveError(model, problem);
         fail(problem);
       }
+    },
+
+    // 撤回尚未执行的任务，恢复该任务的完整输入供重新确认。
+    async reopen(): Promise<void> {
+      if (!availability(model).reopen || !model.receipt) return;
+      model.reopening = true;
+      error.value = null;
+      try {
+        const result = await api.request("/api/reopen", { job_id: model.receipt.job_id });
+        const config = result.configuration;
+        Object.assign(form, { useApiKey: config.auth_mode === "api_key", diarizationEnabled: config.diarization_enabled,
+          hotwordsEnabled: ["hotwords", "both"].includes(config.enhancement_mode),
+          contextEnabled: ["context", "both"].includes(config.enhancement_mode), context: config.context,
+          language: config.language_hint ?? "", speaker: config.speaker_count === null ? "" : String(config.speaker_count),
+          hotwordRows: config.hotword_rows });
+        model.uploads.audio = { status: "ready", id: result.audio.upload_id, name: result.audio.name, size: result.audio.size_bytes };
+        model.uploads.hotwords = { status: "empty", id: null, name: "", size: 0 };
+        model.directories = { json: config.json_directory, document: config.document_directory };
+        Object.assign(model.hotwords, { issues: [], warnings: [], checked: false, count: 0 });
+        model.receipt = null;
+        if (model.session) model.session.confirmed = null;
+        model.phase = "editing";
+        invalidatePreview(model);
+        model.statusMessage = "reopened";
+        await nextTick();
+        await updateAuth();
+        if (model.auth.status !== "failed") view.focus("config-fields");
+      } catch (reason) { fail(reason); }
+      finally { model.reopening = false; }
     },
 
     // 下载热词模板，保留其它表单操作。

@@ -188,7 +188,7 @@ class BailianContractTests(RuntimeTestCase):
         session = Session(self.runtime)
         self.addCleanup(session.cleanup)
         upload = session.upload("audio", "合成样本.wav", io.BytesIO(data), len(data))
-        hotwords_id = ""
+        hotword_rows = []
         if vocabulary is not None:
             workbook = Workbook()
             workbook.active.append(["text", "weight"])
@@ -199,12 +199,12 @@ class BailianContractTests(RuntimeTestCase):
             workbook.save(excel)
             workbook.close()
             content = excel.getvalue()
-            hotwords_id = session.upload("hotwords", "合成热词.xlsx", io.BytesIO(content), len(content))["upload_id"]
+            hotword_rows = session.upload("hotwords", "合成热词.xlsx", io.BytesIO(content), len(content))["rows"]
         preview = session.validate({
             "auth_mode": "api_key", "audio_upload_id": upload["upload_id"],
             "diarization_enabled": True, "language_hint": "zh", "speaker_count": 3,
             "enhancement_mode": "both" if vocabulary is not None else "context",
-            "context": context, "hotwords_upload_id": hotwords_id,
+            "context": context, "hotword_rows": hotword_rows,
             "json_directory": "default", "document_directory": "default",
         })
         job_id = session.confirm(preview["validation_id"])["job_id"]

@@ -8,6 +8,8 @@ participant S as Session对象
 participant P as DirectoryPicker对象
 participant R as Runtime对象
 participant I as inputs（函数模块）
+participant Q as rules（函数模块）
+participant J as job_files（函数模块）
 participant F as 本机文件
 Note over U,C: 新转写先打开页面<br/>录音在网页中选择<br/>工作目录复用会话约定<br/>或当前任务目录
 C->>H: Skill/scripts/asr.py --workspace 用户目录 serve<br/>宿主有浏览器工具时传--no-browser
@@ -41,12 +43,32 @@ S->>F: 保存工作目录/.asr-transcription/.state/web-uploads/会话ID/副本
 S-->>H: upload_id
 H-->>W: 接收回执
 opt 启用热词
-    U->>W: 选择热词Excel
-    W->>H: POST /api/upload-hotwords
-    H->>S: upload(hotwords, name, rfile, size)
-    S->>F: 保存Excel临时副本
-    S-->>H: 热词upload_id
-    H-->>W: 接收回执
+    alt 从Excel导入
+        U->>W: HotwordEditor选择热词Excel
+        W->>H: POST /api/upload-hotwords，传文件字节
+        H->>S: upload(hotwords, name, rfile, size)
+        S->>F: 写入Excel临时副本
+        S->>I: import_hotwords(partial)
+        I->>F: utils.hotwords.read_hotwords()读取单元格
+        I->>Q: validate_hotword_rows(rows)
+        Q-->>I: 词典与提示，或可定位的行级问题
+        I-->>S: rows、issues、warnings
+        S->>F: finally删除Excel临时副本
+        S-->>H: rows＋issues＋warnings＋文件名及大小
+        H-->>W: 导入回执；不提供热词upload_id
+    else 直接填写
+        U->>W: 新增词条，在相同表格填写词语与权重
+    end
+    W-->>U: Element Plus表格显示原行号、单元格问题和提示
+    U->>W: 编辑或删除词条；作废旧预览
+    opt 单独检查词表
+        W->>H: POST /api/validate-hotwords，提交rows
+        H->>S: check_hotwords(rows)
+        S->>Q: validate_hotword_rows(rows)
+        Q-->>S: 词典与提示，或行级问题
+        S-->>H: count、issues、warnings
+        H-->>W: HotwordEditor标红问题单元格并定位页码
+    end
 end
 U->>W: 设置语种、说话人与参考人数；热词及上下文
 opt 选择自定义保存位置
@@ -71,15 +93,17 @@ opt Key模式且凭据待保存
     S-->>H: ok
     H-->>W: 凭据保存完成；详细交互见图04
 end
-W->>H: POST /api/validate，提交upload_id和选项
+W->>H: POST /api/validate<br/>提交audio_upload_id、hotword_rows与选项
 H->>S: validate(payload)
-S->>S: rules.validate_options()校验选项
-S->>I: validate_audio()；按需load_hotwords()
-I->>F: 探测音频并建立SHA；按需读取Excel
-I-->>S: 媒体信息、词典和提示
-S->>S: 按需validate_context()；output_directory()解析保存根
+S->>Q: validate_options()；按需validate_hotword_rows()、validate_context()
+Q-->>S: 已检查的选项、即时词典与上下文
+Note over S,Q: 文本问题先返回对应字段和行号<br/>通过后才读取可能较大的音频
+S->>I: validate_audio()
+I->>F: 探测音频并建立SHA基线
+I-->>S: 媒体信息、指纹和提示
+S->>S: output_directory()解析保存根
 S->>R: check_output_path()核对默认或批准目录
-S->>S: 建立内存draft
+S->>S: 建立draft：id＋config＋原表单form
 S-->>H: validation_id＋summary
 H-->>W: 预览回执
 Note over W,S: 热词与上下文可并用；即时vocabulary进入确认快照<br/>多声道且开启说话人时，预览提示单声道FLAC副本
@@ -87,14 +111,47 @@ U->>W: 核对后保存
 W->>H: POST /api/confirm(validation_id)
 H->>S: confirm(validation_id)
 S->>F: files.check_file_unchanged()核对size/mtime
-S->>F: job_files.publish_config()写配置与摘要并发布配置
+S->>J: publish_config(runtime, config)
+J->>F: 写配置与摘要并发布配置
 S-->>H: 同一job_id的确认回执
 H-->>C: 同一serve进程stdout：event=configured
 H-->>W: HTTP回执：job_id与保存位置
+opt 用户在已保存页面点击修改设置
+    W->>H: POST /api/reopen，提交当前job_id
+    H->>S: reopen(job_id)
+    alt job_id匹配最近成功撤回的_reopened缓存
+        S-->>H: 同一恢复载荷：configuration与audio引用
+        Note over W,S: 已撤回但HTTP响应丢失时，再次点击修改可取回载荷<br/>缓存命中直接返回，原执行占用和STOPPED记录保持不变
+    else 本次尚无匹配的撤回缓存
+        S->>S: 核对同一会话回执、draft及音频引用
+        Note over S,J: reopen与transcribe调用同一reserve_execution()<br/>独占创建旧job的execution目录，只有一方成功
+        S->>J: reserve_execution(runtime, old_job_id)
+        alt 已有执行占用，包括transcribe先取得目录
+            J-->>S: FileExistsError
+            S-->>H: ValidationError；既有任务保持原样
+            H-->>W: 422，说明该任务无法修改
+        else reopen先取得执行占用
+            J-->>S: 新建execution目录
+            S->>J: save_record(STOPPED, LOCAL_CONFIG_REOPENED)<br/>execution_authorized=false，cloud_outcome=not_started
+            J->>F: 写旧job的execution/status.json
+            S->>S: 清空receipt和draft<br/>_reopened保存旧job_id与恢复载荷
+            S-->>H: 原configuration与audio引用
+        end
+    end
+    opt reopen成功，含缓存返回
+        H-->>C: event=configuration_reopened，旧job_id
+        H-->>W: 恢复表单所需的回执
+        W->>W: 恢复音频、热词行、上下文、选项与保存根<br/>回到editing，按所选方式重新读取Key
+        Note over W,S: _reopened只在当前Session内保留最近载荷<br/>开始新上传、成功选择目录或开始validate时清空
+        Note over C,J: 旧job已被占用，后续transcribe只读本地状态<br/>reopen写记录失败也保留占用，不继续执行旧job
+        U->>W: 修改、重新检查并确认
+        Note over W,J: 重走上述validate与confirm<br/>创建新job_id和新确认回执
+    end
+end
 Note over C,S: stdout回执丢失且网页已显示保存成功时<br/>从同一页面取得确切job_id，用job-status核对<br/>同会话GET /api/session的confirmed提供auth_mode与输出路径
 Note over U,C: Codex核对本次上传授权<br/>覆盖音频、增强内容与费用<br/>已覆盖的授权可继续使用
-Note over H,S: 字段或文件错误返回422，由网页定位<br/>保存配置不启动BL<br/>execution_started=false<br/>config.execution_authorized=false<br/>凭据在执行时读取
+Note over H,S: 行级检查可返回issues供表格修改<br/>其他字段或文件错误返回422；过大的JSON请求返回413<br/>保存配置不启动BL，凭据在执行时读取
 Note over C,H: 本机配置页先于BL授权页<br/>保存后按auth_mode和已有凭据决定是否login
 Note over W,S: 输入变化使旧预览失效；确认结果未知时网页持续冻结<br/>关闭网页不关闭serve；服务正常退出保留已确认音频并清理临时副本
-Note over I,F: 默认根：工作目录/transcriptions<br/>JSON与成品分别选择保存根<br/>预览解析热词，执行使用词典快照
-Note over C,F: 前端路径相对仓库根：frontend/App.vue、useTranscription.ts、model.ts、api.ts、preferences.ts<br/>Python路径相对Skill：scripts/asr_runtime/web.py；application/session.py、inputs.py、rules.py<br/>application/transcription.py::job_status；utils/job_files.py、files.py、directory_picker.py、i18n.py
+Note over I,F: 默认根：工作目录/transcriptions<br/>JSON与成品分别选择保存根<br/>Excel只作导入，预览使用编辑行，执行使用词典快照
+Note over C,F: 前端相对仓库根：frontend/App.vue、useTranscription.ts、components/HotwordEditor.vue、model.ts、api.ts<br/>Python相对Skill：scripts/asr_runtime/web.py；application/session.py::upload、check_hotwords、validate、confirm、reopen<br/>application/inputs.py::import_hotwords、validate_audio；application/rules.py::validate_hotword_rows、validate_context<br/>application/transcription.py::transcribe、job_status；utils/job_files.py::reserve_execution、save_record、publish_config

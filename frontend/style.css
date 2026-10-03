@@ -84,6 +84,16 @@ h1 { font-size: clamp(26px, 3vw, 30px); font-weight: 600; }
 .review-links { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .review-links .el-button { margin: 0; white-space: normal; height: auto; }
 .receipt { max-width: 750px; margin: 24px auto; }
+.receipt-actions { margin-top: 24px; text-align: center; }
+.hotword-toolbar, .hotword-footer { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.hotword-toolbar .el-button { margin-left: 0; }
+.hotword-table, .hotword-notice { margin-top: 12px; }
+.hotword-footer { margin: 12px 0; justify-content: space-between; }
+.hotword-table .hotword-error-row {
+  --el-table-tr-bg-color: var(--el-color-danger-light-9);
+  --el-table-row-hover-bg-color: var(--el-color-danger-light-8);
+}
+.hotword-table .field-error { margin-top: 4px; }
 .action-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 25; background: var(--el-bg-color); border-top: 1px solid var(--el-border-color); }
 .action-inner { padding: 17px 24px; }
 .action-copy strong { font-size: 13px; font-weight: 600; }

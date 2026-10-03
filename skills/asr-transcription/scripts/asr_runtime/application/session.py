@@ -17,10 +17,10 @@ from ..utils.directory_picker import DirectoryPicker
 from ..utils.environment import Runtime, SetupError
 from ..utils.files import FileError, check_file_unchanged, resolve_input
 from ..utils.hotwords import MAX_XLSX_BYTES
-from ..utils.job_files import publish_config
-from .inputs import load_hotwords, validate_audio
+from ..utils.job_files import publish_config, reserve_execution, save_record
+from .inputs import import_hotwords, validate_audio
 from .rules import (
-    AUDIO_SUFFIXES, ValidationError, validate_context, LANGUAGE_CODES, validate_options,
+    AUDIO_SUFFIXES, ValidationError, validate_context, validate_hotword_rows, LANGUAGE_CODES, validate_options,
     MAX_CONTEXT_CHARS, MIN_SPEAKERS, MAX_SPEAKERS, MAX_UPLOAD_BYTES,
     MAX_DURATION_SECONDS, MAX_HOTWORDS,
 )
@@ -64,6 +64,7 @@ class Draft(TypedDict):
 
     id: str
     config: JobConfig
+    form: dict[str, object]
 
 
 class Session:
@@ -74,6 +75,7 @@ class Session:
         self._state_lock = threading.Lock()
         self.draft: Draft | None = None
         self.receipt: ConfirmationReceipt | None = None
+        self._reopened: tuple[str, dict[str, object]] | None = None
         self.upload_directory = runtime.root.resolve() / ".state/web-uploads" / uuid.uuid4().hex
         self.uploads: dict[str, UploadRecord] = {}
         self.output_directories: dict[str, Path] = {}
@@ -128,6 +130,7 @@ class Session:
             self._require_editable()
             self.output_directories[kind] = path
             self.draft = None
+            self._reopened = None
         return {"ok": True, "cancelled": False, "path": str(path)}
 
     def cancel_directory(self, picker_id: object) -> dict[str, bool]:
@@ -199,6 +202,7 @@ class Session:
             output = partial.open("xb")
             self._pending_uploads.add(kind)
             self.draft = None
+            self._reopened = None
         published = False
         try:
             with output:
@@ -210,6 +214,12 @@ class Session:
                         raise ValidationError("传入的文件不完整，请重新选择。", field)
                     output.write(chunk)
                     remaining -= len(chunk)
+            if kind == "hotwords":
+                result = import_hotwords(partial)
+                with self._state_lock:
+                    self._require_editable()
+                # Excel只作导入来源，编辑后的行随预览提交；读取完成即清理副本。
+                return {"ok": True, "name": name, "size_bytes": size, **result}
             with self._state_lock:
                 self._require_editable()
                 partial.replace(destination)
@@ -271,8 +281,9 @@ class Session:
             self._require_editable()
             self._require_uploads_complete()
             self.draft = None  # 即使新校验失败，旧预览也不再可确认。
+            self._reopened = None
             allowed = {"auth_mode", "audio_upload_id", "diarization_enabled", "enhancement_mode",
-                       "hotwords_upload_id", "context", "json_directory", "document_directory",
+                       "hotword_rows", "context", "json_directory", "document_directory",
                        "language_hint", "speaker_count"}
             if set(payload) - allowed:
                 raise ValidationError("请求含不支持的配置字段。", "form")
@@ -282,22 +293,21 @@ class Session:
             mode = cast(AuthMode, mode_value)
             diarization = payload.get("diarization_enabled")
             recognition_options = validate_options(payload, diarization)
-            source = self.uploaded(payload.get("audio_upload_id"), "audio")
-            audio = validate_audio(self.upload_directory, source["path"], diarization)
-            audio["name"] = source["name"]
             enhancement_value = payload.get("enhancement_mode")
-            warnings = list(audio["warnings"])
             hotwords = None
             context = None
             if enhancement_value not in ("none", "hotwords", "context", "both"):
                 raise ValidationError("请选择有效的识别增强方式。", "enhancement_mode")
             enhancement = cast(EnhancementMode, enhancement_value)
             if enhancement in ("hotwords", "both"):
-                source = self.uploaded(payload.get("hotwords_upload_id"), "hotwords")
-                hotwords = load_hotwords(self.upload_directory, source["path"])
-                warnings.extend(hotwords["warnings"])
+                hotwords = validate_hotword_rows(payload.get("hotword_rows"))
             if enhancement in ("context", "both"):
                 context = validate_context(payload.get("context"))
+            # 先报告可直接修改的文本问题，再读取可能较大的录音。
+            source = self.uploaded(payload.get("audio_upload_id"), "audio")
+            audio = validate_audio(self.upload_directory, source["path"], diarization)
+            audio["name"] = source["name"]
+            warnings = [*audio["warnings"], *(hotwords["warnings"] if hotwords else [])]
 
             job_id = uuid.uuid4().hex
             json_base = output_directory(self.runtime, payload.get("json_directory"), "json_directory", self.output_directories.get("json"))
@@ -320,8 +330,52 @@ class Session:
                 "json_directory": config["json_directory"], "document_directory": config["document_directory"],
                 "warnings": warnings,
             }
-            self.draft = {"id": secrets.token_urlsafe(24), "config": config}
+            self.draft = {"id": secrets.token_urlsafe(24), "config": config, "form": dict(payload)}
             return {"ok": True, "validation_id": self.draft["id"], "summary": summary}
+
+    def check_hotwords(self, rows: object) -> dict[str, object]:
+        """检查可编辑词表，返回行级问题供表格定位与标红。"""
+        with self._state_lock:
+            self._require_editable()
+        try:
+            result = validate_hotword_rows(rows)
+            return {"ok": True, "count": result["count"], "issues": [], "warnings": result["warnings"]}
+        except ValidationError as exc:
+            if not exc.details:
+                raise
+            return {"ok": True, "count": 0, "issues": exc.details, "warnings": []}
+
+    def reopen(self, job_id: object) -> dict[str, object]:
+        """撤回尚未执行的确认配置，恢复表单供用户重新检查和保存。"""
+        with self._state_lock:
+            self._require_open()
+            # 撤回已生效但HTTP响应丢失时，允许同一编号再次取得恢复数据。
+            if self._reopened and job_id == self._reopened[0]:
+                return self._reopened[1]
+            if not self.receipt or not self.draft or job_id != self.receipt["job_id"]:
+                raise ValidationError("此页面没有可修改的已保存设置，请重新打开当前配置页。", "confirmation")
+            config = self.draft["config"]
+            form = self.draft["form"]
+            audio = self.uploaded(form.get("audio_upload_id"), "audio")
+            try:
+                # 与transcribe竞争同一个一次执行占用；先开始执行的任务保持原样。
+                execution = reserve_execution(self.runtime, config["job_id"])
+            except FileExistsError as exc:
+                raise ValidationError("此任务已进入执行流程，无法修改这份设置。请等待当前任务结束后再新建任务。", "confirmation") from exc
+            save_record(execution, {
+                "job_id": config["job_id"], "status": "STOPPED", "execution_authorized": False,
+                "cloud_outcome": "not_started", "updated_at": datetime.now(timezone.utc).isoformat(),
+                "message": "已返回网页修改设置。本任务已撤回，请重新检查并保存后使用新编号。",
+                "error": {"source": "local", "code": "LOCAL_CONFIG_REOPENED", "phase": "configuration",
+                          "explanation": "用户撤回了未执行的设置，音频未上传。"},
+            })
+            self.receipt = None
+            self.draft = None
+            restored: dict[str, object] = {"ok": True, "configuration": form,
+                "audio": {"upload_id": form["audio_upload_id"], "name": audio["name"],
+                          "size_bytes": config["audio"]["fingerprint"]["size_bytes"]}}
+            self._reopened = (config["job_id"], restored)
+            return restored
 
     def confirm(self, validation_id: object) -> ConfirmationReceipt:
         """保存指定预览的配置快照并返回任务回执。"""

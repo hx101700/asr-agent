@@ -7,6 +7,7 @@ state "STOPPED<br/>本次操作停止" as Stopped
 state "JSON_READY<br/>原JSON结构和正文检查通过" as JsonReady
 [*] --> Configured : confirm成功 / 发布配置及摘要
 Configured --> Preparing : transcribe明确授权、配置有效且execution不存在 / 独占创建目录
+Configured --> Stopped : reopen先取得execution且写入成功 / LOCAL_CONFIG_REOPENED，not_started
 Preparing --> Running : prepare_input完成 / 内存设置RUNNING与unknown
 Preparing --> Stopped : 准备失败或首次记录保存失败 / not_started
 Running --> Stopped : RUNNING保存失败或BL进程启动失败 / not_started
@@ -26,6 +27,10 @@ end note
 note right of Stopped
   execution目录永久保留，同job最多取得一次执行占用
   授权与配置通过后的重复调用读取既有记录
+  reopen与transcribe竞争同一execution目录
+  已执行或已占用任务拒绝reopen
+  撤回后恢复网页表单；重新确认产生新job_id
+  旧job不返回CONFIGURED，也不会再启动BL
   业务异常由error.phase定位
   记录保存失败由record_error.phase说明
 end note
@@ -40,6 +45,8 @@ note left of Preparing
   本图建模dict中的状态字符串，代码没有State类
   delivery/status.json另记EXPORTING、COMPLETE、PARTIAL、FAILED
   读取损坏记录或导出中断可合成OUTCOME_UNKNOWN
+  reopen记录写入失败也保留占用，旧job禁止执行
   源码：scripts/asr_runtime/application/transcription.py、delivery.py
+  重新编辑：scripts/asr_runtime/application/session.py::reopen
   文件协议：scripts/asr_runtime/utils/job_files.py
 end note

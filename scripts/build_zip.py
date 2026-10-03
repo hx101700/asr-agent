@@ -10,8 +10,8 @@ from zipfile import ZIP_DEFLATED, ZipFile
 SKILL_DIRECTORY = Path("skills/asr-transcription")
 REQUIRED_FILES = (
     "SKILL.md", "agents/openai.yaml", "LICENSE", "assets/env.example",
-    "references/usage.md", "references/errors.md", "references/model.md",
-    "scripts/asr.py", "scripts/requirements.txt",
+    "references/usage.md", "references/errors.md", "references/model.md", "references/update.md",
+    "scripts/asr.py", "scripts/update_skill.py", "scripts/requirements.txt",
     "scripts/bailian/package.json", "scripts/bailian/package-lock.json",
     "scripts/bailian/console-browser.cjs",
     "scripts/asr_runtime/__init__.py", "scripts/asr_runtime/__main__.py",

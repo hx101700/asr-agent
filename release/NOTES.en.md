@@ -6,7 +6,7 @@ MemoFlow is being built to turn recordings into meeting minutes that follow your
 
 - Add one recording and adjust the audio language, speaker diarization, and save locations.
 - Switch between Chinese and English, and choose Light, Dark, or System appearance.
-- Import Excel hotwords and enter context. Both enhancement options can be used together.
+- Enter hotwords in the editable table or import them from Excel, and optionally add context at the same time.
 - Use Console login or enter your API key on the page. Checking your settings saves the key to your workspace. The official BL CLI performs recognition.
 - Keep the original JSON and all three documents, with local re-export for existing tasks.
 
@@ -14,7 +14,9 @@ During initial setup, the installer compares file download speeds from PyPI and 
 
 Tell Codex “Please transcribe a recording” to open the configuration page, then click “Choose an audio file” to add your recording. You can proceed as soon as the page opens, without waiting for extra browser checks. Save your settings, then follow the page's reminder to return to Codex and send “continue.”
 
-The refreshed interface pairs blue accents with neutral surfaces and consistent icons to distinguish primary actions from supporting controls. Hover feedback and concise tooltips clarify available actions. Enable hotwords and select “Download template” beside “Hotword list” to get the Excel workbook. Controls remain readable in both Light and Dark modes.
+You can now edit hotwords directly on the page. Excel imports preserve the original row numbers and cell contents. Invalid rows appear in red, with an explanation below the relevant cell. You can also add entries without an Excel file; the template download is in the table toolbar. If context exceeds the limit or contains a character that cannot be transmitted, the page explains the problem and keeps your text for correction.
+
+If you notice a mistake after saving, select “Modify settings.” Before transcription starts, this restores your input so you can review and save it again. Tasks that have already entered execution remain unchanged.
 
 This update addresses a Windows login failure followed by duplicate authorization tabs on retry. Login now requests desktop execution permissions from the first attempt and opens the complete authorization URL once in your system default browser. After authorization, return to Codex and send “continue.”
 
@@ -25,6 +27,8 @@ The Skill now gives clearer guidance for new recordings, re-exporting existing t
 ### Installation and file storage
 
 Install the Skill independently and keep recording tasks, credentials, and dependencies in your chosen workspace. Save locations stay outside the Skill's program directory, so you can manage the tools and transcript files separately.
+
+To update an existing installation, send the new ZIP to Codex and ask it to update the installed Skill. Finish running operations first. The updater replaces installation files together, preserves credentials, recordings, and results in the workspace, and restores the previous copy if replacement fails.
 
 ### Get started
 

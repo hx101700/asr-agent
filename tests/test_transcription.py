@@ -66,7 +66,7 @@ class TranscriptionTests(RuntimeTestCase):
         payload = {
             "auth_mode": "api_key", "audio_upload_id": upload["upload_id"],
             "diarization_enabled": diarization, "enhancement_mode": enhancement,
-            "hotwords_upload_id": "", "context": "",
+            "hotword_rows": [], "context": "",
             "json_directory": "default", "document_directory": "default",
             **options,
         }
@@ -80,7 +80,7 @@ class TranscriptionTests(RuntimeTestCase):
             workbook.close()
             data = stream.getvalue()
             words = session.upload("hotwords", "合成热词.xlsx", io.BytesIO(data), len(data))
-            payload["hotwords_upload_id"] = words["upload_id"]
+            payload["hotword_rows"] = words["rows"]
         if enhancement in ("context", "both"):
             payload["context"] = "讨论合成术语与Qwen的识别效果。"
         try:

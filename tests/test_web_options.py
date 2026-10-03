@@ -41,7 +41,7 @@ class OptionsFixture(RuntimeTestCase):
         return {
             "auth_mode": "console", "audio_upload_id": uploaded["upload_id"],
             "diarization_enabled": True, "enhancement_mode": "none",
-            "hotwords_upload_id": "", "context": "",
+            "hotword_rows": [], "context": "",
             "json_directory": "default", "document_directory": "default",
         }
 
@@ -224,7 +224,7 @@ class DirectoryOptionTests(OptionsFixture):
         uploaded = self.session.upload("hotwords", "synthetic.xlsx", io.BytesIO(content), len(content))
         preview = self.session.validate({
             **self.payload, "language_hint": "zh", "speaker_count": 3,
-            "enhancement_mode": "both", "hotwords_upload_id": uploaded["upload_id"],
+            "enhancement_mode": "both", "hotword_rows": uploaded["rows"],
             "context": "本次会议讨论测试术语。",
         })
         expected = {"language_hints": ["zh"], "speaker_count": 3}
@@ -235,10 +235,9 @@ class DirectoryOptionTests(OptionsFixture):
         self.assertEqual(config["enhancement"]["hotwords"]["count"], 1)
         self.assertEqual(config["enhancement"]["context"], "本次会议讨论测试术语。")
         self.assertFalse(config["execution_authorized"])
-        hotwords_copy = Path(self.session.uploaded(uploaded["upload_id"], "hotwords")["path"])
+        self.assertFalse(list(self.session.upload_directory.glob("*.xlsx*")))
         self.session.cleanup()
         self.assertTrue(Path(config["audio"]["path"]).is_file())
-        self.assertFalse(hotwords_copy.exists())
         self.assertEqual(config["enhancement"]["hotwords"]["vocabulary"], {"测试术语": 4})
 
 

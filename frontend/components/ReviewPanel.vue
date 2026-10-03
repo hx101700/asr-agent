@@ -14,7 +14,6 @@ const rows = computed<[string, string][]>(() => {
   const config = preview?.configuration;
   const summary = preview?.summary;
   const audio = model.uploads.audio;
-  const words = model.uploads.hotwords;
   const language = config ? config.language_hint : form.language;
   const diarization = config ? config.diarization_enabled : form.diarizationEnabled;
   const speakers = config ? config.speaker_count : form.speaker;
@@ -29,7 +28,7 @@ const rows = computed<[string, string][]>(() => {
     [t("diarization"), t(diarization ? "enabled" : "disabled")]);
   if (diarization) values.push([t("speakers"), speakers ? t("speakerValue", { count: speakers }) : t("automatic")]);
   const contextChars = summary ? summary.enhancement.context_chars : Array.from(form.context).length;
-  values.push([t("hotwordsLabel"), form.hotwordsEnabled ? (summary ? t(summary.enhancement.count === 1 ? "hotwordCount" : "hotwordsCount", { count: summary.enhancement.count }) : words.name || t("notAdded")) : t("disabled")],
+  values.push([t("hotwordsLabel"), form.hotwordsEnabled ? (summary ? t(summary.enhancement.count === 1 ? "hotwordCount" : "hotwordsCount", { count: summary.enhancement.count }) : t("hotwordRows", { count: form.hotwordRows.length })) : t("disabled")],
     [t("contextLabel"), form.contextEnabled ? t(contextChars === 1 ? "character" : "characters", { count: contextChars }) : t("disabled")],
     [t("connection"), (config ? config.auth_mode === "api_key" : form.useApiKey) ? "API Key" : t("consoleLogin")]);
   if (summary) values.push([t("jsonLocation"), summary.json_directory], [t("documentLocation"), summary.document_directory]);

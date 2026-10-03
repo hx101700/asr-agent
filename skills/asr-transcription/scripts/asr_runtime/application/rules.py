@@ -4,7 +4,7 @@ import math
 from collections.abc import Iterable, Mapping
 from typing import cast
 
-from ..models import AudioInfo, HotwordConfig, HotwordIssue, HotwordRow, RecognitionOptions
+from ..models import MAX_HOTWORD_ROWS, AudioInfo, HotwordConfig, HotwordIssue, HotwordRow, RecognitionOptions
 from ..utils.i18n import translate
 
 
@@ -52,15 +52,45 @@ def check_audio_limits(info: AudioInfo, diarization: bool) -> None:
 
 def validate_context(text: object) -> str:
     """校验参考文本的长度与字符要求，保留用户原文。"""
-    if not isinstance(text, str) or not text.strip():
-        raise ValidationError("请输入参考文本，或关闭上下文增强。", "context")
+    if not isinstance(text, str):
+        raise ValidationError("参考文本必须为文字，请重新输入。", "context")
+    if not text.strip():
+        raise ValidationError("参考文本为空，请输入与录音相关的术语或参考文字，或关闭上下文增强。", "context")
     if len(text) > MAX_CONTEXT_CHARS:
         raise ValidationError(translate(
-            "参考文本共 {count} 个字符，最多支持 {maximum} 个，请精简后重新检查。"
-        ).format(count=len(text), maximum=MAX_CONTEXT_CHARS), "context")
-    if "\x00" in text or any(0xD800 <= ord(char) <= 0xDFFF for char in text):
-        raise ValidationError("参考文本中含有无法识别的特殊字符，请删除后重新检查。", "context")
+            "参考文本共 {count} 个字符，最多支持 {maximum} 个，超出 {excess} 个。请精简后重新检查。"
+        ).format(count=len(text), maximum=MAX_CONTEXT_CHARS, excess=len(text) - MAX_CONTEXT_CHARS), "context")
+    for position, char in enumerate(text, start=1):
+        if char == "\x00" or 0xD800 <= ord(char) <= 0xDFFF:
+            raise ValidationError(translate(
+                "参考文本第 {position} 个字符无法传输（{codepoint}），请删除或重新输入。"
+            ).format(position=position, codepoint=f"U+{ord(char):04X}"), "context")
     return text
+
+
+def validate_hotword_rows(payload: object) -> HotwordConfig:
+    """检查网页热词表格的数据形状，并应用统一词表规则。"""
+    if not isinstance(payload, list):
+        raise ValidationError("热词表格格式无效，请重新填写或导入。", "hotword_rows")
+    if len(payload) > MAX_HOTWORD_ROWS:
+        raise ValidationError("热词表格最多支持10000行，请减少后重新检查。", "hotword_rows")
+    row_numbers: set[int] = set()
+    for index, value in enumerate(payload, start=1):
+        if (not isinstance(value, dict) or not {"row", "text", "weight"} <= value.keys()
+                or value.keys() - {"row", "text", "weight", "invalid_fields"}
+                or type(value["row"]) is not int or value["row"] < 1
+                or value["row"] in row_numbers):
+            raise ValidationError("热词表格格式无效，请重新填写或导入。", "hotword_rows",
+                                  [{"row": index, "field": "row", "message": "行号必须为不重复的正整数。"}])
+        for field in ("text", "weight"):
+            if value[field] is not None and not isinstance(value[field], (str, int, float, bool)):
+                raise ValidationError("热词表格格式无效，请重新填写或导入。", "hotword_rows",
+                                      [{"row": value["row"], "field": field, "message": "单元格必须为文本或数值。"}])
+        invalid_fields = value.get("invalid_fields", [])
+        if not isinstance(invalid_fields, list) or any(field not in ("text", "weight") for field in invalid_fields):
+            raise ValidationError("热词表格格式无效，请重新填写或导入。", "hotword_rows")
+        row_numbers.add(value["row"])
+    return build_vocabulary(cast(list[HotwordRow], payload))
 
 
 def build_vocabulary(rows: Iterable[HotwordRow]) -> HotwordConfig:
@@ -71,25 +101,38 @@ def build_vocabulary(rows: Iterable[HotwordRow]) -> HotwordConfig:
     warnings = []
     ignored_blank_rows = 0
     super_count = 0
+    first_row: int | None = None
     for row in rows:
-        row_number, text, weight = row.number, row.text, row.weight
-        if text is None and weight is None:
+        row_number, text, weight = row["row"], row["text"], row["weight"]
+        if first_row is None:
+            first_row = row_number
+        invalid_fields = row.get("invalid_fields", [])
+        if text in (None, "") and weight in (None, "") and not invalid_fields:
             ignored_blank_rows += 1
             continue
-        if row.has_formula:
-            details.append({"row": row_number, "field": "row", "message": "不接受公式，请填写固定文本和数值。"})
-            continue
         row_errors = []
-        if not isinstance(text, str) or not text.strip():
+        if "text" in invalid_fields:
+            message = ("不接受公式，请填写固定文本和数值。" if isinstance(text, str) and text.startswith("=")
+                       else "Excel单元格类型不受支持，请在此重新填写文本或权重整数。")
+            row_errors.append(("text", message))
+        elif not isinstance(text, str) or not text.strip():
             row_errors.append(("text", "热词必须为非空文本。"))
-        elif text != text.strip() or any(ord(char) < 32 or ord(char) == 127 for char in text):
+        elif text != text.strip() or any(ord(char) < 32 or ord(char) == 127
+                                        or 0xD800 <= ord(char) <= 0xDFFF for char in text):
             row_errors.append(("text", "请移除热词首尾空白、换行或控制字符；程序不会自动修改。"))
         elif not text.isascii() and len(text) > 15:
             row_errors.append(("text", "含非ASCII字符时，热词总长度最多15个字符。"))
         elif text.isascii() and len([part for part in text.split(" ") if part]) > 7:
             row_errors.append(("text", "纯ASCII热词按空格切分后最多7段。"))
         allowed_weights = (1, 2, 3, 4, 5, 50)
-        if (isinstance(weight, bool) or not isinstance(weight, (int, float))
+        # 网页输入框传递字符串；只转换明确写出的允许整数，保留其他原值供用户修正。
+        if isinstance(weight, str) and weight in ("1", "2", "3", "4", "5", "50"):
+            weight = int(weight)
+        if "weight" in invalid_fields:
+            message = ("不接受公式，请填写固定文本和数值。" if isinstance(weight, str) and weight.startswith("=")
+                       else "Excel单元格类型不受支持，请在此重新填写文本或权重整数。")
+            row_errors.append(("weight", message))
+        elif (isinstance(weight, bool) or not isinstance(weight, (int, float))
                 or weight not in allowed_weights):
             row_errors.append(("weight", "权重必须为1至5的整数或50。"))
         if row_errors:
@@ -110,16 +153,17 @@ def build_vocabulary(rows: Iterable[HotwordRow]) -> HotwordConfig:
             continue
         vocabulary[text] = weight
         first_rows[text] = row_number
-        if len(vocabulary) == MAX_HOTWORDS + 1:
+        if len(vocabulary) > MAX_HOTWORDS:
             details.append({"row": row_number, "field": "text", "message": "热词总数超过2000个，请减少。"})
         if weight == 50:
             super_count += 1
-            if super_count == 51:
+            if super_count > 50:
                 details.append({"row": row_number, "field": "weight", "message": "超级热词（权重50）最多50个。"})
     if details:
-        raise ValidationError("热词文件中有不符合要求的内容，请按以下行号修改后重新添加文件。", "hotwords_path", details)
+        raise ValidationError("请修改热词表格中标红的单元格后重新检查。", "hotword_rows", details)
     if not vocabulary:
-        raise ValidationError("热词Excel未包含有效词条。", "hotwords_path")
+        raise ValidationError("请至少填写一个热词及其权重，或关闭热词增强。", "hotword_rows",
+                              [{"row": first_row or 1, "field": "text", "message": "热词必须为非空文本。"}])
     if ignored_blank_rows:
         warnings.append(translate("已忽略{count}个完全空白行。").format(count=ignored_blank_rows))
     return {"vocabulary": vocabulary, "count": len(vocabulary), "warnings": warnings}

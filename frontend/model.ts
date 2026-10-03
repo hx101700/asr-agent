@@ -11,6 +11,7 @@ export function createModel(): Model {
       audio: { status: "empty", id: null, name: "", size: 0 },
       hotwords: { status: "empty", id: null, name: "", size: 0 },
     },
+    hotwords: { issues: [], warnings: [], checking: false, checked: false, count: 0 }, reopening: false,
     auth: { revision: 0, status: "idle" }, picker: null, downloadingTemplate: false, statusMessage: "",
   };
 }
@@ -19,7 +20,7 @@ export function createModel(): Model {
 export function availability(model: Model) {
   const editable = ["editing", "validating", "review"].includes(model.phase);
   const uploading = Object.values(model.uploads).some(upload => upload.status === "uploading");
-  const pending = uploading || model.auth.status === "loading" || model.auth.status === "saving" || Boolean(model.picker);
+  const pending = uploading || model.hotwords.checking || model.auth.status === "loading" || model.auth.status === "saving" || Boolean(model.picker);
   return {
     editable, uploading,
     validate: editable && model.phase !== "validating" && !pending,
@@ -27,11 +28,13 @@ export function availability(model: Model) {
     chooseDirectory: editable && !model.picker,
     cancelDirectory: Boolean(model.picker) && !model.picker?.cancelling,
     template: editable && !model.downloadingTemplate,
+    editHotwords: editable && model.uploads.hotwords.status !== "uploading" && !model.hotwords.checking,
+    reopen: model.phase === "saved" && Boolean(model.receipt) && !model.reopening,
     changeAuth: editable && model.auth.status !== "saving",
-    changeLanguage: !pending && !model.downloadingTemplate && model.phase !== "validating" && model.phase !== "saving",
+    changeLanguage: !pending && !model.downloadingTemplate && !model.reopening && model.phase !== "validating" && model.phase !== "saving",
     upload: {
       audio: editable && model.uploads.audio.status !== "uploading",
-      hotwords: editable && model.uploads.hotwords.status !== "uploading",
+      hotwords: editable && model.uploads.hotwords.status !== "uploading" && !model.hotwords.checking,
     },
   };
 }
@@ -92,7 +95,7 @@ export function configuration(model: Model, form: FormValues, limits: Limits, t:
     auth_mode: form.useApiKey ? "api_key" : "console",
     audio_upload_id: model.uploads.audio.id, diarization_enabled: form.diarizationEnabled,
     enhancement_mode: form.hotwordsEnabled ? (form.contextEnabled ? "both" : "hotwords") : (form.contextEnabled ? "context" : "none"),
-    hotwords_upload_id: form.hotwordsEnabled ? model.uploads.hotwords.id : null,
+    hotword_rows: form.hotwordsEnabled ? form.hotwordRows.map(row => ({ ...row, ...(row.invalid_fields ? { invalid_fields: [...row.invalid_fields] } : {}) })) : [],
     context: form.contextEnabled ? form.context : "", language_hint: form.language || null,
     speaker_count: speakerCount, json_directory: model.directories.json, document_directory: model.directories.document,
   };
@@ -101,13 +104,14 @@ export function configuration(model: Model, form: FormValues, limits: Limits, t:
 // 检查必填输入并保留超长上下文的全部原文供用户修改。
 export function checkRequiredInputs(config: Configuration, limits: Limits, t: Translate): void {
   if (!config.audio_upload_id) throw new UiError(t("missingAudio"), "audio_upload_id");
-  if (["both", "hotwords"].includes(config.enhancement_mode) && !config.hotwords_upload_id) {
-    throw new UiError(t("missingHotwords"), "hotwords_upload_id");
+  if (["both", "hotwords"].includes(config.enhancement_mode) && !config.hotword_rows.length) {
+    throw new UiError(t("missingHotwords"), "hotword_rows");
   }
   if (["both", "context"].includes(config.enhancement_mode)) {
-    if (!config.context.trim()) throw new UiError(t("missingContext"), "context");
-    if (Array.from(config.context).length > limits.context_chars) {
-      throw new UiError(t("contextTooLong", { count: limits.context_chars }), "context");
+    const length = Array.from(config.context).length;
+    if (!config.context.trim()) throw new UiError(t("missingContext", { length, count: limits.context_chars }), "context");
+    if (length > limits.context_chars) {
+      throw new UiError(t("contextTooLong", { length, count: limits.context_chars, excess: length - limits.context_chars }), "context");
     }
   }
 }

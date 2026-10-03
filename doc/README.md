@@ -9,6 +9,7 @@
 | [usage.md](../skills/asr-transcription/references/usage.md) | 环境准备、认证、网页操作与重导 |
 | [errors.md](../skills/asr-transcription/references/errors.md) | 常见问题处理及状态含义 |
 | [model.md](../skills/asr-transcription/references/model.md) | 固定 BL/API 版本与官方参数依据 |
+| [update.md](../skills/asr-transcription/references/update.md) | 使用新ZIP更新Skill及运行任务的处理边界 |
 
 ## 开发与维护
 

@@ -35,7 +35,7 @@ class WebFixture(RuntimeTestCase):
         uploaded = session.upload("audio", self.audio.name, io.BytesIO(content), len(content))
         return {"auth_mode": "console", "audio_upload_id": uploaded["upload_id"],
                         "diarization_enabled": True, "enhancement_mode": "none",
-                        "hotwords_upload_id": "", "context": "", "json_directory": "default",
+                        "hotword_rows": [], "context": "", "json_directory": "default",
                         "document_directory": "default"}
 
 
@@ -118,8 +118,8 @@ class SessionTests(WebFixture):
             preview = self.session.validate({**self.payload, "auth_mode": "api_key"})
             self.assertTrue(self.session.confirm(preview["validation_id"])["ok"])
 
-    def test_confirmation_uses_hotwords_snapshot_after_excel_is_removed(self):
-        """验证Excel删除后确认仍使用已解析热词快照。"""
+    def test_confirmation_uses_edited_rows_after_excel_is_removed(self):
+        """验证词表导入后可编辑，确认阶段复用已校验词典。"""
         path = self.runtime.path("data/热词.xlsx")
         workbook = Workbook()
         sheet = workbook.active
@@ -130,17 +130,18 @@ class SessionTests(WebFixture):
         workbook.close()
         content = path.read_bytes()
         uploaded = self.session.upload("hotwords", path.name, io.BytesIO(content), len(content))
-        payload = {**self.payload, "enhancement_mode": "both", "hotwords_upload_id": uploaded["upload_id"],
+        path.unlink()
+        self.assertFalse(list(self.session.upload_directory.glob("*.xlsx*")))
+        uploaded["rows"][0]["weight"] = "4"
+        payload = {**self.payload, "enhancement_mode": "both", "hotword_rows": uploaded["rows"],
                    "context": "会议涉及测试术语"}
         preview = self.session.validate(payload)
         self.assertEqual(preview["summary"]["enhancement"]["count"], 1)
         self.assertEqual(preview["summary"]["enhancement"]["context_chars"], len(payload["context"]))
-        copy = Path(self.session.uploaded(uploaded["upload_id"], "hotwords")["path"])
-        copy.unlink()
-        with patch("asr_runtime.application.session.load_hotwords", side_effect=AssertionError("must not parse Excel again")):
+        with patch("asr_runtime.application.session.import_hotwords", side_effect=AssertionError("must not parse Excel again")):
             receipt = self.session.confirm(preview["validation_id"])
         config = json.loads(Path(receipt["config_path"]).read_text(encoding="utf-8"))
-        self.assertEqual(config["enhancement"]["hotwords"]["vocabulary"], {"术语": 50})
+        self.assertEqual(config["enhancement"]["hotwords"]["vocabulary"], {"术语": 4})
 
     def test_browser_rejects_unapproved_output_paths(self):
         """验证客户端提交源码或其他路径时被拒绝。"""
@@ -415,7 +416,7 @@ class WebServerTests(WebFixture):
         error = json.loads(body)
         self.assertEqual(error["field"], "context")
         self.assertIn("401 characters", error["error"])
-        self.assertIn("400 characters or fewer", error["error"])
+        self.assertIn("400-character limit by 1", error["error"])
         self.assertNotIn("词", error["error"])
 
     def test_english_preview_translates_audio_warnings_and_keeps_filename(self) -> None:
@@ -439,19 +440,61 @@ class WebServerTests(WebFixture):
         content = io.BytesIO()
         workbook.save(content)
         workbook.close()
-        uploaded = json.loads(self.request("POST", "/api/upload-hotwords", body=content.getvalue(),
+        status, _, body = self.request("POST", "/api/upload-hotwords", body=content.getvalue(),
                               headers={"Content-Type": "application/octet-stream",
-                                       "X-File-Name": quote("热词.xlsx"), "Accept-Language": "en"})[2])
-        payload = {**self.payload, "enhancement_mode": "hotwords", "hotwords_upload_id": uploaded["upload_id"]}
-        status, _, body = self.request("POST", "/api/validate", payload,
-                                      headers={"Accept-Language": "en"})
+                                       "X-File-Name": quote("热词.xlsx"), "Accept-Language": "en"})
         self.assertEqual(status, 422)
         error = json.loads(body)
-        self.assertEqual(error["field"], "hotwords_path")
+        self.assertEqual(error["field"], "hotword_rows")
         self.assertIn("The first row must contain text and weight", error["error"])
         self.assertEqual(error["details"][0], {
             "row": 1, "field": "header", "message": "Use the column headers from the template.",
         })
+
+    def test_hotword_import_returns_invalid_rows_for_inline_correction(self):
+        """验证HTTP导入保留错误行，修改后的表格使用相同规则通过检查。"""
+        workbook = Workbook()
+        for row in (["text", "weight"], ["术语", 4], ["另一个词", 99], ["术语", 5]):
+            workbook.active.append(row)
+        content = io.BytesIO()
+        workbook.save(content)
+        workbook.close()
+        status, _, body = self.request("POST", "/api/upload-hotwords", body=content.getvalue(),
+                                      headers={"Content-Type": "application/octet-stream", "X-File-Name": "words.xlsx"})
+        self.assertEqual(status, 200)
+        imported = json.loads(body)
+        self.assertEqual([(item["row"], item["field"]) for item in imported["issues"]],
+                         [(3, "weight"), (4, "weight")])
+        self.assertEqual(imported["rows"][1]["weight"], 99)
+        self.assertFalse(list(self.server.session.upload_directory.glob("*.xlsx*")))
+        imported["rows"][1]["weight"] = "4"
+        imported["rows"][2]["weight"] = "4"
+        status, _, body = self.request("POST", "/api/validate-hotwords", {"rows": imported["rows"]})
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body)["issues"], [])
+        self.assertEqual(json.loads(body)["count"], 2)
+
+    def test_hotword_request_accepts_model_limit_beyond_old_body_limit(self):
+        """验证2000条词表可通过HTTP检查，避免被旧32KiB请求上限误拒绝。"""
+        rows = [{"row": number + 2, "text": f"术语{number}", "weight": "4"} for number in range(2000)]
+        self.assertGreater(len(json.dumps({"rows": rows}).encode()), 32 * 1024)
+        status, _, body = self.request("POST", "/api/validate-hotwords", {"rows": rows})
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body)["count"], 2000)
+        self.assertEqual(json.loads(body)["issues"], [])
+
+    def test_http_reopen_withdraws_old_job_and_restores_form(self):
+        """验证重新打开已保存页面后可以撤回并恢复原表单。"""
+        status, _, body = self.request("POST", "/api/validate", self.payload)
+        self.assertEqual(status, 200)
+        _, _, saved = self.request("POST", "/api/confirm", {"validation_id": json.loads(body)["validation_id"]})
+        receipt = json.loads(saved)
+        status, _, body = self.request("POST", "/api/reopen", {"job_id": receipt["job_id"]})
+        self.assertEqual(status, 200)
+        restored = json.loads(body)
+        self.assertEqual(restored["configuration"], self.payload)
+        self.assertEqual(job_status(self.runtime, receipt["job_id"])["error"]["code"], "LOCAL_CONFIG_REOPENED")
+        self.assertIsNone(json.loads(self.request("GET", "/api/session")[2])["confirmed"])
 
     def test_english_api_key_errors_guide_page_input_without_echoing_key(self) -> None:
         """验证Key空值可填写，保存校验英文提示保持凭据脱敏。"""
