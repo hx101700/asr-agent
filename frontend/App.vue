@@ -5,7 +5,7 @@ import { Aim, ChatLineSquare, Check, Edit, FolderOpened, Headset, Key, Monitor, 
 import en from "element-plus/es/locale/lang/en";
 import zhCn from "element-plus/es/locale/lang/zh-cn";
 import { availability } from "./model";
-import { languageName, type MessageKey, type Translate } from "./i18n";
+import { languageName, type Translate } from "./i18n";
 import { usePreferences } from "./preferences";
 import { useTranscription } from "./useTranscription";
 import type { Api, DirectoryKind, Language } from "./types";
@@ -73,13 +73,6 @@ function fieldMessage(field: string): string {
   return invalid(field) ? error.value?.message ?? "" : "";
 }
 
-// 显示热词行级错误所指向的列名。
-function detailLabel(field?: string): string {
-  const labels: Record<string, MessageKey> = { text: "textColumn", weight: "weightColumn", header: "headerColumn", row: "rowColumn" };
-  const key = labels[field ?? ""];
-  return key ? t(key) : field ?? "";
-}
-
 onMounted(actions.start);
 </script>
 
@@ -119,15 +112,7 @@ onMounted(actions.start);
       </ElSteps>
       <ElAlert v-if="model.phase !== 'saved'" :title="t('beforeStart')" type="info" :closable="false" show-icon class="intro-note" />
       <ElAlert v-if="model.statusMessage" :title="t(model.statusMessage)" type="info" :closable="false" show-icon class="page-notice" />
-      <ElAlert v-if="error && !['hotword_rows', 'context'].includes(error.field ?? '')" id="error-panel" tabindex="-1" class="page-notice" :title="error.message" type="error" :closable="false" show-icon>
-        <ul v-if="error.details.length" class="error-details">
-          <li v-for="(detail, index) in error.details" :key="index">
-            <strong v-if="detail.row">{{ t('row', { row: detail.row }) }} · </strong>
-            {{ detailLabel(detail.field) }}
-            {{ detail.field ? ': ' : '' }}{{ detail.message }}
-          </li>
-        </ul>
-      </ElAlert>
+      <ElAlert v-if="error && !['hotword_rows', 'context'].includes(error.field ?? '')" id="error-panel" tabindex="-1" class="page-notice" :title="error.message" type="error" :closable="false" show-icon />
       <p v-if="model.phase === 'loading'" class="loading-note" role="status">{{ t('loading') }}</p>
       <ElAlert v-if="model.phase === 'unavailable'" :title="t('unavailable')" type="error" :closable="false" />
 
@@ -145,7 +130,7 @@ onMounted(actions.start);
       </ElCard>
 
       <div v-else-if="model.session" class="workspace">
-        <ElForm id="config-fields" :disabled="!available.editable" label-position="top" class="form-column" tabindex="-1" @submit.prevent="actions.validate">
+        <ElForm id="config-fields" :disabled="!available.editable" label-position="top" inline-message class="form-column" tabindex="-1" @submit.prevent="actions.validate">
           <ElCard id="audio_upload_id" shadow="never" header-class="section-heading" :class="{ 'needs-attention': invalid('audio_upload_id') }" tabindex="-1">
             <template #header><ElIcon class="section-icon" :size="20" aria-hidden="true"><Headset /></ElIcon><h2>{{ t('audioHeading') }}</h2><span class="section-aside">{{ t('oneFile') }}</span></template>
             <UploadField :upload="model.uploads.audio" :disabled="!available.upload.audio" :accept="model.session.audio_suffixes.join(',')" :t="t" @select="actions.upload('audio', $event)" />
@@ -208,7 +193,6 @@ onMounted(actions.start);
                 <ElFormItem :label="t('reference')" for="context-text" :error="fieldMessage('context')">
                   <ElInput id="context-text" v-model="form.context" type="textarea" :autosize="{ minRows: 4, maxRows: 10 }" :placeholder="t('contextPlaceholder')" @input="actions.changed()" />
                 </ElFormItem>
-                <ul v-if="invalid('context') && error?.details.length" class="field-error error-details"><li v-for="(detail, index) in error.details" :key="index">{{ detail.message }}</li></ul>
                 <div class="textarea-footer"><p class="helper">{{ t('contextHint', { count: model.session.limits.context_chars }) }}</p><span :class="{ 'field-error': contextLength > model.session.limits.context_chars }">{{ contextLength }} / {{ model.session.limits.context_chars }}</span></div>
               </div>
             </div>

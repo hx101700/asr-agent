@@ -29,8 +29,13 @@ Note over C,H: Codex保留serve会话并结束当前回复<br/>页面提示保�
 Note over W,H: App.vue与Element Plus呈现界面<br/>useTranscription编排，model处理纯状态，api发送HTTP<br/>令牌保留在接口闭包；请求携带Accept-Language
 W->>H: actions.start()经api.ts请求GET /api/session
 H->>S: description()
-S-->>H: 模型、限制、语言代码列表、默认目录与已保存回执
+S-->>H: 模型、限制、语言代码列表、默认目录<br/>confirmed与reopened（均可为空）
 H-->>W: 当前会话描述
+Note over W,S: confirmed保留保存时的回执，不随转写更新<br/>页面引导到Codex查看后续执行结果
+opt confirmed为空且reopened存在
+    W->>W: restoreForm(reopened)恢复确认快照<br/>回到editing，按所选方式读取Key
+    Note over W,S: 刷新直接读取同一Session的撤回缓存<br/>不额外发送POST /api/reopen<br/>后续未保存编辑不属于此快照
+end
 opt 调整界面语言或主题
     U->>W: 选择中文/English或system/light/dark
     W->>W: usePreferences同步组件、html与偏好
@@ -141,8 +146,8 @@ opt 用户在已保存页面点击修改设置
     opt reopen成功，含缓存返回
         H-->>C: event=configuration_reopened，旧job_id
         H-->>W: 恢复表单所需的回执
-        W->>W: 恢复音频、热词行、上下文、选项与保存根<br/>回到editing，按所选方式重新读取Key
-        Note over W,S: _reopened只在当前Session内保留最近载荷<br/>开始新上传、成功选择目录或开始validate时清空
+        W->>W: restoreForm(result)恢复音频、热词行、上下文及保存根<br/>回到editing，按所选方式重新读取Key
+        Note over W,S: _reopened只在当前Session内保留最近确认快照<br/>GET /api/session也返回它，供刷新时恢复<br/>开始新上传、成功选择目录或开始validate时清空
         Note over C,J: 旧job已被占用，后续transcribe只读本地状态<br/>reopen写记录失败也保留占用，不继续执行旧job
         U->>W: 修改、重新检查并确认
         Note over W,J: 重走上述validate与confirm<br/>创建新job_id和新确认回执

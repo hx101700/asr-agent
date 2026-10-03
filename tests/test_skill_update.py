@@ -77,6 +77,18 @@ class SkillUpdateTests(RuntimeTestCase):
         report = update_skill(self.archive, self.installed, tasks_finished=True)
         self.assertTrue(report["dependencies_changed"])
 
+    def test_changed_python_lock_does_not_skip_a_missing_bl_lock(self):
+        """验证Python锁先变化时，BL锁缺失仍在替换原目录前被拒绝。"""
+        self.files["scripts/requirements.txt"] = b"av==19.0.0\n"
+        del self.files["scripts/bailian/package-lock.json"]
+        self.write_archive()
+        with patch.object(Path, "rename") as rename, self.assertRaises(FileNotFoundError):
+            update_skill(self.archive, self.installed, tasks_finished=True)
+        rename.assert_not_called()
+        self.assertTrue((self.installed / "old-resource.txt").is_file())
+        self.assertEqual(list(self.installed.parent.iterdir()), [self.installed])
+        self.assertEqual({path: path.read_bytes() for path in self.user_data}, self.user_data)
+
     def test_missing_idle_confirmation_preserves_installation(self):
         """未确认其他任务结束时停止并保留原资源。"""
         self.write_archive()
@@ -190,6 +202,62 @@ class SkillUpdateTests(RuntimeTestCase):
             update_skill(self.archive, self.installed, tasks_finished=True)
         previous = next(self.installed.parent.glob(".asr-transcription-update-*/previous"))
         self.assertTrue((previous / "old-resource.txt").is_file())
+
+    def test_interruption_after_original_rename_restores_original(self):
+        """验证旧目录刚改名后中断仍恢复安装位置并清理候选资源。"""
+        self.write_archive()
+        original_rename = Path.rename
+
+        def interrupt_after_original(path, destination):
+            """完成旧目录改名后立即模拟Ctrl+C。"""
+            result = original_rename(path, destination)
+            if path == self.installed:
+                raise KeyboardInterrupt()
+            return result
+
+        with patch.object(Path, "rename", interrupt_after_original), self.assertRaises(KeyboardInterrupt):
+            update_skill(self.archive, self.installed, tasks_finished=True)
+        self.assertTrue((self.installed / "old-resource.txt").is_file())
+        self.assertEqual(list(self.installed.parent.iterdir()), [self.installed])
+        self.assertEqual({path: path.read_bytes() for path in self.user_data}, self.user_data)
+
+    def test_interruption_before_candidate_rename_restores_original(self):
+        """验证候选目录接管前中断仍恢复旧目录。"""
+        self.write_archive()
+        original_rename = Path.rename
+
+        def interrupt_candidate(path, destination):
+            """在候选目录改名前模拟Ctrl+C，其余改名照常执行。"""
+            if path.name == "candidate":
+                raise KeyboardInterrupt()
+            return original_rename(path, destination)
+
+        with patch.object(Path, "rename", interrupt_candidate), self.assertRaises(KeyboardInterrupt):
+            update_skill(self.archive, self.installed, tasks_finished=True)
+        self.assertTrue((self.installed / "old-resource.txt").is_file())
+        self.assertEqual(list(self.installed.parent.iterdir()), [self.installed])
+        self.assertEqual({path: path.read_bytes() for path in self.user_data}, self.user_data)
+
+    def test_interruption_after_candidate_rename_keeps_new_directory_and_backup(self):
+        """验证候选资源已接管后中断不覆盖新目录，保留旧副本并报告未完成。"""
+        self.write_archive()
+        original_rename = Path.rename
+
+        def interrupt_after_candidate(path, destination):
+            """完成候选目录改名后立即模拟Ctrl+C。"""
+            result = original_rename(path, destination)
+            if path.name == "candidate":
+                raise KeyboardInterrupt()
+            return result
+
+        with patch.object(Path, "rename", interrupt_after_candidate), \
+                self.assertRaisesRegex(RuntimeError, "安装位置已有资源，未覆盖"):
+            update_skill(self.archive, self.installed, tasks_finished=True)
+        self.assertEqual((self.installed / "scripts/asr.py").read_bytes(), self.files["scripts/asr.py"])
+        self.assertFalse((self.installed / "old-resource.txt").exists())
+        previous = next(self.installed.parent.glob(".asr-transcription-update-*/previous"))
+        self.assertTrue((previous / "old-resource.txt").is_file())
+        self.assertEqual({path: path.read_bytes() for path in self.user_data}, self.user_data)
 
     def test_archive_inside_installation_is_preserved(self):
         """拒绝使用位于将被替换目录中的原 ZIP。"""

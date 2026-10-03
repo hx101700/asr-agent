@@ -2,7 +2,7 @@ import { nextTick, reactive, shallowRef } from "vue";
 import { UiError, uiError } from "./api";
 import { availability, checkRequiredInputs, configuration, createModel, invalidatePreview, receiveReceipt, receiveSaveError, receiveValidation } from "./model";
 import type { Translate } from "./i18n";
-import type { Api, DirectoryKind, FormValues, HotwordField, UploadKind } from "./types";
+import type { Api, DirectoryKind, FormValues, HotwordField, ReopenResult, UploadKind } from "./types";
 
 export interface ViewEffects {
   focus(target: string): void;
@@ -62,6 +62,28 @@ export function useTranscription(api: Api, view: ViewEffects, t: Translate, make
     return true;
   }
 
+  // 将服务端保留的确认快照恢复为编辑表单，并重新读取所选凭据。
+  async function restoreForm(result: ReopenResult): Promise<void> {
+    const config = result.configuration;
+    Object.assign(form, { useApiKey: config.auth_mode === "api_key", diarizationEnabled: config.diarization_enabled,
+      hotwordsEnabled: ["hotwords", "both"].includes(config.enhancement_mode),
+      contextEnabled: ["context", "both"].includes(config.enhancement_mode), context: config.context,
+      language: config.language_hint ?? "", speaker: config.speaker_count === null ? "" : String(config.speaker_count),
+      hotwordRows: config.hotword_rows });
+    model.uploads.audio = { status: "ready", id: result.audio.upload_id, name: result.audio.name, size: result.audio.size_bytes };
+    model.uploads.hotwords = { status: "empty", id: null, name: "", size: 0 };
+    model.directories = { json: config.json_directory, document: config.document_directory };
+    Object.assign(model.hotwords, { issues: [], warnings: [], checked: false, count: 0 });
+    model.receipt = null;
+    if (model.session) model.session.confirmed = null;
+    model.phase = "editing";
+    invalidatePreview(model);
+    model.statusMessage = "reopened";
+    await nextTick();
+    await updateAuth();
+    if (model.auth.status !== "failed") view.focus("config-fields");
+  }
+
   const actions = {
     // 标记凭据输入已修改，使当前预览失效。
     keyChanged(): void {
@@ -80,7 +102,7 @@ export function useTranscription(api: Api, view: ViewEffects, t: Translate, make
       catch (reason) { fail(reason); return false; }
     },
 
-    // 加载本机会话并恢复已保存的回执。
+    // 加载本机会话并恢复确认回执或已撤回的表单。
     async start(): Promise<void> {
       try {
         model.session = await api.request("/api/session");
@@ -88,6 +110,8 @@ export function useTranscription(api: Api, view: ViewEffects, t: Translate, make
           receiveReceipt(model, model.session.confirmed);
           view.setApiKey("");
           view.focus("receipt");
+        } else if (model.session.reopened) {
+          await restoreForm(model.session.reopened);
         } else {
           model.phase = "editing";
         }
@@ -151,7 +175,8 @@ export function useTranscription(api: Api, view: ViewEffects, t: Translate, make
       try {
         const result = await api.request("/api/validate-hotwords", { rows: form.hotwordRows });
         if (revision !== model.revision) return;
-        Object.assign(model.hotwords, result, { checked: true });
+        Object.assign(model.hotwords, { issues: result.issues, warnings: result.warnings, count: result.count, checked: true });
+        if (result.issues.length) view.focus("hotword_rows");
       } catch (reason) { fail(reason, "hotword_rows"); }
       finally { model.hotwords.checking = false; }
     },
@@ -307,24 +332,7 @@ export function useTranscription(api: Api, view: ViewEffects, t: Translate, make
       error.value = null;
       try {
         const result = await api.request("/api/reopen", { job_id: model.receipt.job_id });
-        const config = result.configuration;
-        Object.assign(form, { useApiKey: config.auth_mode === "api_key", diarizationEnabled: config.diarization_enabled,
-          hotwordsEnabled: ["hotwords", "both"].includes(config.enhancement_mode),
-          contextEnabled: ["context", "both"].includes(config.enhancement_mode), context: config.context,
-          language: config.language_hint ?? "", speaker: config.speaker_count === null ? "" : String(config.speaker_count),
-          hotwordRows: config.hotword_rows });
-        model.uploads.audio = { status: "ready", id: result.audio.upload_id, name: result.audio.name, size: result.audio.size_bytes };
-        model.uploads.hotwords = { status: "empty", id: null, name: "", size: 0 };
-        model.directories = { json: config.json_directory, document: config.document_directory };
-        Object.assign(model.hotwords, { issues: [], warnings: [], checked: false, count: 0 });
-        model.receipt = null;
-        if (model.session) model.session.confirmed = null;
-        model.phase = "editing";
-        invalidatePreview(model);
-        model.statusMessage = "reopened";
-        await nextTick();
-        await updateAuth();
-        if (model.auth.status !== "failed") view.focus("config-fields");
+        await restoreForm(result);
       } catch (reason) { fail(reason); }
       finally { model.reopening = false; }
     },

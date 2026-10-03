@@ -32,13 +32,13 @@ class LocalizationTests(unittest.TestCase):
             """在同步到达的请求作用域中读取提示。"""
             with language_scope(language):
                 barrier.wait(timeout=5)
-                return translate("请选择热词文件。")
+                return translate("请选择音频文件。")
 
         with ThreadPoolExecutor(max_workers=2) as pool:
             english = pool.submit(render, "en")
             chinese = pool.submit(render, "zh-CN")
-            self.assertEqual(english.result(timeout=5), "Choose a hotword file.")
-            self.assertEqual(chinese.result(timeout=5), "请选择热词文件。")
+            self.assertEqual(english.result(timeout=5), "Choose an audio file.")
+            self.assertEqual(chinese.result(timeout=5), "请选择音频文件。")
 
     def test_unknown_language_and_user_content_keep_original_text(self) -> None:
         """验证未支持的语言使用中文，未登记的用户文本保持原样。"""

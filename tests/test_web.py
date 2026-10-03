@@ -54,6 +54,19 @@ class SessionTests(WebFixture):
         self.assertFalse(self.runtime.path(".state/jobs").exists())
         self.assertFalse(self.runtime.output_root.exists())
 
+    def test_hotword_import_errors_target_the_editable_table(self):
+        """验证导入前的文件错误与等待提示指向当前热词表格字段。"""
+        with self.assertRaises(ValidationError) as caught:
+            self.session.upload("hotwords", "words.xlsx", io.BytesIO(), 0)
+        self.assertEqual(caught.exception.field, "hotword_rows")
+        self.session._pending_uploads.add("hotwords")
+        try:
+            with self.assertRaises(ValidationError) as caught:
+                self.session.validate(self.payload)
+            self.assertEqual(caught.exception.field, "hotword_rows")
+        finally:
+            self.session._pending_uploads.clear()
+
     def test_confirm_is_idempotent_even_with_concurrent_requests(self):
         """验证并发确认共用同一配置回执。"""
         preview = self.session.validate(self.payload)
@@ -78,7 +91,7 @@ class SessionTests(WebFixture):
     def test_file_changed_after_preview_cannot_be_confirmed(self):
         """验证预览后文件变化时拒绝确认。"""
         preview = self.session.validate(self.payload)
-        uploaded = Path(self.session.uploaded(self.payload["audio_upload_id"], "audio")["path"])
+        uploaded = Path(self.session.uploaded_audio(self.payload["audio_upload_id"])["path"])
         uploaded.write_bytes(uploaded.read_bytes() + b"changed")
         with self.assertRaises(ValidationError):
             self.session.confirm(preview["validation_id"])
@@ -166,7 +179,7 @@ class SessionTests(WebFixture):
     def test_reselection_invalidates_preview_and_replaces_only_own_copy(self):
         """验证重选使预览失效并替换当前会话副本。"""
         preview = self.session.validate(self.payload)
-        old_copy = Path(self.session.uploaded(self.payload["audio_upload_id"], "audio")["path"])
+        old_copy = Path(self.session.uploaded_audio(self.payload["audio_upload_id"])["path"])
         content = self.audio.read_bytes()
         self.session.upload("audio", "another.wav", io.BytesIO(content), len(content))
         self.assertFalse(old_copy.exists())

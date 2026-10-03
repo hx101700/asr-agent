@@ -8,34 +8,40 @@ participant D as 已安装Skill目录
 participant F as 同卷暂存目录
 U->>C: 提供新ZIP并要求更新已安装Skill
 C->>C: 核对已有任务／会话均已结束
+Note over C,Z: 仅使用本项目标准发行ZIP<br/>固定build_zip清单保证发行文件完整性<br/>更新检查不验证任意重新封装包能否运行
 Note over C,E: 使用当前入口的任务在main执行期间持有asr.py只读句柄<br/>Windows据此阻止安装目录被改名<br/>旧入口没有该保护，须由人工或宿主已有会话核对<br/>更新器不枚举所有进程；--tasks-finished记录调用者确认
 C->>T: 从安装目录之外的新ZIP解压目录执行<br/>python -I scripts/update_skill.py --zip ZIP<br/>--skill-dir 已安装目录 --tasks-finished
 T->>T: 核对Windows、已结束确认、Skill名称和入口<br/>更新脚本及ZIP均在目标安装目录之外
 T->>F: 在Skill父目录创建本次临时目录及candidate
 T->>Z: _extract_package()读取新包
-Z-->>T: 普通发行文件；核对路径、重复项与Skill标识
-T->>F: 写入candidate中的完整新资源
-T->>D: 比较requirements.txt与BL package-lock.json
-D-->>T: dependencies_changed
+Z-->>T: 普通发行文件；核对路径、重复项与读取CRC
+T->>F: 写入candidate资源，核对Skill名称及入口
+T->>F: 读取新requirements.txt与BL package-lock.json
+T->>D: 读取旧requirements.txt与BL package-lock.json
+T->>T: 两种锁全部读取完成后<br/>any(dependency_changes)得到dependencies_changed
 T->>D: skill_dir.rename(previous)
-alt 目录改名被占用句柄或权限阻止
-    D-->>T: PermissionError
-    T->>F: 清理本次暂存目录
-    T-->>C: 更新失败，原Skill保持原样
-else 原Skill已移入previous
+opt 第一次改名正常返回
     T->>F: candidate.rename(skill_dir)
-    alt 新目录成功就位
-        T->>F: 清理临时目录及previous
-        F-->>T: 清理成功，或留下retained_backup
-        T-->>C: updated、dependencies_changed、retained_backup
-    else 新目录就位失败
+end
+alt 两次改名均正常完成
+    T->>F: 清理临时目录及previous
+    F-->>T: 清理成功，或留下retained_backup
+    T-->>C: updated、dependencies_changed、retained_backup
+else 改名发生异常或中断，共用恢复边界
+    alt previous存在且安装位置空缺
         T->>F: previous.rename(skill_dir)恢复原Skill
         alt 回滚成功
             T->>F: 清理本次暂存内容
-            T-->>C: 更新失败，原Skill已恢复
+            T-->>C: 原Skill已恢复；返回原错误或中断
         else 回滚也失败
             T-->>C: 更新失败，报告保留的previous路径
         end
+    else previous存在且安装位置已有资源
+        Note over T,D: 不覆盖已接管安装位置的资源<br/>保留原副本供核对恢复
+        T-->>C: 报告更新未完成及previous路径
+    else previous不存在
+        T->>F: 清理本次暂存目录
+        T-->>C: 原Skill未被移走；返回原错误或中断
     end
 end
 Note over T,F: 暂存及目录改名在同卷完成，避免逐文件替换混用版本<br/>解包或依赖锁读取失败在改名之前清理暂存并停止<br/>清理失败可留下备份；不自动重新安装依赖

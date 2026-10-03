@@ -52,11 +52,10 @@ def output_directory(runtime: Runtime, value: object, field: str, approved: Path
 
 
 class UploadRecord(TypedDict):
-    """保存当前会话已完整接收文件的本机位置。"""
+    """保存当前会话已完整接收音频的本机位置。"""
 
     path: str
     name: str
-    kind: str
 
 
 class Draft(TypedDict):
@@ -92,13 +91,14 @@ class Session:
         """检查当前会话的配置编辑权限。"""
         self._require_open()
         if self.receipt:
-            raise ValidationError("本会话已保存配置，请新建任务。", "session")
+            raise ValidationError("设置已保存，请先点击“修改设置”返回表单。", "session")
 
     def _require_uploads_complete(self) -> None:
         """检查上传完成状态，报告仍在接收的文件类型。"""
         if self._pending_uploads:
             kind = next(iter(self._pending_uploads))
-            raise ValidationError("文件仍在添加，请稍候。", f"{kind}_upload_id")
+            field = "audio_upload_id" if kind == "audio" else "hotword_rows"
+            raise ValidationError("文件仍在添加，请稍候。", field)
 
     def select_directory(self, kind: object, picker_id: object) -> dict[str, object]:
         """打开原生目录窗口，校验并登记所选保存位置。"""
@@ -174,13 +174,14 @@ class Session:
                                "hotwords_count": MAX_HOTWORDS,
                                "context_chars": MAX_CONTEXT_CHARS, "speaker_min": MIN_SPEAKERS,
                                "speaker_max": MAX_SPEAKERS},
-                    "confirmed": self.receipt}
+                    "confirmed": self.receipt,
+                    "reopened": self._reopened[1] if self._reopened else None}
 
     def upload(self, kind: str, name: str, source: BinaryIO | BufferedIOBase, size: int) -> dict[str, object]:
-        """接收文件字节，保存会话副本并返回上传编号。"""
+        """接收音频副本或导入热词，返回页面所需数据。"""
         if kind not in ("audio", "hotwords"):
             raise ValidationError("不支持的文件用途。", "upload")
-        field = f"{kind}_upload_id"
+        field = "audio_upload_id" if kind == "audio" else "hotword_rows"
         suffixes = AUDIO_SUFFIXES if kind == "audio" else {".xlsx"}
         maximum = MAX_LOCAL_AUDIO_BYTES if kind == "audio" else MAX_XLSX_BYTES
         if (not name or len(name) > 255 or any(char in name for char in "/\\\0")
@@ -225,10 +226,9 @@ class Session:
                 partial.replace(destination)
                 # 新文件完整后再替换旧副本；失败也不会恢复已废弃的旧预览。
                 for old_id, old in list(self.uploads.items()):
-                    if old["kind"] == kind:
-                        Path(old["path"]).unlink(missing_ok=True)
-                        del self.uploads[old_id]
-                self.uploads[identifier] = {"path": str(destination), "name": name, "kind": kind}
+                    Path(old["path"]).unlink(missing_ok=True)
+                    del self.uploads[old_id]
+                self.uploads[identifier] = {"path": str(destination), "name": name}
                 published = True
             return {"ok": True, "upload_id": identifier, "name": name, "size_bytes": size}
         finally:
@@ -242,14 +242,11 @@ class Session:
                     if self._closed.is_set():
                         self._remove_empty_upload_directory()
 
-    def uploaded(self, identifier: object, kind: str) -> UploadRecord:
-        """按会话上传编号查找指定用途的已完成副本。"""
+    def uploaded_audio(self, identifier: object) -> UploadRecord:
+        """按会话上传编号查找已完成的音频副本。"""
         if not isinstance(identifier, str) or identifier not in self.uploads:
-            raise ValidationError("请选择音频文件。" if kind == "audio" else "请选择热词文件。", f"{kind}_upload_id")
-        record = self.uploads[identifier]
-        if record["kind"] != kind:
-            raise ValidationError("文件类型与所选用途不符。", f"{kind}_upload_id")
-        return record
+            raise ValidationError("请选择音频文件。", "audio_upload_id")
+        return self.uploads[identifier]
 
     def _remove_empty_upload_directory(self) -> None:
         """移除上传结束后的空会话目录。"""
@@ -304,7 +301,7 @@ class Session:
             if enhancement in ("context", "both"):
                 context = validate_context(payload.get("context"))
             # 先报告可直接修改的文本问题，再读取可能较大的录音。
-            source = self.uploaded(payload.get("audio_upload_id"), "audio")
+            source = self.uploaded_audio(payload.get("audio_upload_id"))
             audio = validate_audio(self.upload_directory, source["path"], diarization)
             audio["name"] = source["name"]
             warnings = [*audio["warnings"], *(hotwords["warnings"] if hotwords else [])]
@@ -356,7 +353,7 @@ class Session:
                 raise ValidationError("此页面没有可修改的已保存设置，请重新打开当前配置页。", "confirmation")
             config = self.draft["config"]
             form = self.draft["form"]
-            audio = self.uploaded(form.get("audio_upload_id"), "audio")
+            audio = self.uploaded_audio(form.get("audio_upload_id"))
             try:
                 # 与transcribe竞争同一个一次执行占用；先开始执行的任务保持原样。
                 execution = reserve_execution(self.runtime, config["job_id"])

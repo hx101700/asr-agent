@@ -17,6 +17,7 @@ export interface SessionDescription {
   model: string; region: string; limits: Limits; audio_suffixes: string[];
   languages: string[]; output_defaults: Record<DirectoryKind, string>;
   confirmed: Receipt | null;
+  reopened: ReopenResult | null;
 }
 export interface Configuration {
   auth_mode: "console" | "api_key"; audio_upload_id: string | null; diarization_enabled: boolean;
@@ -55,6 +56,7 @@ export interface Model {
 export interface ErrorDetail { row?: number; field?: string; message: string }
 export interface ErrorPayload { error?: string; ok?: boolean; field?: string; details?: ErrorDetail[] }
 export interface UploadResult { upload_id: string; name: string; size_bytes: number }
+export interface ReopenResult { ok: true; configuration: Configuration; audio: UploadResult }
 export type DirectoryResult = { cancelled: true } | { cancelled: false; path: string };
 export interface Endpoints {
   "/api/session": SessionDescription;
@@ -67,7 +69,7 @@ export interface Endpoints {
   "/api/cancel-directory": { ok: true };
   "/api/validate": ValidationResult;
   "/api/confirm": Receipt;
-  "/api/reopen": { ok: true; configuration: Configuration; audio: UploadResult };
+  "/api/reopen": ReopenResult;
 }
 export interface Api {
   request<K extends keyof Endpoints>(path: K, payload?: object, file?: File): Promise<Endpoints[K]>;

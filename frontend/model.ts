@@ -22,7 +22,7 @@ export function availability(model: Model) {
   const uploading = Object.values(model.uploads).some(upload => upload.status === "uploading");
   const pending = uploading || model.hotwords.checking || model.auth.status === "loading" || model.auth.status === "saving" || Boolean(model.picker);
   return {
-    editable, uploading,
+    editable,
     validate: editable && model.phase !== "validating" && !pending,
     confirm: model.phase === "review" && Boolean(model.preview) && !pending,
     chooseDirectory: editable && !model.picker,

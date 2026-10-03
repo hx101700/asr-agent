@@ -66,6 +66,17 @@ class ReconfigureTests(WebFixture):
         self.assertEqual(second["configuration"], self.form)
         self.assertEqual(job_status(self.runtime, self.receipt["job_id"])["status"], "STOPPED")
 
+    def test_page_reload_can_read_existing_reopen_snapshot(self):
+        """验证撤回响应丢失后刷新可读取原恢复快照，预览开始后即失效。"""
+        self.assertIsNone(self.session.description()["reopened"])
+        restored = self.session.reopen(self.receipt["job_id"])
+        with patch("asr_runtime.application.session.read_api_key", side_effect=AssertionError("description must not read credentials")):
+            description = self.session.description()
+        self.assertIsNone(description["confirmed"])
+        self.assertEqual(description["reopened"], restored)
+        self.session.validate(self.form)
+        self.assertIsNone(self.session.description()["reopened"])
+
     def test_new_preview_ends_the_previous_reopen_recovery(self):
         """验证开始新的预览后不再返回旧撤回数据。"""
         self.session.reopen(self.receipt["job_id"])

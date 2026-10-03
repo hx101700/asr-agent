@@ -130,7 +130,7 @@ class SessionConcurrencyTests(RuntimeTestCase):
                 audio.release.set()
                 hotwords.release.set()
             self.assertTrue(audio_upload.result(timeout=2)["ok"])
-        self.assertEqual({entry["kind"] for entry in self.session.uploads.values()}, {"audio"})
+        self.assertEqual([entry["name"] for entry in self.session.uploads.values()], ["replacement.wav"])
 
     def test_pending_upload_rejects_validation_and_confirmation(self):
         """验证上传进行中拒绝预览和确认。"""
@@ -177,10 +177,10 @@ class SessionConcurrencyTests(RuntimeTestCase):
     def test_failed_replacement_preserves_old_file_but_not_old_preview(self):
         """验证替换失败保留旧文件但使旧预览失效。"""
         preview = self.session.validate(self.payload)
-        original = self.session.uploaded(self.payload["audio_upload_id"], "audio").copy()
+        original = self.session.uploaded_audio(self.payload["audio_upload_id"]).copy()
         with self.assertRaisesRegex(ValidationError, "不完整"):
             self.session.upload("audio", "incomplete.wav", io.BytesIO(b"short"), 100)
-        self.assertEqual(self.session.uploaded(self.payload["audio_upload_id"], "audio"), original)
+        self.assertEqual(self.session.uploaded_audio(self.payload["audio_upload_id"]), original)
         self.assertEqual(Path(original["path"]).read_bytes(), self.audio)
         self.assertEqual(list(self.session.upload_directory.iterdir()), [Path(original["path"])])
         self.assertIsNone(self.session.draft)
@@ -191,7 +191,7 @@ class SessionConcurrencyTests(RuntimeTestCase):
     def test_publish_failure_removes_new_destination_and_keeps_original(self):
         """验证发布失败删除新文件并保留原副本。"""
         preview = self.session.validate(self.payload)
-        original = Path(self.session.uploaded(self.payload["audio_upload_id"], "audio")["path"])
+        original = Path(self.session.uploaded_audio(self.payload["audio_upload_id"])["path"])
         unlink = Path.unlink
 
         def refuse_original_delete(path, *args, **kwargs):

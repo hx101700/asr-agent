@@ -39,11 +39,11 @@
 - 用户填写网页或完成授权时，Codex保留持久进程并结束当前回复；网页提示保存后发送“继续”，收到后读取原会话回执。登录结果由BL回执/本地状态判断，不再问用户是否授权成功；不增加后台轮询、HTTP检测或任务状态。
 - 预览建立音频 SHA 基线并保存热词词典；确认复用快照，只核对音频 size/mtime。执行前核对音频完整摘要；后续不重读原 Excel。
 - 热词通过Excel导入或网页直接填写，导入保留行号及错误原值并清理临时文件。规则由`validate_hotword_rows`与`build_vocabulary`统一应用；前端使用Element Plus表格展示、编辑及标红，不另写一套业务校验。
-- 已保存且尚未执行的设置可通过`Session.reopen()`撤回。它与转写竞争同一个执行占用，成功后旧编号记为`STOPPED/LOCAL_CONFIG_REOPENED`，恢复表单、重新确认生成新编号。Codex按最新配置事件继续；已开始的任务保持原样。
+- 已保存且尚未执行的设置可通过`Session.reopen()`撤回。它与转写竞争同一个执行占用，成功后旧编号记为`STOPPED/LOCAL_CONFIG_REOPENED`，恢复表单、重新确认生成新编号。同一服务的`description().reopened`可恢复仍有效的撤回快照，后续未保存编辑不持久化。Codex按最新配置事件继续；已开始的任务保持原样。
 - 用户授权覆盖本次音频及增强内容后，使用 `transcribe --job ID --authorize-upload`。每个任务只允许一次执行尝试，失败或结果未知时停止，不自动重试或删除执行占用。
 - 原始 JSON 有效使用 `JSON_READY` 表达；三种成品完成要求 `delivery.status=COMPLETE` 且 `documents_ready=true`。状态与错误说明在 [errors.md](skills/asr-transcription/references/errors.md)。
 - 新识别在执行占用前核对当前固定模型；历史任务可本地查询和重导，文档模型标签从`config.model`传入writer，不从当前默认常量派生。模型切换不改写历史配置或摘要。
-- 重导读取确认配置、已保存成功记录及匹配的原始 JSON，在固定任务目录覆盖同名文档。各格式生成成功后替换目标，失败保留原目标及其他成功文件。手工修改先另存。
+- 重导读取确认配置、已保存成功记录及匹配的原始 JSON，在固定任务目录覆盖同名文档。文档和状态记录各次写入使用同目录独立临时文件，再替换固定目标；失败保留原目标及其他成功文件。手工修改先另存。
 - 文档保持原文和时间戳；排版规则及路径协议见 [DEVELOPMENT](doc/DEVELOPMENT.md)。内容检查与人工识别、Office 视觉验收分开记录。
 
 ## 开发与发布

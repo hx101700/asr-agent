@@ -1,41 +1,28 @@
 [中文](https://github.com/hx101700/memoflow/blob/v0.1.0/release/NOTES.md) | English
 
-MemoFlow is being built to turn recordings into meeting minutes that follow your preferred style and format, and improve from your confirmed edits. This v0.1.0 development preview delivers the first part: the `asr-transcription` Skill produces Word, Excel, and Markdown transcripts for you to review and correct.
+MemoFlow aims to turn recordings into meeting minutes that follow your preferred style and format. This v0.1.0 development preview delivers the first step: let Codex transcribe a recording and produce timestamped Word, Excel, and Markdown documents for you to review and correct.
 
 ### Features
 
-- Add one recording and adjust the audio language, speaker diarization, and save locations.
-- Switch between Chinese and English, and choose Light, Dark, or System appearance.
-- Enter hotwords in the editable table or import them from Excel, and optionally add context at the same time.
-- Use Console login or enter your API key on the page. Checking your settings saves the key to your workspace. The official BL CLI performs recognition.
-- Keep the original JSON and all three documents, with local re-export for existing tasks.
+- **Local configuration page**: Add one recording and choose the language, speaker diarization, and save locations. Chinese and English interfaces and light and dark themes are available.
+- **Recognition enhancement**: Enter hotwords in the table or import an Excel file and edit it directly. Errors appear on the affected rows; review duplicate terms and keep one entry. Hotwords and context can be used together.
+- **Model Studio recognition**: Qwen-Audio-3.1-ASR-Flash-Filetrans runs through the official BL CLI. Choose Console login or enter and save your own Beijing-region API key on the page.
+- **Document delivery**: Keep the original JSON and all three transcript formats. Successful tasks can be re-exported locally.
 
-During initial setup, the installer compares file download speeds from PyPI and the Aliyun mirror and starts with the faster source. pip attempts to recover interrupted downloads, then the installer switches sources if recovery fails. Complete downloads can be reused, and progress stays visible throughout setup.
+### Using the preview
 
-Tell Codex “Please transcribe a recording” to open the configuration page, then click “Choose an audio file” to add your recording. You can proceed as soon as the page opens, without waiting for extra browser checks. Save your settings, then follow the page's reminder to return to Codex and send “continue.”
+After saving your settings, return to Codex and send “continue.” You can return to editing before transcription starts. If the response to a withdrawal request is interrupted, refreshing the original page restores the confirmed settings still held by the same service. Later unsaved edits are not retained.
 
-You can now edit hotwords directly on the page. Excel imports preserve the original row numbers and cell contents. Invalid rows appear in red, with an explanation below the relevant cell. You can also add entries without an Excel file; the template download is in the table toolbar. If context exceeds the limit or contains a character that cannot be transmitted, the page explains the problem and keeps your text for correction.
-
-Duplicate hotwords now highlight every affected row, including the first occurrence and rows with invalid weights. Review them and keep one row, even when the weights match; the tool will not merge entries for you. Recognition now uses Qwen-Audio-3.1-ASR-Flash-Filetrans.
-
-If you notice a mistake after saving, select “Modify settings.” Before transcription starts, this restores your input so you can review and save it again. Tasks that have already entered execution remain unchanged.
-
-This update addresses a Windows login failure followed by duplicate authorization tabs on retry. Login now requests desktop execution permissions from the first attempt and opens the complete authorization URL once in your system default browser. After authorization, return to Codex and send “continue.”
-
-If a save location is missing or occupied by a file, the folder picker now opens from your working folder so you can choose another location. This update also simplifies data passed between the page and local service and removes unused compatibility code.
-
-The Skill now gives clearer guidance for new recordings, re-exporting existing tasks, and updating credentials. You can save a new API key on the page without adding a recording, with separate guidance for Console credential problems. Word export also handles longer recording filenames while keeping the complete title in the document.
-
-### Installation and file storage
-
-Install the Skill independently and keep recording tasks, credentials, and dependencies in your chosen workspace. Save locations stay outside the Skill's program directory, so you can manage the tools and transcript files separately.
-
-To update an existing installation, send the new ZIP to Codex and ask it to update the installed Skill. Finish running operations first. The updater replaces installation files together, preserves credentials, recordings, and results in the workspace, and restores the previous copy if replacement fails.
+This update fixes hotword pagination jumping after a deletion, overlapping error messages in narrow windows, temporary file collisions during local export, and recovery after an interrupted update. The page, Skill instructions, and developer diagrams have also been checked against the implementation.
 
 ### Get started
 
-Download [asr-transcription.zip](https://github.com/hx101700/memoflow/releases/download/v0.1.0/asr-transcription.zip), send it to Codex, and ask it to install the Skill and read its `SKILL.md`. Codex prepares the environment in the current task folder by default, opens the configuration page, then guides authentication for the method you choose.
+Create an Alibaba Cloud account and complete the platform's identity verification and Model Studio setup. Download [asr-transcription.zip](https://github.com/hx101700/memoflow/releases/download/v0.1.0/asr-transcription.zip) and send it to Codex with this request:
 
-Windows 10/11 x64, Python 3.12 x64, and Node.js 18.17+ with npm are required. Recognition uses `qwen-audio-3.1-asr-flash-filetrans` in Beijing and may incur charges. Personalized minutes, style preferences, and learning from feedback are planned for stage two.
+> Extract the ZIP, read its SKILL.md, and help me install and configure asr-transcription.
 
-See the [project README](https://github.com/hx101700/memoflow/blob/v0.1.0/README.en.md) for instructions. Report problems through [Issues](https://github.com/hx101700/memoflow/issues).
+Once installed, ask Codex to transcribe a recording, then add your file and settings on the page it opens. Existing users can send the new ZIP to Codex and ask it to update the Skill. Finish running operations first; the update replaces tool resources while preserving credentials, recordings, and results in the workspace.
+
+This preview supports Windows 10/11 x64 and requires Python 3.12 x64, Node.js 18.17+, and npm. Recognition uses the Beijing region and may incur charges. Personalized minutes and learning from feedback are planned for a later stage.
+
+See the [README](https://github.com/hx101700/memoflow/blob/v0.1.0/README.en.md) for instructions, or report a problem through [Issues](https://github.com/hx101700/memoflow/issues).

@@ -166,7 +166,7 @@ Python 安装、虚拟环境核对与依赖加载检查使用 `-I` 隔离模式�
 
 ## 生命周期与状态
 
-Session 短锁保护上传登记与发布，文件字节接收在锁外完成，同类上传不能并发。Excel导入完成或失败时清理其临时副本。目录窗口在独立子进程中运行，取消使用选择器自己的信号，没有用户选择总时限。正常服务退出清理未确认音频副本，保留已确认音频。关闭浏览器不等于关闭服务。
+Session 短锁保护上传登记与发布，文件字节接收在锁外完成，同类上传不能并发。HTTP上传仍区分audio和hotwords；只有音频登记到uploads，由`uploaded_audio(identifier)`查找。Excel导入完成或失败时清理其临时副本。目录窗口在独立子进程中运行，取消使用选择器自己的信号，没有用户选择总时限。正常服务退出清理未确认音频副本，保留已确认音频。关闭浏览器不等于关闭服务。
 
 目录选择与取消共享页面生成的`picker_id`。上次位置或默认位置不是可用目录时，窗口从当前工作目录打开，用户可重新选择保存位置。
 
@@ -174,7 +174,7 @@ Session 短锁保护上传登记与发布，文件字节接收在锁外完成，
 
 开启发言人区分且多声道时，用已确认 AudioInfo 调用 PyAV 生成单声道 FLAC。保留采样率，核对源文件变化及新副本的声道、采样率、时长与实际上传大小。转换失败停止，不自动更换编码或切片。
 
-任务独占创建 `execution` 目录后，取得一次执行占用。本地准备失败、识别失败或结果未知均保留占用；重复调用返回既有状态。这限制本地尝试次数，不是云端恰好一次保证。提交超时或本机进程结束均不能证明云端未受理或已取消。
+任务独占创建 `execution` 目录后，取得一次执行占用。本地准备失败、识别失败或结果未知均保留占用；显式授权、配置协议和当前模型检查通过后，重复调用返回既有状态。这限制本地尝试次数，不是云端恰好一次保证。提交超时或本机进程结束均不能证明云端未受理或已取消。
 
 | 状态或字段 | 含义 |
 | --- | --- |
@@ -191,11 +191,13 @@ Session 短锁保护上传登记与发布，文件字节接收在锁外完成，
 
 已保存的配置通过`Session.reopen(job_id)`返回编辑。该操作复用`reserve_execution()`，与终端转写原子竞争同一个`execution`目录；只有尚未执行的任务可以撤回。撤回写入`STOPPED`和`LOCAL_CONFIG_REOPENED`，旧编号不能再启动BL；表单从本次内存Draft恢复，重新预览与确认产生新编号。已开始执行或已有执行结果时拒绝覆盖。这里复用一次执行约束，未引入第二套锁或任务取消协议。
 
-撤回成功后保留最近一次恢复回执，避免HTTP响应中断使页面无法再次取回原输入。同一编号可重复读取该回执；新的文件导入、目录选择或预览会使其失效。该回执只存在于当前Session内，不提供跨服务的草稿恢复。
+撤回成功后保留最近一次恢复回执，避免HTTP响应中断使页面无法再次取回原输入。`Session.description()`返回`confirmed`和`reopened`（没有时为null）；页面启动优先恢复已保存回执，否则用`reopened`恢复撤回时的确认快照。启动与点击“修改设置”共用`restoreForm()`，刷新不再发送`POST /api/reopen`，按所选凭据方式重新读取Key。同一旧编号仍可重复取得撤回回执。
+
+撤回缓存只保存原确认快照，不跟踪恢复后的未保存编辑。开始新的文件导入、成功选择目录或开始预览会使缓存失效；服务结束后也不能恢复。配置保存回执中的`execution_started=false`只描述保存当时，后续不会随转写更新；保存成功页引导用户在Codex查看执行进度与结果。
 
 ## 文档交付
 
-results 解析原始 JSON 后，三个 writer 共享 Transcript。delivery将`config.model`作为必传元信息交给`publish_document`及三个writer，使新导出和历史重导都标注原任务真实模型。生成器不读取当前默认MODEL。delivery顺序尝试Excel、Word、Markdown各一次，单格式失败后仍尝试其余格式。各格式先写partial文件，成功后替换目标；失败保留该格式原目标。Excel、Word在替换前回读，Markdown编码保真由测试验证。
+results 解析原始 JSON 后，三个 writer 共享 Transcript。delivery将`config.model`作为必传元信息交给`publish_document`及三个writer，使新导出和历史重导都标注原任务真实模型。生成器不读取当前默认MODEL。delivery顺序尝试Excel、Word、Markdown各一次，单格式失败后仍尝试其余格式。各次发布使用同目录独立partial文件，成功后替换固定目标，结束时只清理自身临时文件；失败保留该格式原目标。状态JSON也使用同目录独立临时文件完成原子替换。Excel、Word在替换前回读，Markdown编码保真由测试验证。
 
 重新导出核对确认配置、磁盘 JSON_READY 和原始 JSON 摘要，复用相同 writer 与目标，不读取音频、原 Excel 或 Key，不调用 BL。每个任务只有一份 `delivery/status.json`，记录 EXPORTING、COMPLETE、PARTIAL 或 FAILED。手工校对的文档需另存，同一任务等待当前导出结束后再执行下一次。
 
@@ -243,7 +245,7 @@ npm run build:login
 npm run test:browser
 ```
 
-`build:web` 先执行类型检查再构建。`test:browser` 使用开发依赖 Playwright、本机 Edge 和真实 Python 本机服务；测试只使用合成数据，完成后清理自己的工作目录。Python 静态检查工具与配置也仅用于开发，具体命令见 [ACCEPTANCE](ACCEPTANCE.md)。
+`build:web` 先执行类型检查再构建。`test:browser` 使用开发依赖 Playwright、本机 Edge 和真实 Python 本机服务；默认使用合成数据，也可通过`MEMOFLOW_TEST_HOTWORDS`只读使用经授权的真实样表，并核对测试前后源文件摘要。测试完成后清理自己的工作目录。Python 静态检查工具与配置也仅用于开发，具体命令见 [ACCEPTANCE](ACCEPTANCE.md)。
 
 `build:login`用现有TypeScript编译器将`scripts/console-browser.cts`生成到Skill的`scripts/bailian/console-browser.cjs`。只有该运行产物进入ZIP；TypeScript开发源码保留在仓库。更新BL版本时重新核对上游浏览器能力与该适配，采用上游修复后删除适配。
 
@@ -253,7 +255,9 @@ npm run test:browser
 
 ### 更新已安装的 Skill
 
-同一Skill包含按需更新入口，具体操作只维护在[update.md](../skills/asr-transcription/references/update.md)。`scripts/update_skill.py`使用标准库，从新包解压目录运行，接收明确的ZIP与安装目录。它在安装目录同卷暂存资源，核对Skill名称及发行路径，再整体改名替换；失败回滚，回滚受阻则保留原副本并报告路径。用户工作目录不参与替换。
+同一Skill包含按需更新入口，具体操作只维护在[update.md](../skills/asr-transcription/references/update.md)。`scripts/update_skill.py`使用标准库，从新包解压目录运行，只接收本项目标准发行ZIP与明确的安装目录。它核对Skill名称、入口、归档路径和读取时的CRC，并完整读取新旧两种依赖锁后比较；这些检查不验证任意重新封装包能否运行，标准包的文件完整性由`build_zip.py`固定清单保证。
+
+资源在安装目录同卷暂存，两个改名步骤使用同一个异常与中断恢复边界：仅在原副本已移走且安装位置空缺时尝试恢复；安装位置已有资源时不覆盖。无法恢复时保留原副本并报告路径。用户工作目录不参与替换。
 
 `asr.py`在运行期间持有自身只读文件句柄，Windows据此拒绝父目录改名；不创建锁文件，不枚举系统进程。旧版入口没有保护，更新调用者必须核对原任务已结束，`--tasks-finished`表达这项核对而非强制终止。依赖锁变化由更新回执报告，再走已有bootstrap流程，按实际错误处理已有环境冲突。资源更新不热替换正在执行的代码，也不自动迁移任务协议。
 

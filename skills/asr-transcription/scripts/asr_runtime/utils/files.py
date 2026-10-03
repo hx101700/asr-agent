@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import tempfile
 from collections.abc import Collection, Mapping
 from pathlib import Path
 from .i18n import translate
@@ -65,10 +66,15 @@ def check_file_unchanged(path: Path, fingerprint: FileStat) -> None:
 
 def write_json_atomic(path: Path, payload: Mapping[str, object]) -> None:
     """写入JSON临时文件，再原子替换目标记录。"""
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    with temporary.open("w", encoding="utf-8") as stream:
-        json.dump(payload, stream, ensure_ascii=False, indent=2)
-        stream.write("\n")
-        stream.flush()
-        os.fsync(stream.fileno())
-    temporary.replace(path)
+    stream = tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
+                                         prefix=path.name + ".", suffix=".tmp", delete=False)
+    temporary = Path(stream.name)
+    try:
+        with stream:
+            json.dump(payload, stream, ensure_ascii=False, indent=2)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)

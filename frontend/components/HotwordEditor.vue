@@ -84,11 +84,6 @@ async function addRow(): Promise<void> {
 }
 
 watch(() => props.rows.length, () => { page.value = Math.min(page.value, Math.max(1, Math.ceil(props.rows.length / pageSize))); });
-watch(() => props.rows, () => { page.value = 1; });
-watch(() => props.validation.issues, issues => {
-  const index = props.rows.findIndex(row => issues.some(issue => issue.row === row.row));
-  if (index >= 0) page.value = Math.floor(index / pageSize) + 1;
-});
 defineExpose({ focusRow });
 </script>
 

@@ -2,6 +2,8 @@
 
 import hashlib
 import json
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
@@ -10,7 +12,8 @@ from openpyxl import load_workbook
 
 from asr_runtime import MODEL
 from asr_runtime.utils.job_files import read_delivery
-from asr_runtime.utils.documents import DocumentError
+from asr_runtime.utils.documents import DocumentError, write_xlsx
+from asr_runtime.utils.files import write_json_atomic
 from asr_runtime.utils.environment import SetupError
 from asr_runtime.utils.results import load_transcript
 from asr_runtime.utils.documents import timestamp
@@ -138,6 +141,82 @@ class DeliveryTests(RuntimeTestCase):
         self.assertEqual(read_delivery(self.root), second)
         self.cloud.assert_not_called()
 
+    def test_overlapping_exports_do_not_replace_each_others_temporary_files(self):
+        """验证两次导出交错时各自发布成功，不互删临时文档。"""
+        ready, release = threading.Event(), threading.Event()
+        lock = threading.Lock()
+        paths = []
+
+        def pause_first_xlsx(transcript, path, **metadata):
+            """首轮真实Excel生成后暂停，等待第二轮完成再发布。"""
+            with lock:
+                paths.append(path)
+                first = len(paths) == 1
+            write_xlsx(transcript, path, **metadata)
+            if first:
+                ready.set()
+                self.assertTrue(release.wait(5), "测试未释放首轮导出")
+
+        with patch("asr_runtime.application.delivery.write_xlsx", side_effect=pause_first_xlsx), \
+                ThreadPoolExecutor(max_workers=2) as pool:
+            first = pool.submit(export_job, self.runtime, self.job_id)
+            try:
+                self.assertTrue(ready.wait(5), "首轮Excel尚未生成")
+                second = pool.submit(export_job, self.runtime, self.job_id).result(timeout=5)
+            finally:
+                release.set()
+            first_report = first.result(timeout=5)
+        self.assertNotEqual(paths[0], paths[1])
+        for report in (first_report, second, job_status(self.runtime, self.job_id)):
+            self.assertEqual(report["delivery"]["status"], "COMPLETE")
+            self.assertTrue(report["documents_ready"])
+        destination = Path(self.config["document_directory"])
+        self.assertEqual({path.name for path in destination.iterdir()},
+                         {"transcription.xlsx", "transcription.docx", "transcription.md"})
+        self.cloud.assert_not_called()
+
+    def test_overlapping_records_keep_their_own_temporary_files(self):
+        """验证同一JSON目标的交错发布不删除另一调用的临时记录。"""
+        destination = self.root / "audit-record.json"
+        ready, release = threading.Event(), threading.Event()
+        lock = threading.Lock()
+        paths = []
+        replace = Path.replace
+
+        def pause_first_replace(path, target):
+            """暂停首轮记录替换，让第二轮先完成发布。"""
+            with lock:
+                paths.append(path)
+                first = len(paths) == 1
+            if first:
+                ready.set()
+                self.assertTrue(release.wait(5), "测试未释放首轮记录")
+            return replace(path, target)
+
+        with patch.object(Path, "replace", autospec=True, side_effect=pause_first_replace), \
+                ThreadPoolExecutor(max_workers=2) as pool:
+            first = pool.submit(write_json_atomic, destination, {"writer": "first"})
+            try:
+                self.assertTrue(ready.wait(5), "首轮记录尚未写入")
+                second = pool.submit(write_json_atomic, destination, {"writer": "second"})
+                second.result(timeout=5)
+            finally:
+                release.set()
+            first.result(timeout=5)
+        self.assertNotEqual(paths[0], paths[1])
+        self.assertEqual(json.loads(destination.read_text(encoding="utf-8")), {"writer": "first"})
+        self.assertFalse(list(self.root.glob("audit-record.json.*.tmp")))
+
+    def test_failed_record_replacement_preserves_target_and_cleans_its_temporary_file(self):
+        """验证记录替换失败保留原内容并移除本次临时记录。"""
+        destination = self.root / "audit-record.json"
+        destination.write_text('{"writer":"original"}', encoding="utf-8")
+        with patch.object(Path, "replace", side_effect=PermissionError("synthetic target locked")), \
+                self.assertRaises(PermissionError):
+            write_json_atomic(destination, {"writer": "new"})
+        self.assertEqual(json.loads(destination.read_text(encoding="utf-8")), {"writer": "original"})
+        self.assertFalse(list(self.root.glob("audit-record.json.*.tmp")))
+
     def test_failed_reexport_preserves_the_existing_document(self):
         """验证重导写入失败时保留已有成品并完成其他格式。"""
         first = export_job(self.runtime, self.job_id)["delivery"]
@@ -155,6 +234,7 @@ class DeliveryTests(RuntimeTestCase):
         self.assertEqual(document.read_bytes(), original)
         self.assertEqual(report["delivery"]["status"], "PARTIAL")
         self.assertEqual(report["delivery"]["files"]["docx"]["status"], "FAILED")
+        self.assertFalse(list(document.parent.glob("*.partial-*")))
         for extension in ("xlsx", "md"):
             self.assertEqual(report["delivery"]["files"][extension]["status"], "READY")
         self.assertEqual(job_status(self.runtime, self.job_id), report)

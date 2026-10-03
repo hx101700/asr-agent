@@ -60,7 +60,7 @@ def _extract_package(archive_path: Path, destination: Path) -> None:
 
 
 def update_skill(archive_path: Path, skill_dir: Path, *, tasks_finished: bool) -> UpdateReport:
-    """暂存新资源并整体替换 Skill，替换失败时恢复原目录。"""
+    """暂存资源并整体替换 Skill，报告结果与保留的备份。"""
     if os.name != "nt":
         raise ValueError("此更新入口适用于 Windows。")
     if not tasks_finished:
@@ -79,23 +79,26 @@ def update_skill(archive_path: Path, skill_dir: Path, *, tasks_finished: bool) -
         candidate.mkdir()
         _extract_package(archive_path, candidate)
         dependency_files = ("scripts/requirements.txt", "scripts/bailian/package-lock.json")
-        dependencies_changed = any(
+        # 两种锁都必须读取完成，不能因Python锁先变化而跳过BL锁的检查。
+        dependency_changes = [
             (candidate / name).read_bytes() != (skill_dir / name).read_bytes()
             for name in dependency_files
-        )
+        ]
+        dependencies_changed = any(dependency_changes)
         try:
             skill_dir.rename(previous)
         except PermissionError as exc:
             raise ValueError("Skill 正被任务使用，或安装目录没有修改权限；原资源已保留。请结束相关任务或检查目录权限后再更新。") from exc
-        try:
-            candidate.rename(skill_dir)
-        except OSError:
-            previous.rename(skill_dir)
-            raise
+        candidate.rename(skill_dir)
     except BaseException:
-        # 回滚失败时保留原目录副本，供操作者恢复；其余情况只清理本次暂存内容。
+        # 两次改名及其中断共用恢复边界；安装位置已被接管时不覆盖现有资源。
+        if previous.exists() and not skill_dir.exists():
+            try:
+                previous.rename(skill_dir)
+            except BaseException:
+                raise RuntimeError(f"更新未完成，原 Skill 保留在：{previous}") from None
         if previous.exists():
-            raise RuntimeError(f"更新未完成，原 Skill 保留在：{previous}") from None
+            raise RuntimeError(f"更新未完成，安装位置已有资源，未覆盖该目录；原 Skill 保留在：{previous}") from None
         shutil.rmtree(temporary)
         raise
 

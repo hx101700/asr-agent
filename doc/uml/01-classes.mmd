@@ -19,12 +19,13 @@ class Session {
   +dict~str,Path~ output_directories
   +Draft_or_None draft
   +ConfirmationReceipt_or_None receipt
+  -tuple_or_None _reopened
   -Lock _state_lock
   -DirectoryPicker _picker
   -Event _closed
   -set _pending_uploads
   +upload(kind, name, source, size) dict
-  +uploaded(identifier, kind) dict
+  +uploaded_audio(identifier) UploadRecord
   +check_hotwords(rows) dict
   +validate(payload) dict
   +confirm(validation_id) dict
@@ -58,6 +59,6 @@ Session "1" *-- "1" DirectoryPicker : 会话创建并关闭
 ThreadingHTTPServer <|-- LocalServer
 LocalServer "1" *-- "1" Session : 持有会话并在关闭时清理
 note for Runtime "scripts/asr_runtime/utils/environment.py<br/>resource读取Skill；path定位工作目录/.asr-transcription<br/>运行目录与Skill互不包含；check_output_path保护Skill<br/>output_root为工作目录/transcriptions"
-note for Session "scripts/asr_runtime/application/session.py<br/>文件字节接收在锁外，uploads登记音频副本<br/>Excel导入返回可编辑行后清理临时副本<br/>Draft保留配置和表单；reopen恢复同会话的表单<br/>Key通过独立方法写入当前工作目录"
+note for Session "scripts/asr_runtime/application/session.py<br/>HTTP上传区分audio／hotwords，uploads只登记音频<br/>uploaded_audio读取仅含path和name的UploadRecord<br/>Excel导入返回可编辑行后清理临时副本<br/>Draft保留确认表单，_reopened保留最近撤回快照<br/>description返回confirmed与reopened，供页面刷新恢复<br/>Key通过独立方法写入当前工作目录"
 note for DirectoryPicker "scripts/asr_runtime/utils/directory_picker.py<br/>choose_directory函数管理窗口子进程<br/>独立取消信号；Session登记所选精确路径"
 note for LocalServer "scripts/asr_runtime/web.py<br/>create_server创建对象并绑定127.0.0.1<br/>请求处理器使用language_scope隔离提示语言"

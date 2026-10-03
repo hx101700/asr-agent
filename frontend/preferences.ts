@@ -38,5 +38,5 @@ export function usePreferences() {
     document.title = t("title");
     try { window.localStorage.setItem("asr-ui-preferences", JSON.stringify({ language: language.value, theme: theme.value })); } catch { /* 当前页面继续使用所选偏好。 */ }
   }, { immediate: true });
-  return { language, theme, dark, t };
+  return { language, theme, t };
 }

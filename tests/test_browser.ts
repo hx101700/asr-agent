@@ -129,6 +129,9 @@ test("Edge页面完成双语、词表编辑、上下文校验、凭据保存及�
     await page.getByRole('button', { name: 'Check hotwords', exact: true }).click();
     await page.getByText('Checked: 61 hotwords', { exact: true }).waitFor();
     const validColor = await page.locator('#hotword-62-text').evaluate(element => getComputedStyle(element.closest('tr')!).backgroundColor);
+    await page.getByRole('button', { name: 'Delete row 62', exact: true }).click();
+    await page.locator('#hotword-52-text').waitFor();
+    assert.equal(await page.locator('#hotword-2-text').count(), 0);
     await page.locator('#hotword_rows input[type=file]').setInputFiles(externalWords ?? path.join(root, 'fixtures/invalid-rows.xlsx'));
     const duplicateRows = externalWords ? [2, 3, 4, 5] : [2, 4];
     for (const row of duplicateRows) {
@@ -178,17 +181,25 @@ test("Edge页面完成双语、词表编辑、上下文校验、凭据保存及�
     await page.getByText(`Checked: ${hotwordCount}`, { exact: true }).waitFor();
     assert.equal(await page.locator('.hotword-error-row').count(), 0);
     await page.locator('#context-text').fill('😀'.repeat(401));
+    await page.setViewportSize({ width: 390, height: 844 });
     const checksBeforeContext = requests.filter(request => request.path === '/api/validate').length;
     await page.getByRole('button', { name: 'Check and preview', exact: true }).click();
     await page.locator('#context .el-form-item__error').waitFor();
     assert.match(await page.locator('#context .el-form-item__error').innerText(), /401 characters, 1 over the 400-character limit/);
     assert.equal(await page.locator('#context-text').inputValue(), '😀'.repeat(401));
     assert.equal(await page.locator('#context-text').evaluate(element => document.activeElement === element), true);
+    await page.locator('#context').screenshot({ path: path.join(screenshots, 'context-mobile-error.png'), animations: 'disabled' });
+    assert.equal(await page.locator('#context').evaluate(element => {
+      const error = element.querySelector('.el-form-item__error')!.getBoundingClientRect();
+      const footer = element.querySelector('.textarea-footer')!.getBoundingClientRect();
+      return error.bottom <= footer.top;
+    }), true);
     await page.locator('#context-text').fill(' \n\t');
     await page.getByRole('button', { name: 'Check and preview', exact: true }).click();
     assert.match(await page.locator('#context .el-form-item__error').innerText(), /only whitespace \(3 characters\)/);
     assert.equal(await page.locator('#context-text').inputValue(), ' \n\t');
     assert.equal(requests.filter(request => request.path === '/api/validate').length, checksBeforeContext);
+    await page.setViewportSize({ width: 1440, height: 1050 });
     await page.locator('#context-text').fill(input);
     await page.getByRole('button', { name: 'Check and preview', exact: true }).click();
     await page.getByRole('button', { name: 'Save settings', exact: true }).waitFor();
@@ -216,6 +227,8 @@ test("Edge页面完成双语、词表编辑、上下文校验、凭据保存及�
     await page.getByRole('button', { name: 'Check and preview', exact: true }).click();
     await page.getByRole('button', { name: 'Save settings', exact: true }).click();
     await page.locator('#receipt').waitFor();
+    await page.getByText('Follow the next steps and progress in Codex.', { exact: true }).waitFor();
+    assert.equal(await page.getByText('Your audio has not been sent to Alibaba Cloud.', { exact: true }).count(), 0);
     assert.equal(await page.locator('#api-key-value').count(), 0);
     const files = await fs.readdir(path.join(root, '.asr-transcription/.state/jobs'));
     assert.equal(files.length, 1);
@@ -281,12 +294,30 @@ test("Edge页面完成双语、词表编辑、上下文校验、凭据保存及�
     const rebuilt = JSON.parse(await fs.readFile(path.join(root, '.asr-transcription/.state/jobs', newId, 'config.json'), 'utf8'));
     assert.deepEqual(rebuilt.enhancement.hotwords.vocabulary, { TypedTerm: 5 });
     assert.equal(rebuilt.enhancement.context, input);
+    await page.route(origin + '/api/reopen', async route => {
+      const response = await route.fetch();
+      assert.equal(response.status(), 200);
+      await route.fulfill({ status: 502, contentType: 'application/json',
+        body: JSON.stringify({ ok: false, error: 'Synthetic interrupted response before refresh.' }) });
+    }, { times: 1 });
+    await page.getByRole('button', { name: 'Modify settings', exact: true }).click();
+    await page.getByText('Synthetic interrupted response before refresh.', { exact: true }).waitFor();
+    const reopensBeforeRefresh = requests.filter(request => request.path === '/api/reopen').length;
+    await page.reload();
+    await page.locator('#context-text').waitFor();
+    assert.equal(await page.locator('#context-text').inputValue(), input);
+    assert.equal(await page.locator('#hotword-1-text').inputValue(), 'TypedTerm');
+    assert.equal(await page.locator('#hotword-1-weight').inputValue(), '5');
+    await page.locator('#audio_upload_id').getByText('Added', { exact: true }).waitFor();
+    await page.waitForFunction(() => (document.getElementById('api-key-value') as HTMLInputElement)?.value === 'fixture-ui-key-not-real');
+    assert.equal(await page.locator('#receipt').count(), 0);
+    assert.equal(requests.filter(request => request.path === '/api/reopen').length, reopensBeforeRefresh);
     const storage = await page.evaluate(() => ({ ...localStorage }));
     assert.deepEqual(Object.keys(storage), ['asr-ui-preferences']);
     assert.equal(JSON.stringify(storage).includes('fixture-ui-key-not-real'), false);
     assert.ok(requests.every(request => request.origin === origin));
     assert.equal(requests.filter(request => request.path === '/api/save-api-key').length, 2);
-    assert.deepEqual(gatewayFailures, ['/api/reopen']);
+    assert.deepEqual(gatewayFailures, ['/api/reopen', '/api/reopen']);
     const actualErrors = errors.filter(message => !message.includes('status of 422') && !message.includes('status of 502'));
     assert.deepEqual(actualErrors, []);
     await context.close();

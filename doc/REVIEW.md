@@ -1,6 +1,6 @@
 # 代码审查
 
-日期：2026-10-04。下表保留当前版本的整体源码审查范围；本轮重新核对用户给出的官方词表规则与实际IPO样表，并追踪固定模型切换对提交、历史配置读取和三格式文档标签的影响。实际结果见[ACCEPTANCE](ACCEPTANCE.md)，历史修正通过Git追溯。
+日期：2026-10-04。本轮重新从入口到具体实现阅读全文，并分别检查前端交互、后端记录和文件操作、安装更新、Skill指令及UML。用独立复现确认问题后修改，再运行回归；没有把已有检测脚本的通过当作源码审查。实际结果见[ACCEPTANCE](ACCEPTANCE.md)，历史修正通过Git追溯。
 
 ## 阅读覆盖
 
@@ -8,12 +8,12 @@ Python 代码路径相对于 `skills/asr-transcription/`；前端与开发配置
 
 | 范围 | 完整阅读的文件 |
 | --- | --- |
-| 入口与共享定义 | scripts/asr.py；scripts/asr_runtime下的__init__.py、__main__.py、models.py、error_catalog.json |
+| 入口与共享定义 | scripts/asr.py、update_skill.py；scripts/asr_runtime下的__init__.py、__main__.py、models.py、error_catalog.json |
 | 应用用例 | application下的__init__、bootstrap、diagnostics、inputs、rules、session、transcription、delivery |
 | 本机能力 | utils下的__init__、environment、installation、auth、bailian、files、job_files、results、media、hotwords、documents、directory_picker、_directory_dialog、i18n |
-| 网页 | web.py；frontend下的App.vue、main.ts、useTranscription.ts、model.ts、api.ts、types.ts、preferences.ts、i18n.ts、style.css、index.html，以及UploadField、KeyDisplay、ReviewPanel组件 |
+| 网页 | web.py；frontend下的App.vue、main.ts、useTranscription.ts、model.ts、api.ts、types.ts、preferences.ts、i18n.ts、style.css、index.html，以及UploadField、KeyDisplay、ReviewPanel、HotwordEditor组件 |
 | 技能与依赖 | SKILL.md、agents/openai.yaml、assets/env.example、references全部；scripts/requirements.txt、bailian/package.json和package-lock.json全部锁项 |
-| 开发与交付 | scripts/build_zip.py、probe_bl.py；前端package/lock、vite/tsconfig配置和Python静态检查配置；README/AGENTS双语、doc文档、UML源稿与图、Release说明；运行、权限、媒体、文档、HTTP、前端和打包相关测试 |
+| 开发与交付 | scripts/build_zip.py、probe_bl.py、console-browser.cts及其构建产物；前端package/lock、vite/tsconfig配置和Python静态检查配置；README/AGENTS双语、doc文档、全部11份UML源稿与图、Release说明；相关运行、权限、媒体、文档、HTTP、更新、前端和打包测试 |
 
 第三方BL及Python依赖按锁定版本使用。本审查核对其公开接口、安装边界和实际调用，不把对项目源码的审查称为第三方全部代码审计。
 
@@ -21,13 +21,18 @@ Python 代码路径相对于 `skills/asr-transcription/`；前端与开发配置
 
 | 位置 | 问题与处理 |
 | --- | --- |
-| `rules.build_vocabulary` | 旧逻辑跳过非法权重行的重复检查，首行也未被标为重复；相同权重会自动合并。按用户要求先登记全部文本行，再为整组重复生成错误，权重问题另行保留 |
-| 规则来源 | 用户所给SDK文档未禁止IPO这样的英文缩写；prefix的小写/数字限制不属于text。重复必须用户处理是本地产品要求，不声称已验证云端重复词错误 |
-| `__init__.MODEL` / BL合约 | 新识别采用3.1，现有BL2.1真实本机请求保留新model、热词及上下文；最小配置仍有parameters对象，无需新增API调用实现 |
-| `job_files.read_config` / `transcription.transcribe` | 将当前模型限制放在新识别入口，读取持久记录保留真实model；不同模型的待执行配置在占用前明确拒绝，不改写原配置与摘要 |
-| `documents` / `delivery` | 原writer读取全局MODEL，会在模型更新后给历史重导贴上新标签。改为必传config.model，三格式保持来源模型；用合成旧模型成功JSON验证 |
+| `documents.publish_document` / `files.write_json_atomic` | 固定临时文件名会让同时导出或写记录的两个调用互相覆盖，出现文件已生成但回执失败。改用同目录的独立临时文件，仍替换固定目标并清理自身临时文件；没有增加导出锁或队列 |
+| `Session.description` / `useTranscription.restoreForm` | 撤回已完成但HTTP响应中断后，刷新会丢失恢复入口。现有会话缓存通过GET返回，页面启动和点击修改共用恢复函数；不重复撤回，也不持久化未保存编辑 |
+| `App.vue` / `i18n.ts` | 多行上下文错误在窄窗口与提示文字重叠；保存页还会在转写开始后静态声称音频未上传。使用Element Plus原生inline-message布局，保存页改为引导到Codex查看进度 |
+| `HotwordEditor.vue` | 删除第二页的行会因数组变化退回第一页。删除无条件重置的监听，只在页数缩小时限制当前页；校验失败仍主动定位错误行 |
+| `update_skill.update_skill` | 两次目录改名之间的KeyboardInterrupt未进入旧回滚分支，可能留下空安装位置。统一异常和中断恢复边界，仅安装位置空缺时恢复旧副本；已接管或恢复受阻时保留原副本并说明路径 |
+| 更新器依赖比较 | any生成器在Python锁变化时提前返回，漏读缺少的BL锁。先完整读取两种依赖锁，再归并变化结果；缺失时在替换前报错 |
+| 旧接口与无调用者字段 | 音频登记仍带通用kind、上传查找仍允许热词、错误字段仍使用hotwords_upload_id；前端还保留全局行级错误列表及无消费者的返回字段。改为uploaded_audio和hotword_rows，删除这些旧分支与重复展示 |
+| 文档与UML | 纠正关闭浏览器等同结束服务、保存回执等同实时状态、重复调用无条件返回旧状态、浏览器测试只能用合成数据，以及更新检查保证任意ZIP完整可用等不准确说明；同步受影响的四张图 |
 
-校验继续共用现有函数，错误沿既有表格协议呈现；没有添加语义词典、旧模型白名单、自动配置迁移或另一套云端客户端。历史结果的模型标签是显式元信息，与新识别的固定模型约束分别放在对应消费者处。
+改动沿用既有会话、执行占用、原子文件替换和Element Plus组件。没有新增依赖、云端调用层、后台轮询、任务状态或兼容分支。旧热词接口的删除由实际消费者范围确定；历史任务保留真实模型标签仍是必要的数据含义。
+
+标准发行ZIP由固定清单构建并逐文件核对。更新器只核对名称、入口、路径、CRC及依赖锁；将标准包重新封装并删除其它运行模块时，更新器可能接受但安装后无法运行。该范围明确为不支持的输入，没有为每个模块追加一次性检查或另建包验证框架。
 
 ## 职责判断
 
@@ -76,7 +81,9 @@ Vue 组件负责呈现和浏览器操作，useTranscription编排页面用例，
 
 ## Skill 指令审查
 
-本轮核对[Agent Skills格式规范](https://agentskills.io/specification)、[OpenAI Skill文档](https://learn.chatgpt.com/docs/build-skills)和[指令写作建议](https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra)。当前结构符合必需的SKILL.md及name/description格式，scripts、references、assets按用途组织；agents/openai.yaml是OpenAI支持的可选展示元数据，隐式调用保持默认开启。
+本轮按本机skill-creator指导核对指令与实现，并读取当前[OpenAI Skill文档](https://learn.chatgpt.com/docs/build-skills)及[脚本使用建议](https://developers.openai.com/plugins/build/skills)。当前结构包含必需的SKILL.md及name/description，scripts、references、assets按用途组织；agents/openai.yaml是可选展示元数据，隐式调用保持默认开启。
+
+格式符合要求与分发方式分别判断：当前官方推荐用[Plugin](https://developers.openai.com/plugins/build/plugins)分发可复用Skill。Codex自动发现本地Skill变化不等于从远端自动下载新版，也不代表运行进程热更新。本机官方skill-installer的`_copy_skill`在目标存在时拒绝安装，没有覆盖更新参数。项目的update_skill.py服务于用户明确要求的ZIP更新和活动任务保护，是本项目工具而非OpenAI标准机制；本轮保持既定ZIP范围，未引入Plugin或另一套包管理。
 
 参考方向限定为带本机脚本或外部CLI的任务型Skill：
 

@@ -4,6 +4,7 @@ import html
 import math
 import re
 import string
+import tempfile
 import unicodedata
 from datetime import timedelta
 from pathlib import Path
@@ -57,10 +58,16 @@ def timestamp(milliseconds: int) -> str:
 def publish_document(writer: DocumentWriter, transcript: Transcript, final_path: Path, *,
                      source_name: str, job_id: str, model: str) -> int:
     """先生成临时文件，再替换同名成品并返回文件大小。"""
-    temporary = final_path.with_name("transcription.partial" + final_path.suffix)
-    writer(transcript, temporary, source_name=source_name, job_id=job_id, model=model)
-    temporary.replace(final_path)
-    return final_path.stat().st_size
+    with tempfile.NamedTemporaryFile(dir=final_path.parent, prefix=final_path.stem + ".partial-",
+                                      suffix=final_path.suffix, delete=False) as stream:
+        temporary = Path(stream.name)
+    # Windows需先关闭临时句柄；每次发布只写入和清理自己创建的文件。
+    try:
+        writer(transcript, temporary, source_name=source_name, job_id=job_id, model=model)
+        temporary.replace(final_path)
+        return final_path.stat().st_size
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def _title(source_name: str) -> str:

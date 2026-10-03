@@ -9,7 +9,7 @@ import type { Api, Configuration, Endpoints, Language, Limits, Model, Receipt, S
 const limits: Limits = { audio_bytes: 2_000_000_000, hotwords_bytes: 5_000_000, upload_bytes: 1_000_000_000,
   audio_seconds: 43200, hotwords_count: 2000, context_chars: 400, speaker_min: 2, speaker_max: 100 };
 const description: SessionDescription = { model: "fixed-model", region: "cn-beijing", limits,
-  audio_suffixes: [".wav"], languages: ["zh"], output_defaults: { json: "D:/example", document: "D:/example" }, confirmed: null };
+  audio_suffixes: [".wav"], languages: ["zh"], output_defaults: { json: "D:/example", document: "D:/example" }, confirmed: null, reopened: null };
 const audio = new File(["synthetic audio"], "sample.wav");
 const words = new File(["synthetic spreadsheet"], "words.xlsx");
 const hotwordRows = [{ row: 2, text: "术语", weight: 4 }];
@@ -626,6 +626,18 @@ test("词表检查期间阻止重复检查和覆盖输入，不冻结其他设�
   assert.equal(availability(page.model).editHotwords, true);
 });
 
+test("用户主动检查词表时定位问题区域，普通行修改只作废预览", async () => {
+  const page = harness({ "/api/validate-hotwords": () => ({ issues: [{ row: 1, field: "weight", message: "请修改权重。" }], warnings: [], count: 0 }) });
+  await page.actions.start();
+  page.actions.addHotword();
+  page.actions.changeHotword(1, "text", "Term");
+  page.actions.changeHotword(1, "weight", "9");
+  assert.equal(page.view.focus, "");
+  await page.actions.checkHotwords();
+  assert.equal(page.view.focus, "hotword_rows");
+  assert.equal(page.model.hotwords.issues[0].row, 1);
+});
+
 test("保存成功清空显示凭据，刷新只恢复回执", async () => {
   const page = harness();
   await preview(page);
@@ -664,6 +676,23 @@ test("刷新后的保存页可撤回未执行任务并恢复完整输入，重�
   await page.actions.confirm();
   assert.equal((page.model as Model).receipt?.job_id, "new-job");
   assert.deepEqual(page.calls.filter(call => call.path === "/api/reopen").map(call => call.payload), [{ job_id: "job" }]);
+});
+
+test("刷新直接恢复服务端已撤回的表单，仅重新读取Key而不再次撤回任务", async () => {
+  const config: Configuration = { auth_mode: "api_key", audio_upload_id: "kept-audio", diarization_enabled: false,
+    enhancement_mode: "both", hotword_rows: [{ row: 11, text: "OriginalTerm", weight: "5" }], context: " Keep the original reference.\n",
+    language_hint: "en", speaker_count: null, json_directory: "D:/approved-json", document_directory: "D:/approved-documents" };
+  const page = harness({ "/api/session": () => ({ ...description, reopened: { ok: true, configuration: config,
+    audio: { upload_id: "kept-audio", name: "original.wav", size_bytes: 123 } } }),
+    "/api/api-key": () => ({ value: "fixture-restored-key" }) });
+  await page.actions.start();
+  assert.equal(page.model.phase, "editing");
+  assert.equal(page.model.receipt, null);
+  assert.deepEqual(configuration(page.model, page.form, limits, page.t), config);
+  assert.equal(page.view.apiKey, "fixture-restored-key");
+  assert.equal(page.view.focus, "config-fields");
+  assert.deepEqual(page.calls.map(call => call.path), ["/api/session", "/api/api-key"]);
+  assert.equal(JSON.stringify(page.model).includes("fixture-restored-key"), false);
 });
 
 test("撤回请求等待中不会重复提交，执行中任务被拒绝时保留原回执", async () => {
