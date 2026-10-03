@@ -12,7 +12,7 @@ MemoFlow 是整个产品，目标是从语音输入生成符合用户习惯、�
 | `asr-transcription` | Codex 使用的录音转写 Skill，位于 `skills/asr-transcription/` |
 | `asr_runtime` | Skill 内部的 Python 执行包，位于 `scripts/asr_runtime/`，由 `scripts/asr.py` 调用 |
 
-第一阶段将单个本地录音转为原始 JSON、Excel、Word、Markdown，交给用户检查。模型固定为 `qwen-audio-3.0-asr-flash-filetrans`，北京地域，通过 BL 的临时 OSS 上传。
+第一阶段将单个本地录音转为原始 JSON、Excel、Word、Markdown，交给用户检查。模型固定为 `qwen-audio-3.1-asr-flash-filetrans`，北京地域，通过 BL 的临时 OSS 上传。
 
 Codex 读取 Skill，选择工作目录、执行工具并解释回执。网页接收本机文件、编辑选项并保存配置。BL 负责鉴权、上传、提交、轮询、下载和原始 JSON 落盘。Python 负责本机文件、媒体处理、结果解析与文档生成。
 
@@ -112,6 +112,8 @@ Python 的 TypedDict 描述已有 JSON 字段和允许的状态，数据在运�
 
 `validate_hotword_rows`只核对JSON行协议，`build_vocabulary`统一处理词条规则；导入、“检查词表”和最终预览共用这条路径。表格每页50行，错误可定位到原行号。JSON请求上限512KiB用于容纳2000条词语及行号等编辑字段，这是本机传输限制。上下文按400个Unicode字符及可传输字符检查，保留原文并指出长度或字符位置；内容与录音是否相关没有可靠的本机语义判定。
 
+词条重复检测在权重校验之前登记全部文本行，结束时为整组重复行生成text错误；同一行可同时带有weight错误。程序按原文精确比较，所有重复都要求用户保留一行，不输出合并后的词典作为成功结果。该规则属于明确的产品输入约束，官方text、weight、prefix规则及依据分别记录在model.md。
+
 页面使用Element Plus组件及其默认蓝色强调色，搭配灰白黑页面背景。优先使用组件公开参数和插槽：卡片用`ElCard`，摘要用`ElDescriptions`，保存结果用`ElResult`，说明折叠用`ElCollapse`，核对区滚动用`ElScrollbar`。图标直接使用`@element-plus/icons-vue`，精度增强用靶心、Excel导入用上传、词表用书本。
 
 `style.css`负责页面布局、响应式适配和少量主题配置：区分控件与卡片底色，将警告映射为红色，标记需要修正的字段。悬停、聚焦、禁用等交互沿用Element Plus默认行为。调整第三方组件前先确认公开参数是否满足具体需求，避免维护重复的组件外观或行为。
@@ -193,9 +195,11 @@ Session 短锁保护上传登记与发布，文件字节接收在锁外完成，
 
 ## 文档交付
 
-results 解析原始 JSON 后，三个 writer 共享 Transcript。delivery 顺序尝试 Excel、Word、Markdown 各一次，单格式失败后仍尝试其余格式。各格式先写 partial 文件，成功后替换目标；失败保留该格式原目标。Excel、Word 在替换前回读，Markdown 编码保真由测试验证。
+results 解析原始 JSON 后，三个 writer 共享 Transcript。delivery将`config.model`作为必传元信息交给`publish_document`及三个writer，使新导出和历史重导都标注原任务真实模型。生成器不读取当前默认MODEL。delivery顺序尝试Excel、Word、Markdown各一次，单格式失败后仍尝试其余格式。各格式先写partial文件，成功后替换目标；失败保留该格式原目标。Excel、Word在替换前回读，Markdown编码保真由测试验证。
 
 重新导出核对确认配置、磁盘 JSON_READY 和原始 JSON 摘要，复用相同 writer 与目标，不读取音频、原 Excel 或 Key，不调用 BL。每个任务只有一份 `delivery/status.json`，记录 EXPORTING、COMPLETE、PARTIAL 或 FAILED。手工校对的文档需另存，同一任务等待当前导出结束后再执行下一次。
+
+`read_config`核对持久化协议与非空模型名称，保留模型来源；`transcribe`在创建执行占用前要求配置模型等于当前固定模型。模型更新后，旧配置的状态查看和成功结果重导仍可用；重新识别须在当前版本另行确认设置。该边界由数据协议和执行入口表达，不维护旧版本白名单，不补写配置摘要。
 
 - 三格式标题：`源文件名（不含扩展名） 录音转写`，不另列“音频”信息行。
 - Excel：等线、黑白无填充色；标题和任务说明左对齐，第三行直接表头；表头及非正文列居中，正文左对齐且自动换行；保留筛选、冻结，真实存储限制不截断。

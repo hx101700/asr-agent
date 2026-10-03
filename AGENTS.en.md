@@ -7,7 +7,7 @@ These instructions govern the source repository. To resume work, read [doc/READM
 ## Product scope
 
 - Stage one delivers one standalone Codex Skill: configure one recording through a local page, let Codex call BL, and save original JSON, Excel, Word, and Markdown for the user to review.
-- Use `qwen-audio-3.0-asr-flash-filetrans`, China (Beijing), and temporary OSS. Hotwords and context can coexist. Speaker diarization is enabled by default; multichannel input gets a notice before a mono FLAC copy is generated. Preserve the source.
+- Use `qwen-audio-3.1-asr-flash-filetrans`, China (Beijing), and temporary OSS. Hotwords and context can coexist. Speaker diarization is enabled by default; multichannel input gets a notice before a mono FLAC copy is generated. Preserve the source.
 - The final product turns voice input into meeting minutes that follow the user's preferences and requested format, and keeps learning from their examples and confirmed edits. Stage one delivers transcripts for review; stage two will add personalized minutes and feedback-based learning. Stage two is not implemented yet.
 - Support Windows 10/11 x64, CPython 3.12 x64 with venv, ensurepip, and tkinter, and Node.js 18.17+ with npm. Dependency locks target this platform. Setup requires internet access.
 
@@ -42,6 +42,7 @@ These instructions govern the source repository. To resume work, read [doc/READM
 - `Session.reopen()` withdraws saved settings before execution starts. It competes with transcription for the same execution reservation, records the old task as `STOPPED/LOCAL_CONFIG_REOPENED`, and restores the form. Saving again creates a new task ID. Codex follows the latest configuration event; tasks already in execution remain unchanged.
 - After authorization covers the recording and enhancement content, use `transcribe --job ID --authorize-upload`. Each task permits one execution attempt. Stop on failure or an unknown result; do not retry automatically or remove the execution reservation.
 - `JSON_READY` means valid original JSON. Completion of all three documents requires `delivery.status=COMPLETE` and `documents_ready=true`. State and error semantics are in [errors.md](skills/asr-transcription/references/errors.md).
+- New recognition checks the current fixed model before reserving execution. Historical tasks remain available for local status queries and re-export; writers receive the model label from `config.model`, not the current default. Model changes preserve saved configuration and digests.
 - Re-export reads confirmed configuration, saved success records, and matching original JSON, then replaces documents in the fixed task directory. Each format replaces its target after successful generation; failure preserves that target and other successful files. Save manual edits separately.
 - Preserve original text and timestamps. Formatting and path contracts are in [DEVELOPMENT](doc/DEVELOPMENT.md). Record content checks separately from recognition accuracy and Office visual acceptance.
 

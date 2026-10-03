@@ -13,6 +13,18 @@ from tests.support import RuntimeTestCase
 
 
 class HotwordEditorTests(RuntimeTestCase):
+    def test_duplicate_words_mark_every_row_even_when_weights_are_invalid(self):
+        """验证整组重复词都标错，非法权重同时保留独立提示。"""
+        rows = [{"row": row, "text": "IPO", "weight": weight}
+                for row, weight in ((2, 4), (3, -1000), (4, 3), (5, 4))]
+        with self.assertRaises(ValidationError) as caught:
+            validate_hotword_rows(rows)
+        details = caught.exception.details
+        self.assertEqual([item["row"] for item in details if item["field"] == "text"], [2, 3, 4, 5])
+        self.assertEqual([item["row"] for item in details if item["field"] == "weight"], [3])
+        self.assertTrue(all("重复" in item["message"] for item in details if item["field"] == "text"))
+        self.assertEqual(validate_hotword_rows(rows[:1])["vocabulary"], {"IPO": 4})
+
     def workbook(self, rows):
         """保存带固定表头的测试工作簿。"""
         path = self.runtime.path("editor.xlsx")
@@ -32,16 +44,16 @@ class HotwordEditorTests(RuntimeTestCase):
         original = path.read_bytes()
         report = import_hotwords(path)
         self.assertEqual([(issue["row"], issue["field"]) for issue in report["issues"]],
-                         [(3, "weight"), (4, "weight")])
+                         [(2, "text"), (3, "weight"), (4, "text")])
         self.assertEqual(report["rows"][1]["weight"], "错误")
         self.assertEqual(path.read_bytes(), original)
 
         path.unlink()
         report["rows"][1]["weight"] = "4"
-        report["rows"][2]["weight"] = "4"
+        report["rows"].pop(2)
         result = validate_hotword_rows(report["rows"])
         self.assertEqual(result["vocabulary"], {"术语": 4, "另一个词": 4})
-        self.assertIn("第4行与第2行", result["warnings"][0])
+        self.assertEqual(result["warnings"], [])
 
     def test_formula_errors_belong_to_cells_and_disappear_after_edit(self):
         """验证公式原文及错误定位可见，改写后使用当前单元格值。"""
@@ -65,12 +77,13 @@ class HotwordEditorTests(RuntimeTestCase):
         workbook.save(path)
         workbook.close()
         report = import_hotwords(path)
-        self.assertEqual([(issue["row"], issue["field"]) for issue in report["issues"]], [(2, "text")])
+        self.assertEqual([issue["row"] for issue in report["issues"] if "公式" in issue["message"]], [2])
+        self.assertEqual([issue["row"] for issue in report["issues"] if "重复" in issue["message"]], [2, 3])
         self.assertNotIn("invalid_fields", report["rows"][1])
         self.assertEqual(validate_hotword_rows([report["rows"][1]])["vocabulary"], {"=1+1": 4})
         # 网页输入保存为固定文本，编辑动作会移除原Excel的类型标记。
         report["rows"][0]["invalid_fields"] = []
-        self.assertEqual(validate_hotword_rows(report["rows"])["vocabulary"], {"=1+1": 4})
+        self.assertEqual(validate_hotword_rows(report["rows"][:1])["vocabulary"], {"=1+1": 4})
 
     def test_limits_report_all_excess_rows_at_once(self):
         """验证总词数和超级词超限时一次返回全部超限行。"""

@@ -4,6 +4,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .. import MODEL
 from ..models import AudioInfo, AudioRecord, DeliveryReport, ExecutionReport, JobConfig, Transcript
 from ..utils.bailian import BailianFailure, PreparedCommand, prepare_command, recognition_arguments, run_recognition
 from ..utils.environment import Runtime, SetupError
@@ -130,6 +131,11 @@ def transcribe(runtime: Runtime, job_id: str, *, authorize_upload: bool = False)
     if not authorize_upload:
         raise SetupError("保存设置不等于授权上传。需用户明确同意后，使用--authorize-upload执行本次任务。")
     config = read_config(runtime, job_id)
+    if config["model"] != MODEL:
+        raise SetupError(
+            f"已保存设置的模型与当前固定模型{MODEL}不一致，请在网页重新检查并保存设置。"
+            "未更改原配置、未占用执行，也未上传；已有结果仍可本地查看或重导。"
+        )
     try:
         # 目录是一次执行的持久占用标记，成功、失败、崩溃后都不删除或自动重试。
         execution = reserve_execution(runtime, job_id)

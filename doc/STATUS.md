@@ -4,27 +4,23 @@
 
 ## 产品与入口
 
-MemoFlow第一阶段由独立的`asr-transcription` Skill完成单个录音的本机网页配置、BL识别和JSON、Word、Excel、Markdown交付。个性化会议纪要及反馈学习尚未实现。
+MemoFlow第一阶段由独立的asr-transcription Skill完成单录音网页配置、BL识别，以及JSON、Word、Excel和Markdown交付。个性化纪要与反馈学习尚未实现。
 
-入口为`skills/asr-transcription/scripts/asr.py`，执行包为`asr_runtime/`；Python保持入口 → application → utils，前端为Vue、TypeScript、Element Plus。版本仍为0.1.0，开发分支dev，master保持`6c83711`。
+新识别固定使用qwen-audio-3.1-asr-flash-filetrans，北京地域，BL固定2.1.0。入口为skills/asr-transcription/scripts/asr.py；Python保持入口 → application → utils，前端采用Vue、TypeScript和Element Plus。开发分支dev，版本0.1.0，master保持6c83711。
 
-## 本轮实现
+## 本轮修正
 
-- 热词改为可编辑表格：可以导入Excel或直接填写，保留原行号、错误原值和单元格级提示。后端导入、单独检查与预览共用词条规则；原Excel保持不变。
-- 上下文检查说明空白、实际长度/超出数、首个不可传输字符位置，保留输入供修改。没有添加语义相关性黑名单。
-- 保存成功后可点击“修改设置”。`Session.reopen`与转写共用执行占用，旧编号撤回为`STOPPED/LOCAL_CONFIG_REOPENED`，表单恢复后重新保存产生新编号；已开始的任务不覆盖。
-- 同一Skill新增用户提供ZIP时的更新分支。新包的独立更新脚本整体替换安装资源并在失败时回滚；Windows运行入口持有只读文件句柄，阻止任务期间改名替换。旧版首次更新需核对原执行会话，不自动扫描或终止进程。
-
-实际用户词表在本机复现第3行权重非法、第4行重复权重冲突。真实Edge测试已完成导入、红色定位、页内修正、确认、刷新后返回修改及纯手填再次保存；源Excel前后摘要相同。用户没有提供上下文故障案例，本轮按官方输入规则验证其行为。
+- 用户IPO样表第2—5行完全重复，第3行另有非法权重。现为全部重复行生成text错误，包括首行、同权重和权重非法的行；程序不自动合并，用户决定保留哪一行。
+- 官方词表SDK文档的prefix限制与text分开核对；未找到禁止IPO英文缩写的规则。重复拒绝属于本项目的明确输入要求。
+- 新配置与新识别采用3.1；BL本机合约确认新模型、增强参数及最小parameters对象正确。
+- 文档writer显式接收config.model。历史成功JSON可重导并保留原模型标签；其它模型的待执行配置须重新确认，原配置和摘要不改写。
 
 ## 验证与边界
 
-348项Python完整回归、47项前端测试、严格Python/Vue类型检查、前端构建和Skill格式校验通过。合成数据与用户实际词表分别完成Edge回归；UML源稿与PNG同步。详细执行范围见[ACCEPTANCE](ACCEPTANCE.md)。
+353项Python完整回归通过，无跳过；严格mypy检查30个源码文件，Vue类型检查和前端构建通过。合成和实际IPO样表分别通过完整Edge回归，包括整组标红、用户删行、保存刷新及撤回恢复；原Excel摘要未改变。UML已同步受影响的模型与交付边界，详细证据见[ACCEPTANCE](ACCEPTANCE.md)。
 
-本轮未调用真实云端识别或启动真实BL登录；不从本机回归推导识别准确率、Chrome授权窗口或Office逐页视觉已通过。用户原工作目录和已安装Skill未修改，README.md原有用户修改保留。
+本轮只使用BL与本机模拟服务验证请求，没有调用真实3.1云端识别。用户工作目录、已安装Skill和README本地修改保留。
 
 ## 交付状态
 
-实现提交`c82d768`已推送dev；独立Skill情境评审、实际ZIP更新和发行核对完成，同一[v0.1.0预览](https://github.com/hx101700/memoflow/releases/tag/v0.1.0)及双语说明已更新。master和版本号保持不变。
-
-公开ZIP包含46个文件、330879字节，SHA-256为`90a1a0f845416fec8136a91d8405483a945db01cb07ed002139f183b50aa80be`。匿名公开下载与本地包逐字节一致；远端源码树140个文件与本地实现提交一致。仍保留一个Release、一个标签和一个ZIP附件。开发文档、UML、测试、凭据、录音和结果不入包；本轮没有自动覆盖用户已安装的Skill。
+本轮尚未提交或发布，基线为6b9fede。待图稿与新ZIP最终核对后更新同一v0.1.0预览；不改master或版本号。发行包仅含Skill运行资源和按需参考资料。

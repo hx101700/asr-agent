@@ -16,6 +16,8 @@ Tell Codex “Please transcribe a recording” to open the configuration page, t
 
 You can now edit hotwords directly on the page. Excel imports preserve the original row numbers and cell contents. Invalid rows appear in red, with an explanation below the relevant cell. You can also add entries without an Excel file; the template download is in the table toolbar. If context exceeds the limit or contains a character that cannot be transmitted, the page explains the problem and keeps your text for correction.
 
+Duplicate hotwords now highlight every affected row, including the first occurrence and rows with invalid weights. Review them and keep one row, even when the weights match; the tool will not merge entries for you. Recognition now uses Qwen-Audio-3.1-ASR-Flash-Filetrans.
+
 If you notice a mistake after saving, select “Modify settings.” Before transcription starts, this restores your input so you can review and save it again. Tasks that have already entered execution remain unchanged.
 
 This update addresses a Windows login failure followed by duplicate authorization tabs on retry. Login now requests desktop execution permissions from the first attempt and opens the complete authorization URL once in your system default browser. After authorization, return to Codex and send “continue.”
@@ -34,6 +36,6 @@ To update an existing installation, send the new ZIP to Codex and ask it to upda
 
 Download [asr-transcription.zip](https://github.com/hx101700/memoflow/releases/download/v0.1.0/asr-transcription.zip), send it to Codex, and ask it to install the Skill and read its `SKILL.md`. Codex prepares the environment in the current task folder by default, opens the configuration page, then guides authentication for the method you choose.
 
-Windows 10/11 x64, Python 3.12 x64, and Node.js 18.17+ with npm are required. Recognition uses `qwen-audio-3.0-asr-flash-filetrans` in Beijing and may incur charges. Personalized minutes, style preferences, and learning from feedback are planned for stage two.
+Windows 10/11 x64, Python 3.12 x64, and Node.js 18.17+ with npm are required. Recognition uses `qwen-audio-3.1-asr-flash-filetrans` in Beijing and may incur charges. Personalized minutes, style preferences, and learning from feedback are planned for stage two.
 
 See the [project README](https://github.com/hx101700/memoflow/blob/v0.1.0/README.en.md) for instructions. Report problems through [Issues](https://github.com/hx101700/memoflow/issues).

@@ -464,11 +464,11 @@ class WebServerTests(WebFixture):
         self.assertEqual(status, 200)
         imported = json.loads(body)
         self.assertEqual([(item["row"], item["field"]) for item in imported["issues"]],
-                         [(3, "weight"), (4, "weight")])
+                         [(2, "text"), (3, "weight"), (4, "text")])
         self.assertEqual(imported["rows"][1]["weight"], 99)
         self.assertFalse(list(self.server.session.upload_directory.glob("*.xlsx*")))
         imported["rows"][1]["weight"] = "4"
-        imported["rows"][2]["weight"] = "4"
+        imported["rows"].pop(2)
         status, _, body = self.request("POST", "/api/validate-hotwords", {"rows": imported["rows"]})
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(body)["issues"], [])

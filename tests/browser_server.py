@@ -25,7 +25,6 @@ def main() -> None:
         stream.setframerate(16000)
         stream.writeframes(b"\0" * 64000)
     sheets = {
-        "words.xlsx": [("text", "weight"), ("Kubernetes", 4), ("Kubernetes", 4)],
         "invalid.xlsx": [("wrong", "weight"), ("Kubernetes", 4)],
         "invalid-rows.xlsx": [("text", "weight"), ("Kubernetes", 4), ("MemoFlow", 9), ("Kubernetes", 5)],
         "paged.xlsx": [("text", "weight"), *[(f"Term{number}", 4) for number in range(60)], ("LastTerm", 8)],

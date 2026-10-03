@@ -7,7 +7,7 @@
 ## 产品范围
 
 - 第一阶段交付一个独立的 Codex Skill：单个录音通过本机网页配置，由 Codex 调用 BL，保存原始 JSON、Excel、Word、Markdown，交给用户校对。
-- 固定模型 `qwen-audio-3.0-asr-flash-filetrans`、北京地域、临时 OSS。热词与上下文可同时使用；发言人区分默认开启，多声道先提示再生成单声道 FLAC 副本，原文件保留。
+- 固定模型 `qwen-audio-3.1-asr-flash-filetrans`、北京地域、临时 OSS。热词与上下文可同时使用；发言人区分默认开启，多声道先提示再生成单声道 FLAC 副本，原文件保留。
 - 最终产品把语音输入整理为符合用户习惯和指定格式的会议纪要，并从用户提供的范例与确认后的修改中持续学习。第一阶段交付转写校对稿；第二阶段实现个性化纪要及反馈学习，当前代码尚未实现后者。
 - 支持 Windows 10/11 x64、CPython 3.12 x64（含 venv、ensurepip、tkinter）、Node.js 18.17+ 及 npm。依赖锁限定该平台，安装需要联网。
 
@@ -42,6 +42,7 @@
 - 已保存且尚未执行的设置可通过`Session.reopen()`撤回。它与转写竞争同一个执行占用，成功后旧编号记为`STOPPED/LOCAL_CONFIG_REOPENED`，恢复表单、重新确认生成新编号。Codex按最新配置事件继续；已开始的任务保持原样。
 - 用户授权覆盖本次音频及增强内容后，使用 `transcribe --job ID --authorize-upload`。每个任务只允许一次执行尝试，失败或结果未知时停止，不自动重试或删除执行占用。
 - 原始 JSON 有效使用 `JSON_READY` 表达；三种成品完成要求 `delivery.status=COMPLETE` 且 `documents_ready=true`。状态与错误说明在 [errors.md](skills/asr-transcription/references/errors.md)。
+- 新识别在执行占用前核对当前固定模型；历史任务可本地查询和重导，文档模型标签从`config.model`传入writer，不从当前默认常量派生。模型切换不改写历史配置或摘要。
 - 重导读取确认配置、已保存成功记录及匹配的原始 JSON，在固定任务目录覆盖同名文档。各格式生成成功后替换目标，失败保留原目标及其他成功文件。手工修改先另存。
 - 文档保持原文和时间戳；排版规则及路径协议见 [DEVELOPMENT](doc/DEVELOPMENT.md)。内容检查与人工识别、Office 视觉验收分开记录。
 

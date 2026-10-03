@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import IO, NotRequired, TypedDict, cast
 from urllib.parse import parse_qs, urlsplit
 
-from .. import BAILIAN_VERSION, MODEL
+from .. import BAILIAN_VERSION
 from ..models import ErrorReport, JobConfig
 from .auth import bailian_environment
 from .environment import Runtime, SetupError, check_login_execution_context, find_node, run_process
@@ -72,7 +72,7 @@ def verify_bl_installation(runtime: Runtime) -> None:
 def recognition_arguments(config: JobConfig, audio_path: Path, json_path: Path) -> list[str]:
     """将已确认的识别选项映射为BL命令参数。"""
     arguments = [
-        "speech", "recognize", "--config", "default", "--model", MODEL, "--url", str(audio_path),
+        "speech", "recognize", "--config", "default", "--model", config["model"], "--url", str(audio_path),
         "--base-url", BEIJING_BASE_URL, "--out", str(json_path),
         "--timeout", str(WAIT_SECONDS), "--poll-interval", "5", "--output", "json",
     ]

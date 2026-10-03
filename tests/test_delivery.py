@@ -5,6 +5,9 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
+from docx import Document
+from openpyxl import load_workbook
+
 from asr_runtime import MODEL
 from asr_runtime.utils.job_files import read_delivery
 from asr_runtime.utils.documents import DocumentError
@@ -222,6 +225,35 @@ class DeliveryTests(RuntimeTestCase):
         self.assertFalse(report["documents_ready"])
         self.assertFalse(destination.parent.exists())
         self.assertEqual(self.json_path.read_bytes(), before)
+        self.cloud.assert_not_called()
+
+    def test_saved_result_exports_with_its_recorded_model(self):
+        """验证更新后的本地重导保留任务原模型，不改配置或重新识别。"""
+        recorded_model = "qwen-audio-3.0-asr-flash-filetrans"
+        self.config["model"] = recorded_model
+        self.save_config()
+        original_config = (self.root / "config.json").read_bytes()
+        original_checksum = (self.root / "config.sha256").read_bytes()
+        original_json = self.json_path.read_bytes()
+        report = export_job(self.runtime, self.job_id)
+        self.assertTrue(report["documents_ready"])
+        self.assertEqual(job_status(self.runtime, self.job_id), report)
+        files = report["delivery"]["files"]
+        with Path(files["xlsx"]["path"]).open("rb") as stream:
+            workbook = load_workbook(stream, read_only=True)
+            try:
+                self.assertEqual(workbook["转写明细"]["A2"].value,
+                                 f"模型：{recorded_model}    任务：{self.job_id}")
+            finally:
+                workbook.close()
+        document = Document(files["docx"]["path"])
+        self.assertEqual(document.paragraphs[1].text, f"模型：{recorded_model}")
+        markdown_model = recorded_model.replace("-", "\\-").replace(".", "\\.")
+        self.assertIn(f"模型：{markdown_model}",
+                      Path(files["md"]["path"]).read_text(encoding="utf-8"))
+        self.assertEqual((self.root / "config.json").read_bytes(), original_config)
+        self.assertEqual((self.root / "config.sha256").read_bytes(), original_checksum)
+        self.assertEqual(self.json_path.read_bytes(), original_json)
         self.cloud.assert_not_called()
 
     def test_unreadable_delivery_record_reports_unknown(self):

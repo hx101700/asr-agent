@@ -13,6 +13,7 @@ from docx.oxml.ns import qn
 from openpyxl import load_workbook
 from openpyxl.workbook import Workbook
 
+from asr_runtime import MODEL
 from asr_runtime.utils.documents import DocumentError, write_docx, write_markdown, write_xlsx
 from asr_runtime.models import Sentence, Transcript
 from tests.support import RuntimeTestCase
@@ -37,7 +38,7 @@ class DocumentTests(RuntimeTestCase):
     def write(self, writer, extension, transcript=None):
         """用指定写入器导出样本并返回文件位置。"""
         target = self.output(extension)
-        writer(transcript or sample(), target, source_name="合成测试录音.wav", job_id="a" * 32)
+        writer(transcript or sample(), target, source_name="合成测试录音.wav", job_id="a" * 32, model=MODEL)
         return target
 
     def test_xlsx_roundtrip_preserves_all_columns_and_has_no_formulas(self):
@@ -128,7 +129,7 @@ class DocumentTests(RuntimeTestCase):
         """验证合法长文件名生成Word时保留完整正文标题。"""
         source_name = "a" * 251 + ".wav"
         path = self.output("docx")
-        write_docx(sample(), path, source_name=source_name, job_id="a" * 32)
+        write_docx(sample(), path, source_name=source_name, job_id="a" * 32, model=MODEL)
         document = Document(path)
         self.assertEqual(document.paragraphs[0].text, "a" * 251 + " 录音转写")
 
@@ -242,4 +243,4 @@ class DocumentTests(RuntimeTestCase):
         for writer in (write_xlsx, write_docx, write_markdown):
             with self.subTest(writer=writer.__name__), self.assertRaises(DocumentError):
                 writer(sample(), self.runtime.path("missing/output.bin"),
-                       source_name="test.wav", job_id="a" * 32)
+                       source_name="test.wav", job_id="a" * 32, model=MODEL)

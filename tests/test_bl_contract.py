@@ -88,7 +88,7 @@ class BailianContractTests(RuntimeTestCase):
         self.thread.join(timeout=5)
         super().tearDown()
 
-    def invoke(self, mode="success"):
+    def invoke(self, mode="success", *, diarization=True):
         """以指定模拟场景调用真实BL并返回结果文件。"""
         self.mode = mode
         self.runtime.prepare()
@@ -98,9 +98,11 @@ class BailianContractTests(RuntimeTestCase):
         output = self.runtime.path("result.json")
         arguments = [
             "speech", "recognize", "--model", MODEL, "--url", SYNTHETIC_AUDIO_URL,
-            "--base-url", self.base_url, "--diarization", "--out", str(output),
+            "--base-url", self.base_url, "--out", str(output),
             "--timeout", "1", "--poll-interval", "0.1", "--output", "json",
         ]
+        if diarization:
+            arguments.append("--diarization")
         # 这里运行真实CLI；Python HTTP代码仅为测试fixture，不属于产品运行路径。
         result = subprocess.run(
             bl_command(contract_runtime(), arguments), cwd=self.runtime.root, env=env,
@@ -128,6 +130,16 @@ class BailianContractTests(RuntimeTestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(len(self.calls), 1)
         self.assertFalse(output.exists())
+
+    def test_minimal_recognition_still_sends_parameters(self):
+        """验证所有可选项关闭时真实BL仍传模型要求的parameters对象。"""
+        result, output = self.invoke(diarization=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(output.is_file())
+        self.assertEqual([call[0] for call in self.calls], ["POST", "GET", "GET"])
+        submitted = self.calls[0][2]
+        self.assertEqual(submitted["model"], "qwen-audio-3.1-asr-flash-filetrans")
+        self.assertEqual(submitted["parameters"], {"channel_id": [0]})
 
     def test_submit_500_is_not_retried(self):
         """验证提交500错误返回失败且请求次数为一。"""

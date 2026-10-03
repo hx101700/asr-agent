@@ -12,6 +12,12 @@ Note over C,D: 成功主路径：输入有效且记录均写入成功；失败�
 C->>T: --workspace 用户目录 transcribe --job ID --authorize-upload
 T->>T: 核对显式上传授权
 T->>J: read_config()核对协议及配置SHA
+T->>T: 核对config.model等于当前MODEL
+Note over T,J: 当前MODEL：qwen-audio-3.1-asr-flash-filetrans
+break 模型与当前固定模型不一致
+    T-->>C: SetupError；回网页重新检查并保存
+    Note over C,J: 原配置保持不变，尚未创建execution或上传<br/>已有结果仍可本地查看或重导
+end
 T->>J: reserve_execution()独占创建execution
 alt execution已存在
     J-->>T: FileExistsError
@@ -62,7 +68,7 @@ else 本次取得执行占用
     J->>R: check_output_path(documents目录)
     J->>F: 创建或复用固定documents目录
     loop xlsx、docx、md逐格式各执行一次
-        D->>L: documents.publish_document(writer, transcript, final_path)
+        D->>L: documents.publish_document(writer, transcript, final_path,<br/>model=config.model，其他标签来自确认配置)
         L->>F: 写partial文件，完成后替换同名成品<br/>Excel和Word回读；Markdown编码写入
         L-->>D: 字节数或格式异常
         D->>J: save_record()保存该格式READY / FAILED

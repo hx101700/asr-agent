@@ -26,7 +26,8 @@ def export_documents(runtime: Runtime, config: JobConfig, transcript: Transcript
     for extension, writer in (("xlsx", write_xlsx), ("docx", write_docx), ("md", write_markdown)):
         final = destination / f"transcription.{extension}"
         try:
-            size = publish_document(writer, transcript, final, source_name=config["audio"]["name"], job_id=config["job_id"])
+            size = publish_document(writer, transcript, final, source_name=config["audio"]["name"],
+                                    job_id=config["job_id"], model=config["model"])
             report["files"][extension] = {"status": "READY", "path": str(final),
                                           "bytes": size}
         except Exception as exc:

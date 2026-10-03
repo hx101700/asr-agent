@@ -34,4 +34,6 @@ python -S -X utf8 '新ZIP解压目录/scripts/update_skill.py' `
 - `retained_backup` 非空时，替换已成功但临时旧副本未清理，核对回执中的精确路径后处理；正常成功会自行清理。
 - 继续原任务前重新读取它的实际回执。更新本身不执行转写、不重试失败任务，也不改写既有任务协议。版本不支持旧配置时报告实际不兼容，不补写摘要或猜测字段。
 
+当前识别模型为`qwen-audio-3.1-asr-flash-filetrans`。其它模型的已确认配置可以查看，成功结果可以本地重导并保留原模型标注；`transcribe`仅接受当前模型的确认配置，模型不同时会在执行占用前提示重新配置，不改变历史记录。
+
 Codex会自动发现Skill文件变化；如果仍未显示更新，可重新开始对话或重启Codex。[OpenAI官方说明](https://learn.chatgpt.com/docs/build-skills)说明的是技能发现，不能据此假设已运行的Python、Node或网页进程会热更新。

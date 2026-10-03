@@ -16,6 +16,8 @@ MemoFlow 的目标是将录音整理为符合你的习惯和指定格式的会�
 
 热词现在可以直接在网页中修改。导入 Excel 后，原行号和单元格内容会保留，有问题的行标红，原因显示在对应单元格下方；也可以直接新增词条，无需准备 Excel。模板下载位于表格工具栏。上下文超长或包含无法传输的字符时，页面会说明具体问题并保留原文，方便修改。
 
+重复词会标出全部相关行，包括第一行及权重有误的行。即使权重相同，也请确认后只保留一行，工具不会自动替你合并。本次识别模型已更新为 Qwen-Audio-3.1-ASR-Flash-Filetrans。
+
 保存后发现填错了，可以点击“修改设置”。尚未开始转写时，原输入会恢复到表单，重新核对保存即可；已经进入执行流程的任务保持原样。
 
 修正了 Windows 登录时先报错、重试后出现两张授权页的问题：首次登录即使用正常桌面权限，完整授权链接只交给系统默认浏览器打开一次。完成授权后回到 Codex 发送“继续”即可。
@@ -34,6 +36,6 @@ Skill 可以独立安装，录音任务、凭据和依赖保存在你选择的�
 
 下载 [asr-transcription.zip](https://github.com/hx101700/memoflow/releases/download/v0.1.0/asr-transcription.zip) 后交给 Codex，要求安装为 Skill，并阅读其中的 `SKILL.md`。Codex 默认在当前任务文件夹准备环境，打开配置网页后，再按你选择的方式引导认证。
 
-当前支持 Windows 10/11 x64，需要 Python 3.12 x64、Node.js 18.17+ 与 npm。识别使用北京地域的 `qwen-audio-3.0-asr-flash-filetrans`，上传及识别可能产生调用费用。个性化纪要、样式偏好和反馈学习将在第二阶段实现。
+当前支持 Windows 10/11 x64，需要 Python 3.12 x64、Node.js 18.17+ 与 npm。识别使用北京地域的 `qwen-audio-3.1-asr-flash-filetrans`，上传及识别可能产生调用费用。个性化纪要、样式偏好和反馈学习将在第二阶段实现。
 
 详细操作见[项目 README](https://github.com/hx101700/memoflow/blob/v0.1.0/README.md)。遇到问题欢迎提交 [Issue](https://github.com/hx101700/memoflow/issues)。

@@ -178,10 +178,12 @@ class ValidationTests(RuntimeTestCase):
         before = path.read_bytes()
         with patch("asr_runtime.application.inputs.file_fingerprint", side_effect=AssertionError("热词导入不计算文件SHA")):
             result = import_hotwords(path)
-        self.assertEqual(validate_hotword_rows(result["rows"])["vocabulary"], {"语音实验室": 4, "hello world": 2})
-        self.assertEqual(result["issues"], [])
-        self.assertIn("已忽略1个完全空白行。", result["warnings"])
-        self.assertEqual(len(result["warnings"]), 3)
+        self.assertEqual([issue["row"] for issue in result["issues"]], [2, 4])
+        result["rows"] = [row for row in result["rows"] if row["row"] != 4]
+        checked = validate_hotword_rows(result["rows"])
+        self.assertEqual(checked["vocabulary"], {"语音实验室": 4, "hello world": 2})
+        self.assertIn("已忽略1个完全空白行。", checked["warnings"])
+        self.assertEqual(len(result["warnings"]), 1)
         self.assertEqual(path.read_bytes(), before)
 
     def test_hotwords_reports_formula_conflict_empty_word_and_invalid_weights_by_row(self):
@@ -192,7 +194,7 @@ class ValidationTests(RuntimeTestCase):
         ])
         imported = import_hotwords(path)
         details = imported["issues"]
-        self.assertEqual({error["row"] for error in details}, set(range(3, 11)))
+        self.assertEqual({error["row"] for error in details}, set(range(2, 11)))
         self.assertTrue(all(set(error) == {"row", "field", "message"} for error in details))
         with self.assertRaises(ValidationError) as caught:
             validate_hotword_rows(imported["rows"])

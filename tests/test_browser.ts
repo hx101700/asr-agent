@@ -60,7 +60,9 @@ test("Edge页面完成双语、词表编辑、上下文校验、凭据保存及�
     page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
     page.on('request', request => { const url = new URL(request.url()); requests.push({ origin: url.origin, path: url.pathname }); });
     page.on('response', response => { if (response.status() === 502) gatewayFailures.push(new URL(response.url()).pathname); });
+    const sessionResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/session');
     await page.goto(connection.url);
+    assert.equal((await (await sessionResponse).json()).model, 'qwen-audio-3.1-asr-flash-filetrans');
     await page.getByText('选择音频文件', { exact: true }).waitFor();
     assert.equal(await page.locator('#language_hint').getByText('自动识别', { exact: true }).isVisible(), true);
     await page.screenshot({ path: path.join(screenshots, 'zh-light.png'), animations: 'disabled' });
@@ -126,14 +128,18 @@ test("Edge页面完成双语、词表编辑、上下文校验、凭据保存及�
     await page.locator('#hotword-62-weight').fill('4');
     await page.getByRole('button', { name: 'Check hotwords', exact: true }).click();
     await page.getByText('Checked: 61 hotwords', { exact: true }).waitFor();
+    const validColor = await page.locator('#hotword-62-text').evaluate(element => getComputedStyle(element.closest('tr')!).backgroundColor);
     await page.locator('#hotword_rows input[type=file]').setInputFiles(externalWords ?? path.join(root, 'fixtures/invalid-rows.xlsx'));
+    const duplicateRows = externalWords ? [2, 3, 4, 5] : [2, 4];
+    for (const row of duplicateRows) {
+      await page.locator(`#hotword-${row}-text[aria-invalid="true"]`).waitFor();
+      assert.ok((await page.locator(`#hotword-${row}-text-errors`).innerText()).length > 0);
+    }
     await page.locator('#hotword-3-weight[aria-invalid="true"]').waitFor();
-    await page.locator('#hotword-4-weight[aria-invalid="true"]').waitFor();
-    assert.equal(await page.locator('.hotword-error-row').count(), 2);
+    assert.equal(await page.locator('.hotword-error-row').count(), externalWords ? 4 : 3);
+    assert.equal(await page.getByRole('button', { name: /^Delete row \d+$/ }).count(), externalWords ? 4 : 3);
     assert.ok((await page.locator('#hotword-3-weight-errors').innerText()).length > 0);
-    assert.ok((await page.locator('#hotword-4-weight-errors').innerText()).includes('2'));
     const invalidColor = await page.locator('.hotword-error-row').first().evaluate(element => getComputedStyle(element).backgroundColor);
-    const validColor = await page.locator('#hotword-2-text').evaluate(element => getComputedStyle(element.closest('tr')!).backgroundColor);
     assert.notEqual(invalidColor, validColor);
     await page.locator('#hotword_rows').screenshot({ path: path.join(screenshots, 'hotwords-en-dark-errors.png'), animations: 'disabled' });
     await page.locator('.theme-select').click();
@@ -156,15 +162,18 @@ test("Edge页面完成双语、词表编辑、上下文校验、凭据保存及�
     await page.getByRole('option', { name: 'English', exact: true }).click();
     const validWeight = await page.locator('#hotword-2-weight').inputValue();
     const previousWordChecks = requests.filter(request => request.path === '/api/validate-hotwords').length;
-    await page.locator('#hotword-3-weight').fill(validWeight);
-    await page.locator('#hotword-4-weight').fill(validWeight);
+    if (externalWords) {
+      for (const row of [3, 4, 5]) await page.getByRole('button', { name: `Delete row ${row}`, exact: true }).click();
+    } else {
+      await page.locator('#hotword-3-weight').fill(validWeight);
+      await page.getByRole('button', { name: 'Delete row 4', exact: true }).click();
+    }
     assert.equal(requests.filter(request => request.path === '/api/validate-hotwords').length, previousWordChecks);
     const checked = page.waitForResponse(response => new URL(response.url()).pathname === '/api/validate-hotwords');
     await page.getByRole('button', { name: 'Check hotwords', exact: true }).click();
     const checkedWords = await (await checked).json() as { issues: unknown[]; count: number };
     assert.deepEqual(checkedWords.issues, []);
-    assert.ok(checkedWords.count > 0);
-    if (!externalWords) assert.equal(checkedWords.count, 2);
+    assert.equal(checkedWords.count, externalWords ? 1 : 2);
     const hotwordCount = `${checkedWords.count} ${checkedWords.count === 1 ? 'hotword' : 'hotwords'}`;
     await page.getByText(`Checked: ${hotwordCount}`, { exact: true }).waitFor();
     assert.equal(await page.locator('.hotword-error-row').count(), 0);
@@ -244,8 +253,12 @@ test("Edge页面完成双语、词表编辑、上下文校验、凭据保存及�
     assert.deepEqual(await (await repeatedRecovery).json(), originalRecovery);
     await page.locator('#context-text').waitFor();
     assert.equal(await page.locator('#context-text').inputValue(), input);
-    assert.equal(await page.locator('#hotword-3-weight').inputValue(), validWeight);
-    assert.equal(await page.locator('#hotword-4-weight').inputValue(), validWeight);
+    assert.equal(await page.locator('#hotword-2-weight').inputValue(), validWeight);
+    if (externalWords) {
+      assert.equal(await page.locator('#hotword-3-weight').count(), 0);
+      assert.equal(await page.locator('#hotword-5-weight').count(), 0);
+    } else assert.equal(await page.locator('#hotword-3-weight').inputValue(), validWeight);
+    assert.equal(await page.locator('#hotword-4-weight').count(), 0);
     await page.waitForFunction(() => (document.getElementById('api-key-value') as HTMLInputElement)?.value === 'fixture-ui-key-not-real');
     await page.locator('#audio_upload_id').getByText('Added', { exact: true }).waitFor();
     assert.equal(await fs.readFile(stoppedPath, 'utf8'), stoppedRecord);

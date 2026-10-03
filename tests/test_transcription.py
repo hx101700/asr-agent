@@ -151,7 +151,8 @@ class TranscriptionTests(RuntimeTestCase):
 
     def test_success_delivers_documents_and_never_reexecutes_the_saved_job(self):
         """验证成功任务交付三格式并复用执行记录。"""
-        job_id, _ = self.make_job()
+        job_id, config = self.make_job()
+        self.assertEqual(config["model"], "qwen-audio-3.1-asr-flash-filetrans")
         report = transcribe(self.runtime, job_id, authorize_upload=True)
         self.assertEqual(report["status"], "JSON_READY")
         self.assertEqual(report["cloud_outcome"], "result_received")
@@ -163,6 +164,38 @@ class TranscriptionTests(RuntimeTestCase):
         config_text = self.runtime.path(f".state/jobs/{job_id}/config.json").read_text(encoding="utf-8")
         self.assertFalse(json.loads(config_text)["execution_authorized"])
         self.assertNotIn(self.secret, config_text + json.dumps(report))
+
+    def test_different_confirmed_model_is_not_uploaded_or_changed(self):
+        """验证模型更新后旧确认配置必须重新保存，不静默换模型上传。"""
+        job_id, config = self.make_job()
+        config["model"] = "qwen-audio-3.0-asr-flash-filetrans"
+        path = self.runtime.path(f".state/jobs/{job_id}/config.json")
+        content = json.dumps(config, ensure_ascii=False).encode("utf-8")
+        checksum = hashlib.sha256(content).hexdigest().encode("ascii")
+        path.write_bytes(content)
+        path.with_suffix(".sha256").write_bytes(checksum)
+        with self.assertRaisesRegex(SetupError, "重新检查并保存"):
+            transcribe(self.runtime, job_id, authorize_upload=True)
+        self.assertFalse(path.parent.joinpath("execution").exists())
+        self.assertEqual(path.read_bytes(), content)
+        self.assertEqual(path.with_suffix(".sha256").read_bytes(), checksum)
+        self.assertEqual(job_status(self.runtime, job_id)["status"], "CONFIGURED")
+        self.cli.assert_not_called()
+
+    def test_saved_configuration_requires_a_model_name(self):
+        """验证本地任务配置仍要求非空字符串模型名称。"""
+        for model in (None, "", " \t", []):
+            with self.subTest(model=model):
+                job_id, config = self.make_job()
+                config["model"] = model
+                path = self.runtime.path(f".state/jobs/{job_id}/config.json")
+                content = json.dumps(config, ensure_ascii=False).encode("utf-8")
+                path.write_bytes(content)
+                path.with_suffix(".sha256").write_text(hashlib.sha256(content).hexdigest(), encoding="ascii")
+                with self.assertRaises(SetupError):
+                    job_status(self.runtime, job_id)
+                self.assertFalse(path.parent.joinpath("execution").exists())
+        self.cli.assert_not_called()
 
     def test_audio_and_vocabulary_snapshot_execute_after_web_session_cleanup(self):
         """验证网页关闭后通过音频和词典快照执行任务。"""

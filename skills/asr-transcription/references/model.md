@@ -1,6 +1,6 @@
 # 官方依据与固定能力
 
-API资料核验基线：2026-09-29。CLI固定2.1.0，对照源码提交`8bbbbc722d70fb200641ef22b6f6d033aeae9f74`及本机发布包；不把未核实的新版本能力加入当前接口。
+API资料核验基线：2026-10-04，当前模型为Qwen-Audio-3.1-ASR-Flash-Filetrans。CLI固定2.1.0，对照源码提交`8bbbbc722d70fb200641ef22b6f6d033aeae9f74`及本机发布包；不把未核实的新版本能力加入当前接口。
 
 精度增强[A04]与说话人分离[A03]资料最近核验：2026-10-03。产品输入方式和媒体处理以项目实现为准。
 
@@ -8,10 +8,11 @@ API资料核验基线：2026-09-29。CLI固定2.1.0，对照源码提交`8bbbbc7
 
 | 编号 | 来源 | 用途 |
 | --- | --- | --- |
-| A01 | [模型详情](https://help.aliyun.com/en/model-studio/qwen-audio-3-0-asr-flash-filetrans) | 固定模型与地域 |
+| A01 | [模型详情](https://help.aliyun.com/zh/model-studio/qwen-audio-3-1-asr-flash-filetrans) | 固定模型与地域 |
 | A02 | [音频规格](https://help.aliyun.com/zh/model-studio/asr-model) | 容器、时长、采样率、模型文件大小 |
 | A03 | [Filetrans HTTP API](https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-http-api) | 参数、句子JSON、子任务结果 |
 | A04 | [提高识别准确率](https://help.aliyun.com/zh/model-studio/improve-asr-accuracy) | 即时热词、超级词、上下文 |
+| A05 | [定制热词Python SDK参考](https://docs.bailian.console.aliyun.com/zh/model-studio/vocabulary-python-sdk) | 区分词条text/weight与预编译词表prefix的约束 |
 | A06 | [临时文件URL](https://help.aliyun.com/zh/model-studio/get-temporary-file-url/) | 临时OSS限制及有效期 |
 | A07 | [异步任务管理](https://help.aliyun.com/zh/model-studio/manage-asynchronous-tasks) | 通用任务状态 |
 | A08 | [百炼错误码](https://www.alibabacloud.com/help/zh/model-studio/error-code) | API错误解释 |
@@ -30,7 +31,7 @@ API资料核验基线：2026-09-29。CLI固定2.1.0，对照源码提交`8bbbbc7
 
 | 项目 | 当前依据与处理 |
 | --- | --- |
-| 模型/地域 | qwen-audio-3.0-asr-flash-filetrans，首版北京[A01] |
+| 模型/地域 | qwen-audio-3.1-asr-flash-filetrans，首版北京[A01] |
 | 输入 | 单文件；模型<=2GB、<=12小时，任意采样率[A02] |
 | 容器 | aac/amr/avi/flac/flv/m4a/mkv/mov/mp3/mp4/mpeg/ogg/opus/wav/webm/wma/wmv；只处理音频，不提供视频编辑[A02] |
 | 临时上传 | 官方1GB，项目采用1,000,000,000字节阈值；限制实际上传副本，超限不压缩/切片重试[A06] |
@@ -41,11 +42,15 @@ API资料核验基线：2026-09-29。CLI固定2.1.0，对照源码提交`8bbbbc7
 | 上下文 | 单段<=400个Unicode字符，应包含要识别的相关原词，不作为模型行为指令[A04] |
 | 组合增强 | input.context和parameters.vocabulary可同时存在；BL同一请求已核对[A03] |
 | 音轨 | channel_id指音轨，默认[0]；不同于PyAV音轨内的channels。当前不开放选择 |
-| 未开放参数 | special_word_filter没有已核实BL公开入口；keep_dialect只属3.1，固定3.0不使用 |
+| 未开放参数 | 固定BL2.1的help及commands/core/runtime发布源码均无keep_dialect、special_word_filter入口；当前沿用模型缺省行为，不绕过CLI接入这些API参数 |
 
 Excel的5MB、20MiB解压、200个内部文件、10001行和两列是本地解析资源限制，集中在utils/hotwords.py，不冒称模型限额。模型输入规则集中在application/rules.py，界面从服务端取得显示限制。
 
 2026-10-04复核[A04]：热词和上下文规则保持上述来源。网页热词表的导入、手填和预览共用同一规则；权重文本只接受明确的`1`–`5`或`50`，Excel真实公式与普通文本分别处理。官方说明超过400字符的上下文会从末尾截断，本项目在本机提示用户精简后重查，避免静默丢失内容；不使用关键词规则判断上下文与录音的语义相关性。
+
+同日核对[A05]原页面：`text`要求实际词语及上述长度，`weight`常用值为4；未列出禁止英文缩写的规则。仅小写字母和数字、长度不超过10的限制针对预编译词表`prefix`，不是热词内容。该SDK页面的通用权重表为1–5；本项目使用Qwen 3.1即时热词，权重50的支持以[A03/A04]中明确针对该模型的说明为准。
+
+重复词由本项目在表格阶段拒绝：按原文精确比较，全部重复行（包括首次出现、权重相同或权重非法的行）都提示保留一行；不自动合并、统一权重、改写大小写或去除空白。这是本工具的输入约束，不把它宣称为已验证的云端错误行为。
 
 ## BL复用边界
 
@@ -61,6 +66,8 @@ Excel的5MB、20MiB解压、200个内部文件、10001行和两列是本地解�
 | 失败/轮询 | [http.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/client/http.ts)、[polling.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/runtime/src/utils/polling.ts) | 当前ASR请求失败上抛，正常未完成才轮询；不据此声称整个CLI所有命令都没有重试 |
 
 使用recognize完整模式，不传--async。项目传timeout=3600、poll-interval=5；Python进程上限3900秒。这是项目等待策略，不是官方处理承诺。最后JSON下载使用原生fetch，没有单独下载超时，保留外层进程上限。
+
+2026-10-04的真实BL本机合约确认：`--model qwen-audio-3.1-asr-flash-filetrans`被原样提交，热词与上下文可一起进入请求；全部可选设置关闭时仍有`parameters={"channel_id":[0]}`，符合[A03]对3.1必须携带parameters对象的要求。BL2.1帮助中的增强描述仍提到3.0，云端3.1能力以[A01/A03/A04]为依据，本机合约只验证CLI实际请求，不作为云端识别成功证明。
 
 BL可能跳过失败子项、写空数组，或在没有子结果时不写文件；因此退出0仍需检查实际JSON。固定单文件成功结果已实测为对象，包含file_url/properties/transcripts；句子含begin_time/end_time/text及可空speaker_id，时间单位毫秒。Python不猜字段别名，也不声称获得了全部云端子任务信封。
 

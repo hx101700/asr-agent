@@ -96,7 +96,7 @@ def validate_hotword_rows(payload: object) -> HotwordConfig:
 def build_vocabulary(rows: Iterable[HotwordRow]) -> HotwordConfig:
     """校验热词行并构建即时词典，汇总行级错误和导入提示。"""
     vocabulary: dict[str, int] = {}
-    first_rows: dict[str, int] = {}
+    word_rows: dict[str, list[int]] = {}
     details: list[HotwordIssue] = []
     warnings = []
     ignored_blank_rows = 0
@@ -110,6 +110,9 @@ def build_vocabulary(rows: Iterable[HotwordRow]) -> HotwordConfig:
         if text in (None, "") and weight in (None, "") and not invalid_fields:
             ignored_blank_rows += 1
             continue
+        # 重复问题属于整组词条，首行和权重不合法的行也需要显示。
+        if isinstance(text, str) and text.strip():
+            word_rows.setdefault(text, []).append(row_number)
         row_errors = []
         if "text" in invalid_fields:
             message = ("不接受公式，请填写固定文本和数值。" if isinstance(text, str) and text.startswith("=")
@@ -143,23 +146,23 @@ def build_vocabulary(rows: Iterable[HotwordRow]) -> HotwordConfig:
         text = cast(str, text)
         weight = int(cast(int | float, weight))
         if text in vocabulary:
-            if vocabulary[text] != weight:
-                details.append({"row": row_number, "field": "weight",
-                                "message": translate("与第{first_row}行热词重复但权重不同，请统一。").format(
-                                    first_row=first_rows[text])})
-            else:
-                warnings.append(translate("第{row}行与第{first_row}行完全相同，已合并为一个词条。").format(
-                    row=row_number, first_row=first_rows[text]))
             continue
         vocabulary[text] = weight
-        first_rows[text] = row_number
         if len(vocabulary) > MAX_HOTWORDS:
             details.append({"row": row_number, "field": "text", "message": "热词总数超过2000个，请减少。"})
         if weight == 50:
             super_count += 1
             if super_count > 50:
                 details.append({"row": row_number, "field": "weight", "message": "超级热词（权重50）最多50个。"})
+    for repeated in word_rows.values():
+        if len(repeated) > 1:
+            for number in repeated:
+                other = repeated[1] if number == repeated[0] else repeated[0]
+                details.append({"row": number, "field": "text", "message": translate(
+                    "与第{other_row}行热词重复，请删除重复行，仅保留一行。"
+                ).format(other_row=other)})
     if details:
+        details.sort(key=lambda issue: issue["row"])
         raise ValidationError("请修改热词表格中标红的单元格后重新检查。", "hotword_rows", details)
     if not vocabulary:
         raise ValidationError("请至少填写一个热词及其权重，或关闭热词增强。", "hotword_rows",

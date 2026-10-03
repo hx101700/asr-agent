@@ -24,7 +24,6 @@ from openpyxl.styles import Alignment, Border, Font, Side
 from openpyxl.worksheet.properties import PageSetupProperties
 from openpyxl.worksheet.worksheet import Worksheet
 
-from .. import MODEL
 from ..models import Sentence, Transcript
 
 FONT_NAME = "等线"
@@ -42,7 +41,7 @@ class DocumentError(ValueError):
 class DocumentWriter(Protocol):
     """约定三种文档生成函数共用的输入参数。"""
 
-    def __call__(self, transcript: Transcript, path: Path, *, source_name: str, job_id: str) -> None:
+    def __call__(self, transcript: Transcript, path: Path, *, source_name: str, job_id: str, model: str) -> None:
         """将转写内容与任务标签写入指定格式文件。"""
         ...
 
@@ -56,10 +55,10 @@ def timestamp(milliseconds: int) -> str:
 
 
 def publish_document(writer: DocumentWriter, transcript: Transcript, final_path: Path, *,
-                     source_name: str, job_id: str) -> int:
+                     source_name: str, job_id: str, model: str) -> int:
     """先生成临时文件，再替换同名成品并返回文件大小。"""
     temporary = final_path.with_name("transcription.partial" + final_path.suffix)
-    writer(transcript, temporary, source_name=source_name, job_id=job_id)
+    writer(transcript, temporary, source_name=source_name, job_id=job_id, model=model)
     temporary.replace(final_path)
     return final_path.stat().st_size
 
@@ -123,7 +122,7 @@ def _row_height(text: str, width: float) -> float:
     return min(409, max(30, 20 * lines + 10))
 
 
-def write_xlsx(transcript: Transcript, path: Path, *, source_name: str, job_id: str) -> None:
+def write_xlsx(transcript: Transcript, path: Path, *, source_name: str, job_id: str, model: str) -> None:
     """写入带时间、标签和正文的Excel，并回读核验内容。"""
     if len(transcript.sentences) + FIRST_ROW - 1 > 1_048_576:
         raise DocumentError("转写段落超过Excel工作表行数上限，本次未截断内容。")
@@ -137,7 +136,7 @@ def write_xlsx(transcript: Transcript, path: Path, *, source_name: str, job_id: 
         widths = (8, 22, 18, 18, 18, 88)
         for column_letter, width in zip("ABCDEF", widths):
             sheet.column_dimensions[column_letter].width = width
-        metadata = (_title(source_name), f"模型：{MODEL}    任务：{job_id}")
+        metadata = (_title(source_name), f"模型：{model}    任务：{job_id}")
         workbook.properties.title = metadata[0]
         for row, value in enumerate(metadata, 1):
             sheet.merge_cells(start_row=row, start_column=1, end_row=row, end_column=6)
@@ -241,9 +240,9 @@ def _word_style(style: ParagraphStyle, *, size: float, bold: bool = False) -> No
         fonts.attrib.pop(qn(f"w:{attribute}"), None)
 
 
-def write_docx(transcript: Transcript, path: Path, *, source_name: str, job_id: str) -> None:
+def write_docx(transcript: Transcript, path: Path, *, source_name: str, job_id: str, model: str) -> None:
     """写入按段落排版的Word，并回读核验内容。"""
-    expected = [_title(source_name), f"模型：{MODEL}", f"任务：{job_id}"]
+    expected = [_title(source_name), f"模型：{model}", f"任务：{job_id}"]
     try:
         document = Document()
         section = document.sections[0]
@@ -324,9 +323,9 @@ def _markdown_text(text: str) -> str:
     return "".join(result)
 
 
-def write_markdown(transcript: Transcript, path: Path, *, source_name: str, job_id: str) -> None:
+def write_markdown(transcript: Transcript, path: Path, *, source_name: str, job_id: str, model: str) -> None:
     """写入按段落组织的UTF-8 Markdown，保留时间、标签与原文字符。"""
-    parts = [f"# {_markdown_text(_title(source_name))}", f"模型：{_markdown_text(MODEL)}",
+    parts = [f"# {_markdown_text(_title(source_name))}", f"模型：{_markdown_text(model)}",
              f"任务：{_markdown_text(job_id)}"]
     for sentence in transcript.sentences:
         parts.extend((f"### {_label(sentence, separator=' · ')}", _markdown_text(sentence.text)))

@@ -8,7 +8,6 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import cast
 
-from .. import MODEL
 from ..models import DeliveryReport, ExecutionReport, JobConfig
 from .environment import Runtime, SetupError
 from .files import write_json_atomic
@@ -56,14 +55,16 @@ def read_config(runtime: Runtime, job_id: str) -> JobConfig:
         if hashlib.sha256(content).hexdigest() != checksum.read_text(encoding="ascii").strip():
             raise SetupError("已保存的配置发生变化，请重新检查并确认；未执行转写。")
         config = json.loads(content)
+        # 模型记录用于标注原结果；是否允许新上传由转写入口按当前固定模型判断。
         valid = (config["schema_version"] == 1 and config["job_id"] == job_id
-                 and config["model"] == MODEL and config["region"] == "cn-beijing"
+                 and isinstance(config["model"], str) and bool(config["model"].strip())
+                 and config["region"] == "cn-beijing"
                  and config["status"] == "CONFIGURED"
                  and config["execution_authorized"] is False and bool(config["confirmed_at"]))
     except (OSError, ValueError, KeyError, TypeError) as exc:
         raise SetupError("无法读取已确认的配置，请通过网页重新检查并保存。") from exc
     if not valid:
-        raise SetupError("任务配置与当前模型、地域或保存协议不符，未执行。")
+        raise SetupError("任务配置的模型名称、地域或保存协议不符，未执行。")
     # 配置由publish_config生成；上面的协议和摘要检查确定读取的是确认快照。
     return cast(JobConfig, config)
 
