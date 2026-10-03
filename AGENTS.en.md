@@ -32,6 +32,7 @@ These instructions govern the source repository. To resume work, read [doc/READM
 
 ## Execution and delivery
 
+- Start a new transcription by opening the local configuration page, where the user selects the recording. Reuse the current task folder or the workspace already agreed for this session. Use `serve --no-browser` when the host provides browser tools, and confirm opening through actual page state. A startup receipt or system-browser request does not prove that the page is visible.
 - The page receives local file bytes and saves a confirmed snapshot. The same `serve` process returns `job_id` to Codex. Saving does not start BL.
 - Preview establishes the audio SHA baseline and saves the hotword vocabulary. Confirmation reuses the snapshot and checks audio size/mtime. Execution checks the complete audio digest; later stages do not reread the original Excel file.
 - After authorization covers the recording and enhancement content, use `transcribe --job ID --authorize-upload`. Each task permits one execution attempt. Stop on failure or an unknown result; do not retry automatically or remove the execution reservation.

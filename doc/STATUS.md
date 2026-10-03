@@ -4,32 +4,33 @@
 
 ## 产品与实现
 
-MemoFlow 的目标是将语音输入整理为符合用户习惯和指定格式的会议纪要，并从确认后的范例与修改中改善后续结果。当前完成第一阶段 `asr-transcription` Skill：配置单个录音，经官方 BL CLI 转写，交付原始 JSON、Word、Excel 和 Markdown 供用户校对。个性化纪要与反馈学习尚待第二阶段实现。
+MemoFlow 的目标是把录音整理为符合用户习惯和指定格式的会议纪要，并从用户确认的范例与修改中改善后续结果。当前第一阶段 `asr-transcription` 提供本机网页配置、BL 转写及 JSON、Word、Excel、Markdown 校对稿；个性化纪要与反馈学习属于后续阶段。
 
-Skill 位于 `skills/asr-transcription/`，CLI 入口为 `scripts/asr.py`，Python 执行包为 `scripts/asr_runtime/`。代码保持入口 → application → utils；前端为 Vue 3、TypeScript、Element Plus。运行环境、凭据与任务写入用户工作目录，Skill 资源保持只读。
+Skill 位于 `skills/asr-transcription/`，入口为 `scripts/asr.py`，执行包为 `scripts/asr_runtime/`。代码保持入口 → application → utils，前端为 Vue 3、TypeScript、Element Plus。
 
-## 当前工作：依赖下载恢复
+## 当前工作：页面启动与选择录音
 
-已完成并发布安装器改进：
+本轮修正真实使用中出现的启动误导：
 
-- 安装前并行采样 PyPI 与阿里云镜像的文件前缀，优先选择较快来源。
-- 使用摘要锁定的 pip 26.2.1，业务依赖的中断恢复由 pip 处理；每来源一次下载流程，失败后尝试另一个来源。
-- 完整 wheel 保存在私有工作目录，下载成功后再从本机文件安装；本机安装错误不触发换源。
-- 安装进程持续输出进度并同步写日志，没有下载总耗时上限。
-- 云端转写继续保持失败不自动重试，npm 安装仍为单次尝试。
+- 新转写先打开网页，录音由网页文件选择器接收；工作目录优先复用会话约定，否则采用当前任务目录。
+- 有宿主浏览器工具时使用 `serve --no-browser`，打开完整启动 URL，并依据实际页面或用户反馈确认显示。
+- `serve` 输出 `event=listening` 及 `browser_request`，分别表示端口监听和系统打开请求结果。系统调用失败时保留本机服务，启动回执写入失败时关闭服务。
+- 宿主没有页面查看能力时请用户确认，不为检查网页额外扫描或控制桌面应用。本机配置页与 BL 授权页分开说明。
 
-相关代码为 `application/bootstrap.py` 和 `utils/installation.py`。Skill、使用说明、开发规则和安装 UML 已同步。
+定向启动、HTTP与打包检查共51项通过，mypy检查29个文件通过，官方Skill格式校验通过。新候选包在本对话实际显示，用户已确认；另在用户指定的agent对话启动同一候选代码，主对话通过浏览器接口核对该实例的页面和截图。实际证据与范围见[ACCEPTANCE](ACCEPTANCE.md)。
 
-本轮在新空目录完成联网安装，PyAV 27.6 MB 完整下载，Python 依赖及 BL 2.1.0 安装成功，doctor 的 issues 为空。发行 ZIP 解压代码执行 306 项 Python 回归通过、无跳过，包含真实 pip 的断流/续传、重新下载与摘要拒绝，以及 BL 本机合约；mypy 检查 29 个文件通过。实际范围见 [ACCEPTANCE](ACCEPTANCE.md)。
+前端构建文件始终包含在ZIP中；本轮只修改启动代码与指引，静态HTML、JavaScript和CSS保持原有内容。
 
-发行包：`dist/asr-transcription.zip`，43 个文件，272860 字节。SHA-256：`3f8cf2ba1221b6d8ca84ca2948974376e00c69291c13d2513fc839a99a03d745`。仅新增必要的安装工具模块，开发文档、UML、测试、安装环境、wheel 缓存和用户数据均在包外。
+## 清理与用户当前操作
+
+用户指定测试位置中的旧ZIP、旧运行目录和用户级asr-transcription Skill已删除。agent对话复测产生的空白临时副本也已清理，原始MP3保留。
+
+用户随后在本项目 `.runtime/browser-startup-case/work` 的页面自行添加真实录音并完成本机预览。该页面、服务和工作目录已保留，未执行云端识别；后续清理须先确认用户已结束操作。这个目录用于本轮页面验证，复用开发Python依赖，不代表已完成其独立工作区的BL环境准备。
 
 ## 分支与发布
 
-仓库为 [hx101700/memoflow](https://github.com/hx101700/memoflow)，开发分支为 `dev`。安装器实现提交 `3df8d2166e9d1a9de02f359fe6740850be7f2ca7` 已推送。现有 [v0.1.0 开发预览](https://github.com/hx101700/memoflow/releases/tag/v0.1.0) 已更新中英文说明及 ZIP，旧附件已替换，公开下载与上述本地包逐字节一致；远端代码、文档和图稿的完整文件树核对通过。
+开发分支为 `dev`，项目版本保持 `0.1.0`。本轮按用户要求更新同一个 v0.1.0 开发预览；发布结果在远端核对后补充，`master`保持不变。
 
-远端只保留一个 `v0.1.0` 标签和一个开发预览。项目版本保持 `0.1.0`，只有正式发布到 `master` 时才变更；`master` 保持 `6c8371135d92b9f9d3bd52ca9ee246747f0c7f5e`，本轮未合并。
+待发布ZIP：`dist/asr-transcription.zip`，43个文件、274650字节，SHA-256：`03756c1cd8a0f645713bc399f30a250f5ccde22c2944f92fb63bff460ee6f706`。仅包含Skill运行所需文件；开发文档、UML、测试、运行环境及用户数据不入包。
 
-## 下一步
-
-从 Release 下载新 ZIP 并更新安装测试所用的 Skill 副本，验证目标网络中的安装体验。完整第一阶段验收仍需目标 Windows 的新 Codex 对话、真实云端识别、原生目录窗口与 Office 视觉证据；随后再决定 `master` 里程碑。限制见 [ISSUES](ISSUES.md)，模块见 [DEVELOPMENT](DEVELOPMENT.md)，图示见 [UML](UML.md)。
+原Windows红色错误弹窗的具体错误码未保留，原因仍未确认。已验证的修复范围是网页启动指引、回执语义，以及通过宿主浏览器打开页面。后续完整使用、BL授权和真实识别按用户需求单独验收。

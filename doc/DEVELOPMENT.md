@@ -53,7 +53,7 @@ skills/asr-transcription/       # 独立安装的 Skill，运行时只读
 └── transcriptions/            # 默认结果保存根
 ```
 
-`Runtime(workspace, skill_root)` 传递这两种目录的边界：`resource(relative)` 读取 Skill 内的文件，`path(relative)` 定位私有运行目录中的文件，`output_root` 给出默认结果目录，`check_output_path(path)` 检查输出位置。工作目录必须是用户选定、已经存在的目录，位于 Skill 安装目录之外。私有运行目录与 Skill 目录互不包含。所有 CLI 命令必须显式提供 `--workspace`，与当前终端目录无关。
+`Runtime(workspace, skill_root)` 传递这两种目录的边界：`resource(relative)` 读取 Skill 内的文件，`path(relative)` 定位私有运行目录中的文件，`output_root` 给出默认结果目录，`check_output_path(path)` 检查输出位置。Skill优先复用会话中已约定的工作目录，否则采用当前任务目录；该目录须已存在且位于Skill安装目录之外。私有运行目录与 Skill 目录互不包含。CLI仍显式接收`--workspace`，按该参数定位文件。录音输入由网页选择，不作为工作目录选择或服务启动的前提。
 
 同一 Skill 可以服务不同工作目录。凭据和任务按工作目录分开，Skill 移动不改变既有工作目录里的任务文件。这里的“私有运行目录”表示当前工作区单独使用的存储位置；实际读写仍受 Windows 文件权限和执行工具权限约束。
 
@@ -100,6 +100,10 @@ Python 运行模块位于 `skills/asr-transcription/scripts/asr_runtime/`。多�
 Python 的 TypedDict 描述已有 JSON 字段和允许的状态，数据在运行时保持普通字典；业务规则和外部输入仍由现有解析边界检查。TypeScript 定义表单、页面状态、端点回执和组件接口，开发时通过 `vue-tsc` 核对 Vue 单文件组件及脚本。类型声明与实际验证各自承担明确职责。
 
 ## 页面与界面偏好
+
+`serve`持续运行并输出`event=listening`、URL、PID及`browser_request`。`skipped`表示由宿主浏览器工具打开；`requested`表示系统接受打开请求；`failed`表示返回失败或抛出浏览器异常。浏览器失败时仍保持HTTP服务供调用方打开同一URL；启动输出失败时关闭服务器。是否实际显示页面，由浏览器工具状态或用户反馈确认。
+
+有浏览器工具时，Codex使用`serve --no-browser`并打开返回的完整URL；只有系统浏览器可用时才调用默认打开方式。新转写从配置页的文件选择器开始。本机配置页与BL的阿里云授权页是两个阶段：确认配置后再按认证方式和已有凭据决定是否执行login。
 
 `App.vue` 组合 Element Plus 控件及三个视图组件。`useTranscription()` 保存页面用例所需的响应式状态，`model.ts` 计算操作权限、构造配置并处理预览与回执；`ReviewPanel.vue` 从同一表单或已检查快照派生摘要。`ViewEffects` 将焦点、模板下载和 Key 控件读写留在视图侧。
 

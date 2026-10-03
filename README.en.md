@@ -22,10 +22,10 @@ First, [register an Alibaba Cloud account](https://help.aliyun.com/zh/account/st
 Send the distribution package `asr-transcription.zip` to Codex with this request:
 
 ```text
-Install this ZIP as the asr-transcription Skill. Read its SKILL.md and prepare the required environment. First, let me choose a workspace for recording tasks and results.
+Install this ZIP as the asr-transcription Skill. Read its SKILL.md and prepare the required environment in the current task folder.
 ```
 
-The Skill location holds tools and instructions. Your workspace holds the runtime environment, credentials, tasks, and results. Windows 10/11 x64, Python 3.12 x64, and Node.js 18.17+ with npm are required. Initial setup needs internet access. See the [usage guide](skills/asr-transcription/references/usage.md) for details.
+The Skill location holds tools and instructions. Your workspace holds the runtime environment, credentials, tasks, and results. It defaults to the current task folder; you can ask Codex to use another location. Windows 10/11 x64, Python 3.12 x64, and Node.js 18.17+ with npm are required. Initial setup needs internet access. See the [usage guide](skills/asr-transcription/references/usage.md) for details.
 
 ## Quick start
 

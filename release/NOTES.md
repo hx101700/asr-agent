@@ -12,13 +12,15 @@ MemoFlow 的目标是将录音整理为符合你的习惯和指定格式的会�
 
 首次准备环境时，安装器会比较 PyPI 与阿里云镜像的文件下载速度，优先使用较快来源。下载中断时由 pip 尝试恢复，仍失败再换另一个来源；已完整下载的文件可以复用。安装进度会持续显示，便于了解当前状态。
 
+告诉 Codex“帮我转写录音”后，它会打开配置网页，你可以点击“添加音频”选取文件。这次预览改进了页面打开的判断和提示；如果网页没有显示，Codex 会继续帮助你打开已启动的页面。
+
 ### 安装与文件保存
 
 Skill 可以独立安装，录音任务、凭据和依赖保存在你选择的工作目录。保存位置会避开 Skill 程序目录，方便分别管理工具和转写文件。
 
 ### 开始使用
 
-下载 [asr-transcription.zip](https://github.com/hx101700/memoflow/releases/download/v0.1.0/asr-transcription.zip) 后交给 Codex，要求安装为 Skill，并阅读其中的 `SKILL.md`。选择独立的工作目录后，Codex 会按说明准备环境并打开配置网页，再按所选方式引导认证。
+下载 [asr-transcription.zip](https://github.com/hx101700/memoflow/releases/download/v0.1.0/asr-transcription.zip) 后交给 Codex，要求安装为 Skill，并阅读其中的 `SKILL.md`。Codex 默认在当前任务文件夹准备环境，打开配置网页后，再按你选择的方式引导认证。
 
 当前支持 Windows 10/11 x64，需要 Python 3.12 x64、Node.js 18.17+ 与 npm。识别使用北京地域的 `qwen-audio-3.0-asr-flash-filetrans`，上传及识别可能产生调用费用。个性化纪要、样式偏好和反馈学习将在第二阶段实现。
 

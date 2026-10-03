@@ -6,7 +6,7 @@
 
 本机需要Windows 10/11 x64、CPython 3.12 x64（含venv、ensurepip和tkinter）、Node.js 18.17.0或更高版本及npm。依赖安装需要联网。运行时可从[Python](https://www.python.org/downloads/windows/)和[Node.js](https://nodejs.org/en/download)官方页面获取。
 
-选择一个位于Skill安装目录之外的现有工作目录。Skill目录存放代码和参考资料；工作目录保存环境、凭据、任务和结果。所有命令都显式传入同一个`--workspace`。转写保存位置同样应在Skill目录之外。
+复用本次会话已约定的工作目录；无约定时使用当前Codex任务的现有目录并告知用户。只有缺少可用目录或目录位于Skill内时才另行选择。Skill目录存放代码和参考资料；工作目录保存环境、凭据、任务和结果，录音在网页中通过文件选择器添加。所有命令都显式传入同一个`--workspace`，保存位置应在Skill目录之外。
 
 在PowerShell中准备位置并安装依赖：
 
@@ -34,6 +34,8 @@ Python依赖从HTTPS PyPI或阿里云镜像下载并校验摘要，然后从本�
 
 ## 认证与运行
 
+先打开下文的本机转写页面，由用户选择录音与认证方式、保存配置，再按回执决定是否需要控制台登录。本机页面来自127.0.0.1；阿里云授权页面由BL的login命令另行打开。环境诊断doctor不执行登录。
+
 ### 控制台登录
 
 网页保持“使用指定API Key”未勾选。首次配置运行以下命令，用户在最后打开的阿里云官方页面完成授权：
@@ -56,7 +58,9 @@ Python依赖从HTTPS PyPI或阿里云镜像下载并校验摘要，然后从本�
 & $pythonPath -X utf8 $scriptPath --workspace $workspaceDir serve
 ```
 
-命令持续运行并默认打开浏览器。原生目录窗口需要正常Windows交互桌面，应遵循执行工具的权限流程启动。仅用另一个浏览器工具打开启动URL时才传`--no-browser`。URL含会话令牌，只用于本机页面，不贴入聊天、日志或截图。
+命令持续运行并默认请求系统浏览器打开页面。Codex提供浏览器打开/查看工具时，优先运行`serve --no-browser`，读取启动回执中的完整URL，再通过该工具打开并检查页面。原生目录窗口需要正常Windows交互桌面，应遵循执行工具的权限流程启动。
+
+启动回执为`event="listening"`，包含`url`、`pid`和`browser_request`：`skipped`表示由调用方工具负责打开，`requested`表示已向系统发出打开请求，`failed`表示该请求失败。系统接受请求不能证明页面已经显示；以实际浏览器页面或用户反馈确认。页面未出现时保留同一服务，按[页面打开问题](errors.md#页面打开问题)处理。URL含会话令牌，只用于本机页面，不贴入聊天、日志或截图。
 
 ## 网页配置
 

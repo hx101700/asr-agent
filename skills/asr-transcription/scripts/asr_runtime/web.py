@@ -9,6 +9,7 @@ from collections.abc import Mapping
 from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Literal
 from urllib.parse import unquote, urlsplit
 
 from .utils.environment import Runtime, SetupError
@@ -192,11 +193,16 @@ def serve(runtime: Runtime, *, port: int = 0, open_browser: bool = True) -> None
     """持续提供配置网页与进程回执，退出时释放本次服务资源。"""
     server = create_server(runtime, port)
     url = f"http://127.0.0.1:{server.server_port}/#token={server.session.token}"
-    # 仅在调用方的本地终端交付会话链接，不写Git或HTTP访问日志。
-    print(json.dumps({"url": url, "pid": os.getpid()}, ensure_ascii=False), flush=True)
-    if open_browser:
-        webbrowser.open(url)
     try:
+        browser_request: Literal["skipped", "requested", "failed"] = "skipped"
+        if open_browser:
+            try:
+                browser_request = "requested" if webbrowser.open(url) else "failed"
+            except (OSError, webbrowser.Error):
+                browser_request = "failed"
+        # 请求被系统接受与页面实际显示分别确认；完整链接仅交付给调用方工具。
+        print(json.dumps({"event": "listening", "url": url, "pid": os.getpid(),
+                          "browser_request": browser_request}, ensure_ascii=False), flush=True)
         server.serve_forever()
     except KeyboardInterrupt:
         pass

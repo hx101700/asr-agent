@@ -22,10 +22,10 @@ MemoFlow 的目标是把录音整理成符合你习惯和指定格式的会议�
 将发行包 `asr-transcription.zip` 和下面这句话发给 Codex：
 
 ```text
-请将这个 ZIP 安装为 asr-transcription Skill，阅读其中的 SKILL.md，并按说明准备运行环境。请先让我选择存放录音任务和结果的工作目录。
+请将这个 ZIP 安装为 asr-transcription Skill，阅读其中的 SKILL.md，并按说明在当前任务文件夹准备运行环境。
 ```
 
-Skill 安装位置存放工具与说明；你选择的工作目录存放运行环境、凭据、任务和结果。当前支持 Windows 10/11 x64，需要 Python 3.12 x64 和 Node.js 18.17+（含 npm），首次准备环境需要联网。详细说明见[使用指南](skills/asr-transcription/references/usage.md)。
+Skill 安装位置存放工具与说明；工作目录存放运行环境、凭据、任务和结果，默认使用当前任务文件夹，也可以告诉 Codex 使用其他位置。当前支持 Windows 10/11 x64，需要 Python 3.12 x64 和 Node.js 18.17+（含 npm），首次准备环境需要联网。详细说明见[使用指南](skills/asr-transcription/references/usage.md)。
 
 ## 快速开始
 

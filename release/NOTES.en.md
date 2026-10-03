@@ -12,13 +12,15 @@ MemoFlow is being built to turn recordings into meeting minutes that follow your
 
 During initial setup, the installer compares file download speeds from PyPI and the Aliyun mirror and starts with the faster source. pip attempts to recover interrupted downloads, then the installer switches sources if recovery fails. Complete downloads can be reused, and progress stays visible throughout setup.
 
+Tell Codex “Please transcribe a recording” to open the configuration page, then click “Add audio” to choose a file. This preview improves how Codex checks and reports whether the page has opened. If it has not appeared, Codex helps you open the page from the running service.
+
 ### Installation and file storage
 
 Install the Skill independently and keep recording tasks, credentials, and dependencies in your chosen workspace. Save locations stay outside the Skill's program directory, so you can manage the tools and transcript files separately.
 
 ### Get started
 
-Download [asr-transcription.zip](https://github.com/hx101700/memoflow/releases/download/v0.1.0/asr-transcription.zip) and send it to Codex and ask it to install the Skill and read its `SKILL.md`. Choose a separate workspace. Codex prepares the environment and opens the configuration page, then guides authentication for the method you choose.
+Download [asr-transcription.zip](https://github.com/hx101700/memoflow/releases/download/v0.1.0/asr-transcription.zip), send it to Codex, and ask it to install the Skill and read its `SKILL.md`. Codex prepares the environment in the current task folder by default, opens the configuration page, then guides authentication for the method you choose.
 
 Windows 10/11 x64, Python 3.12 x64, and Node.js 18.17+ with npm are required. Recognition uses `qwen-audio-3.0-asr-flash-filetrans` in Beijing and may incur charges. Personalized minutes, style preferences, and learning from feedback are planned for stage two.
 
