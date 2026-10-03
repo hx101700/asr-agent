@@ -124,6 +124,14 @@ class DocumentTests(RuntimeTestCase):
         with patch.object(Workbook, "save", corrupt), self.assertRaisesRegex(DocumentError, "回读"):
             self.write(write_xlsx, "xlsx")
 
+    def test_word_keeps_full_title_for_maximum_audio_filename(self):
+        """验证合法长文件名生成Word时保留完整正文标题。"""
+        source_name = "a" * 251 + ".wav"
+        path = self.output("docx")
+        write_docx(sample(), path, source_name=source_name, job_id="a" * 32)
+        document = Document(path)
+        self.assertEqual(document.paragraphs[0].text, "a" * 251 + " 录音转写")
+
     def test_word_roundtrip_retains_exact_text_tags_and_styles(self):
         """验证Word回读保留正文、标签和字体格式。"""
         text = "  原文\t测试\r\n下一行\r单独回车 & <标签> 😀 "

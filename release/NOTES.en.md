@@ -20,6 +20,8 @@ Model Studio Console login uses your system default browser. Codex does not open
 
 If a save location is missing or occupied by a file, the folder picker now opens from your working folder so you can choose another location. This update also simplifies data passed between the page and local service and removes unused compatibility code.
 
+The Skill now gives clearer guidance for new recordings, re-exporting existing tasks, and updating credentials. You can save a new API key on the page without adding a recording, with separate guidance for Console credential problems. Word export also handles longer recording filenames while keeping the complete title in the document.
+
 ### Installation and file storage
 
 Install the Skill independently and keep recording tasks, credentials, and dependencies in your chosen workspace. Save locations stay outside the Skill's program directory, so you can manage the tools and transcript files separately.

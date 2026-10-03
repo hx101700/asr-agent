@@ -42,6 +42,22 @@ export function useTranscription(api: Api, view: ViewEffects, t: Translate, make
     }
   }
 
+  // 保存显示组件中的 Key，并按凭据版本更新保存状态。
+  async function persistApiKey(): Promise<boolean> {
+    const revision = model.auth.revision;
+    const value = view.getApiKey();
+    if (!value) throw new UiError(t("keyNotReady"), "auth_mode");
+    model.auth.status = "saving";
+    try { await api.request("/api/save-api-key", { value }); }
+    catch (reason) {
+      if (revision === model.auth.revision) model.auth.status = "failed";
+      throw uiError(reason, t("failed"), "auth_mode");
+    }
+    if (revision !== model.auth.revision) return false;
+    model.auth.status = "ready";
+    return true;
+  }
+
   const actions = {
     // 标记凭据输入已修改，使当前预览失效。
     keyChanged(): void {
@@ -51,6 +67,15 @@ export function useTranscription(api: Api, view: ViewEffects, t: Translate, make
       error.value = null;
       invalidatePreview(model);
     },
+
+    // 将当前 Key 单独保存到工作目录并返回保存结果。
+    async saveApiKey(): Promise<boolean> {
+      if (!form.useApiKey || !availability(model).changeAuth || !["dirty", "failed"].includes(model.auth.status)) return false;
+      error.value = null;
+      try { return await persistApiKey(); }
+      catch (reason) { fail(reason); return false; }
+    },
+
     // 加载本机会话并恢复已保存的回执。
     async start(): Promise<void> {
       try {
@@ -179,17 +204,11 @@ export function useTranscription(api: Api, view: ViewEffects, t: Translate, make
       model.phase = "validating";
       try {
         if (form.useApiKey && model.auth.status !== "ready") {
-          const authRevision = model.auth.revision;
-          const value = view.getApiKey();
-          if (!value) throw new UiError(t("keyNotReady"), "auth_mode");
-          model.auth.status = "saving";
-          try { await api.request("/api/save-api-key", { value }); }
-          catch (reason) {
-            if (authRevision === model.auth.revision) model.auth.status = "failed";
-            throw uiError(reason, t("failed"), "auth_mode");
+          const saved = await persistApiKey();
+          if (!saved || revision !== model.revision) {
+            model.phase = "editing";
+            return;
           }
-          if (authRevision === model.auth.revision) model.auth.status = "ready";
-          if (revision !== model.revision) { model.phase = "editing"; return; }
         }
         const result = await api.request("/api/validate", config);
         if (receiveValidation(model, revision, result, config)) view.focus("review");

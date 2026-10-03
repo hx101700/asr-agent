@@ -281,6 +281,66 @@ test("空Key允许网页填写，检查时先保存，再提交无Key配置", as
   assert.equal(JSON.stringify(page.model).includes("fixture-new-key"), false);
 });
 
+test("无音频可单独保存Key，后续校验复用已保存值且不创建任务", async () => {
+  const page = harness();
+  await page.actions.start();
+  await page.actions.setAuthMode(true);
+  page.view.apiKey = "fixture-standalone-key";
+  page.actions.keyChanged();
+  assert.equal(await page.actions.saveApiKey(), true);
+  assert.equal(page.model.auth.status, "ready");
+  assert.equal(page.model.phase, "editing");
+  assert.equal(page.model.uploads.audio.id, null);
+  assert.equal(page.model.receipt, null);
+  assert.deepEqual(page.calls.map(call => call.path), ["/api/session", "/api/api-key", "/api/save-api-key"]);
+  assert.deepEqual(page.calls.at(-1)?.payload, { value: "fixture-standalone-key" });
+  assert.equal(JSON.stringify(page.model).includes("fixture-standalone-key"), false);
+  assert.equal(JSON.stringify(page.form).includes("fixture-standalone-key"), false);
+  assert.equal(await page.actions.saveApiKey(), false);
+  await page.actions.upload("audio", [audio]);
+  await page.actions.validate();
+  assert.equal(page.model.phase, "review");
+  assert.equal(lastConfig(page).auth_mode, "api_key");
+  assert.equal(JSON.stringify(lastConfig(page)).includes("fixture-standalone-key"), false);
+  assert.equal(page.calls.filter(call => call.path === "/api/save-api-key").length, 1);
+  assert.equal(page.calls.filter(call => call.path === "/api/confirm").length, 0);
+});
+
+test("单独保存Key失败保留输入与失败状态，不校验或自动重试", async () => {
+  const page = harness({ "/api/save-api-key": () => { throw new UiError("不能写入", "auth_mode", 422); } });
+  await page.actions.start();
+  await page.actions.setAuthMode(true);
+  page.view.apiKey = "fixture-standalone-key";
+  page.actions.keyChanged();
+  assert.equal(await page.actions.saveApiKey(), false);
+  assert.equal(page.model.auth.status, "failed");
+  assert.equal(page.model.phase, "editing");
+  assert.equal(page.view.apiKey, "fixture-standalone-key");
+  assert.equal(page.view.focus, "auth_mode");
+  assert.equal(page.error.value?.field, "auth_mode");
+  assert.deepEqual(page.calls.map(call => call.path), ["/api/session", "/api/api-key", "/api/save-api-key"]);
+});
+
+test("单独保存Key期间不重复保存或发起表单校验", async () => {
+  const pending = deferred<Endpoints["/api/save-api-key"]>();
+  const page = harness({ "/api/save-api-key": () => pending.promise });
+  await page.actions.start();
+  await page.actions.setAuthMode(true);
+  page.view.apiKey = "fixture-standalone-key";
+  page.actions.keyChanged();
+  const saving = page.actions.saveApiKey();
+  assert.equal(page.model.auth.status, "saving");
+  assert.equal(await page.actions.saveApiKey(), false);
+  await page.actions.validate();
+  await page.actions.setAuthMode(false);
+  assert.equal(page.form.useApiKey, true);
+  assert.deepEqual(page.calls.map(call => call.path), ["/api/session", "/api/api-key", "/api/save-api-key"]);
+  pending.resolve({ ok: true });
+  assert.equal(await saving, true);
+  assert.equal(page.model.auth.status, "ready");
+  assert.equal(page.model.phase, "editing");
+});
+
 test("Key保存失败保留输入，停止校验且不自动重试", async () => {
   const page = harness({ "/api/save-api-key": () => { throw new UiError("不能写入", "auth_mode", 422); } });
   await addAudio(page);
@@ -290,6 +350,7 @@ test("Key保存失败保留输入，停止校验且不自动重试", async () =>
   page.actions.keyChanged();
   await page.actions.validate();
   assert.equal(page.model.phase, "editing");
+  assert.equal(page.model.auth.status, "failed");
   assert.equal(page.view.apiKey, "fixture-key");
   assert.equal(page.error.value?.field, "auth_mode");
   assert.equal(page.calls.filter(call => call.path === "/api/save-api-key").length, 1);
@@ -313,6 +374,28 @@ test("Key写入期间保持认证方式与显示值一致，不重新读取旧Ke
   await checking;
   assert.equal(page.view.apiKey, "fixture-new-key");
   assert.equal(page.model.phase, "review");
+});
+
+test("检查保存Key期间修改表单会停止旧校验，重新检查复用保存结果", async () => {
+  const pending = deferred<Endpoints["/api/save-api-key"]>();
+  const page = harness({ "/api/save-api-key": () => pending.promise });
+  await addAudio(page);
+  await page.actions.setAuthMode(true);
+  page.view.apiKey = "fixture-new-key";
+  page.actions.keyChanged();
+  const checking = page.actions.validate();
+  page.form.diarizationEnabled = false;
+  page.actions.changed();
+  pending.resolve({ ok: true });
+  await checking;
+  assert.equal(page.model.auth.status, "ready");
+  assert.equal(page.model.phase, "editing");
+  assert.equal(page.model.preview, null);
+  assert.equal(page.calls.filter(call => call.path === "/api/validate").length, 0);
+  await page.actions.validate();
+  assert.equal(page.model.phase, "review");
+  assert.equal(lastConfig(page).diarization_enabled, false);
+  assert.equal(page.calls.filter(call => call.path === "/api/save-api-key").length, 1);
 });
 
 test("空Key阻止检查；切回控制台后可继续", async () => {

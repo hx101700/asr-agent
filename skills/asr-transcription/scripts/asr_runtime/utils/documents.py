@@ -290,7 +290,6 @@ def write_docx(transcript: Transcript, path: Path, *, source_name: str, job_id: 
         page.set(qn("w:instr"), "PAGE")
         footer._p.append(page)
         footer.add_run(" 页")
-        document.core_properties.title = expected[0]
         document.core_properties.author = "asr-transcription"
         document.save(str(path))
         with path.open("rb") as stream:

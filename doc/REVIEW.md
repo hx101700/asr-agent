@@ -1,6 +1,6 @@
 # 代码审查
 
-日期：2026-10-03。本次审查覆盖Skill源码、前端、依赖声明、开发脚本、相关测试、使用文档及UML，采用全文阅读和调用追踪；检索用于修改后的引用核对。以当前业务消费者判断保留或删除逻辑，实际测试结果见[ACCEPTANCE](ACCEPTANCE.md)，历史修正通过Git追溯。
+日期：2026-10-03。本轮重新阅读实际源码并按用户动作追踪调用，未以既有自动测试或上轮结论替代审查。覆盖运行Python、前端、依赖边界和Skill指引；发现问题后才做最小复现及针对性回归。实际结果见[ACCEPTANCE](ACCEPTANCE.md)，历史修正通过Git追溯。
 
 ## 阅读覆盖
 
@@ -21,11 +21,10 @@ Python 代码路径相对于 `skills/asr-transcription/`；前端与开发配置
 
 | 位置 | 问题与处理 |
 | --- | --- |
-| `session.py::select_directory` | 默认或上次保存位置为普通文件时，目录窗口在打开前被拒绝；现在不可用起点回到当前工作目录。增加原生子进程边界回归，保留被占用文件 |
-| 目录请求与语言显示 | 删除仅被旧测试使用的picker_id自动生成，使用页面已有编号；语言列表仅传代码并复用前端本地化，删除无消费者的中文标签和语言切换转调函数 |
-| `SKILL.md` / `usage.md` | 合并重复的人工交接和登录状态说明，区分首次安装、故障诊断、凭据查询与登录分支；明确transcribe内自动完成导出，正常成功后按回执直接交付 |
-| `environment.py::run_process` | 安装已由run_installer管理，删除“安装传入None”的旧注释与无人使用的可空超时类型；短命令仍保留现有超时 |
-| 文档与UML | 删除指向当前验收页的旧轮次叙述；配置图同步语言代码及目录选择，状态图明确结果读取失败分支。核对全部图源，改动图稿重新渲染 |
+| `documents.py::write_docx` | 合法255字符文件名可能生成256字符标题，超过python-docx核心元数据的255字符限制。删除可选元数据标题赋值，正文标题完整保留；最小复现先失败，修正后回读通过 |
+| `SKILL.md` / `openai.yaml` | 描述聚焦录音转文字和已有任务重导，入口先选择任务类型；安装和异常细节按需读取引用资料，交付直接使用真实回执字段 |
+| 凭据修复说明 | 区分本机凭据存在与在线有效性。BL保留已有模型Key时，重复控制台登录不足以更换失效Key；复用当前工作目录中的BL原生配置命令处理明确失败，不新增鉴权服务 |
+| Key独立保存 | 原页面仅通过音频检查保存Key，单独修复凭据会被要求添加录音；复用已有保存接口与auth状态，增加独立保存操作，普通检查仍共用同一保存逻辑 |
 
 上述修正复用现有解析、样式和错误处理入口；没有增加新的运行校验层或兼容入口。STATUS与ACCEPTANCE统一描述当前版本，移除重复堆叠的迁移与验收叙述。
 
@@ -76,7 +75,16 @@ Vue 组件负责呈现和浏览器操作，useTranscription编排页面用例，
 
 ## Skill 指令审查
 
-对照[OpenAI Skill 文档](https://learn.chatgpt.com/docs/build-skills)和[技能指令写作建议](https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra)，入口保留触发范围、工作目录、主流程和交付判定；安装细节、错误分支与模型资料按需进入 references。Skill 描述当前可执行的转写能力，项目的个性化纪要目标写入产品文档。
+本轮核对[Agent Skills格式规范](https://agentskills.io/specification)、[OpenAI Skill文档](https://learn.chatgpt.com/docs/build-skills)和[指令写作建议](https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra)。当前结构符合必需的SKILL.md及name/description格式，scripts、references、assets按用途组织；agents/openai.yaml是OpenAI支持的可选展示元数据，隐式调用保持默认开启。
+
+参考方向限定为带本机脚本或外部CLI的任务型Skill：
+
+| 官方范例 | 借鉴点 | 本项目取舍 |
+| --- | --- | --- |
+| [transcribe](https://github.com/openai/skills/blob/main/skills/.curated/transcribe/SKILL.md) | 描述对应录音转写意图，固定脚本入口，说明输出和引用资料 | 保留BL与网页选文件；不采用其OpenAI模型、默认参数或重复识别策略 |
+| [gh-fix-ci](https://github.com/openai/skills/blob/main/skills/.curated/gh-fix-ci/SKILL.md) | 使用现有CLI，给出输入默认值、任务边界及可操作结果 | 认证按本项目已知状态选择，避免每次重复检查；不引入其计划审批流程 |
+
+入口先区分新录音与已有任务，正常路径保留必要的回执、授权及人工交接；安装、错误修复和模型限制按需加载。交付使用json_path和各READY文件的path，减少额外查找。范例用于设计参照，不表示外部Skill的全部规定都适用于本项目。
 
 独立审查完整阅读 Skill 与引用资料，并核对实际 CLI 帮助和代码。入口与实现一致，条件分支明确以下操作：
 

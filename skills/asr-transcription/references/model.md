@@ -17,6 +17,7 @@ API资料核验基线：2026-09-29。CLI固定2.1.0，对照源码提交`8bbbbc7
 | A08 | [百炼错误码](https://www.alibabacloud.com/help/zh/model-studio/error-code) | API错误解释 |
 | A09 | [模型系列SDK状态示例](https://help.aliyun.com/zh/model-studio/funauidio-asr-recorded-speech-recognition-python-sdk) | 状态/错误依据，不采用SDK实现 |
 | A10 | [CLI安装与鉴权](https://docs.bailian.console.aliyun.com/zh/model-studio/cli/installation) | 控制台授权与本地状态 |
+| A11 | [API Key获取与时效](https://help.aliyun.com/zh/model-studio/get-api-key) | 普通Key、临时Key及失效条件 |
 | A13 | [CLI语音识别](https://help.aliyun.com/zh/model-studio/cli/speech) | 公开recognize与out参数 |
 | W01 | [CreateProcessW](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw) | Windows命令行长度 |
 | W02 | [cmd](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/cmd)、[os.startfile](https://docs.python.org/3.12/library/os.html#os.startfile) | BL系统浏览器调用与完整链接转交 |
@@ -76,6 +77,14 @@ BL可能跳过失败子项、写空数组，或在没有子结果时不写文件
 2026-10-03再次核对固定源码及本机2.1.0发布包：[local-server.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/shared/local-server.ts)在Windows调用cmd/start传入URL，&needapikey参数存在被拆开的引用问题。[login-console.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/login-console.ts)在打开失败时输出完整备用链接，保持原回调服务至授权完成或15分钟超时；该版本未提供已核实的auth login禁用浏览器选项。
 
 本项目校验BL备用URL后用`os.startfile`交给系统默认浏览器，保留BL原授权会话、回调与凭据保存行为。登录命令按执行工具权限机制运行于正常Windows交互桌面，Codex不另外打开授权页。该固定版本可能先打开参数不完整的页面，再转交完整链接；仅使用最后的完整链接页面。
+
+### 后续调用与凭据修复
+
+2026-10-03核对固定2.1.0源码及本机CLI：模型凭据解析器选择显式参数、环境变量或配置中的api_key；控制台access_token用于另一类控制台请求。`auth status`读取本机authStore描述，不能证明Key当前可被云端接受。[resolver.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/auth/resolver.ts)、[status.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/status.ts)
+
+控制台登录仅在本机未保存模型Key时设置`needApiKey=true`。[login.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/login.ts)。明确无效的旧Key可通过`bl config set --config default --key api_key --value= --quiet`清空，然后复用官方登录。`config set`由BL更新指定字段，本机隔离合约已确认空Key不再出现在auth status中且console凭据保留；该命令不等于在线验证。[set.ts](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/config/set.ts)
+
+普通Key无固定失效时间，临时Key最长1800秒；具体失效条件以[A11]为准。Python只读写用户工作目录和解释BL错误，不实现Key刷新或独立鉴权服务。
 
 ### 更新与安装副作用
 

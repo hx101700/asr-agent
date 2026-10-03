@@ -41,6 +41,35 @@ URL中的会话令牌由打开页面的工具直接使用，不写入聊天或�
 
 BL返回完整备用链接时，Python会在系统浏览器中打开该链接，原login进程继续等待回调；以最后打开的完整链接页面为准。若Chrome仍报错，保留错误信息并停止本次登录，核对执行权限后再按用户意图发起。避免在已失败的受限环境中反复运行，也不通过额外打开Codex页面掩盖系统浏览器错误。
 
+## 鉴权失败与重新配置
+
+先读取BL返回的`code`、`http_status`和说明，区分凭据、模型权限、地域、业务空间及额度问题。`configured=true`只说明本机有凭据；不能仅凭401/403就断言Key过期，也不要对所有错误都要求重新登录。
+
+| 已确认的问题 | 处理方式 |
+| --- | --- |
+| 指定API Key缺失、填写错误或已失效 | 打开新的配置页，选择“使用指定 API Key”，让用户填写有效的北京地域Key并点击“保存 API Key”。页面提示保存成功后，本机Key已更新，可以关闭页面并结束该serve；无需添加音频或保存任务，该模式不运行控制台login。 |
+| 控制台模式缺少模型Key | 运行现有login入口，由BL获取并保存模型凭据。 |
+| 控制台令牌失效 | 需要使用控制台能力时运行login；ASR使用的是模型Key，不能因控制台令牌变化就认定模型Key也无效。 |
+| 控制台模式中已保存的模型Key被明确拒绝 | 按用户的修复意图，用下方BL原生命令清空本工作目录default Profile的api_key，再运行现有login入口；也可由用户选择改用网页指定Key。 |
+| 模型访问权限、地域、业务空间或额度问题 | 按官方错误说明处理对应配置或权限；重新登录或换Key不一定能解决。 |
+
+BL 2.1.0发现已保存的模型Key时，不会仅因重新控制台登录就请求另一份Key。这一分支使用BL公开配置命令，不手工改写BL配置文件，也不清除控制台等其他凭据。以下沿用[运行准备](usage.md#运行准备)中的变量，仅在已确认需要更换控制台模式的模型Key时执行：
+
+```powershell
+$blEntry = Join-Path $workspaceDir '.asr-transcription/.tools/bailian/node_modules/bailian-cli/dist/bailian.mjs'
+$previousBlConfigDir = $env:BAILIAN_CONFIG_DIR
+try {
+    $env:BAILIAN_CONFIG_DIR = Join-Path $workspaceDir '.asr-transcription/.state/bailian'
+    & node $blEntry config set --config default --key api_key '--value=' --quiet
+    if ($LASTEXITCODE -ne 0) { throw 'BL未完成本机Key配置更新。' }
+} finally {
+    $env:BAILIAN_CONFIG_DIR = $previousBlConfigDir
+}
+& $pythonPath -X utf8 $scriptPath --workspace $workspaceDir login
+```
+
+配置修复不改变已失败任务的执行记录，也不触发重传。若用户明确要求再次转写，说明原任务的已知`cloud_outcome`，按新录音流程重新确认设置并创建新任务；不删除旧占用或自动以新编号重试。命令依据见[固定BL登录与配置行为](model.md#后续调用与凭据修复)。
+
 ## 保存回执恢复
 
 网页仍在编辑时，保留同一`serve`会话，提示用户保存后发送“继续”，结束当前回复。网页已显示保存成功、但终端输出断开时，可从该网页或用户保留的回执取得确切`job_id`，运行`job-status --job JOB_ID`核对。

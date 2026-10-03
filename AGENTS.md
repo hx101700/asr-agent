@@ -16,7 +16,7 @@
 - Skill 源码在 `skills/asr-transcription/`，由 `SKILL.md`、`agents/openai.yaml`、`scripts/`、`references/`、`assets/` 组成。
 - `scripts/asr.py` 是调用入口，`scripts/asr_runtime/` 是内部 Python 执行包；Skill 名称仍为 `asr-transcription`。
 - `Runtime(workspace, skill_root)` 区分用户工作目录与 Skill 资源。`resource()` 读取 Skill 文件；`path()` 定位 `<workspace>/.asr-transcription/` 内的运行文件；默认输出根为 `<workspace>/transcriptions/`。私有运行目录与 Skill 目录互不包含，`check_output_path()` 在选择和生成文件时保护 Skill 资源。
-- 所有 CLI 命令使用 Skill 内 `scripts/asr.py` 的绝对路径，并显式传入 `--workspace`。依赖环境、BL 安装、凭据、暂存输入和任务记录写入工作目录，Skill 文件保持只读。
+- 本项目 CLI 命令使用 Skill 内 `scripts/asr.py` 的绝对路径，并显式传入 `--workspace`。凭据修复复用[错误说明](skills/asr-transcription/references/errors.md#鉴权失败与重新配置)中已核实的BL原生命令，限定当前工作目录与default Profile。依赖环境、BL 安装、凭据、暂存输入和任务记录写入工作目录，Skill 文件保持只读。
 - API Key 从私有运行目录 `.env` 读取；bootstrap 只复制空模板。网页允许用户填写或修改 Key，在“检查并预览”时保存到该固定文件。控制台模式使用 BL 在同一工作目录保存的配置。凭据不得写回 Skill。
 - 源码仓库包含 Skill 源文件，维护操作不自动安装到用户级或项目级 Skill 发现目录。
 

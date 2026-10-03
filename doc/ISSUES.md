@@ -2,7 +2,7 @@
 
 本文记录仍存在的不足和运行限制。Python 源码在 `skills/asr-transcription/scripts/asr_runtime/`，前端源码在 `frontend/`；实际验证范围见 [ACCEPTANCE](ACCEPTANCE.md)，工作与发布状态见 [STATUS](STATUS.md)。
 
-本轮已解决保存位置被普通文件占用时无法打开目录窗口的问题。不可用起点改为当前工作目录，回归覆盖默认位置冲突和原位置被替换或删除；处理依据见[REVIEW](REVIEW.md)。
+本轮人工复核解决长录音文件名导致Word导出失败的问题：保留完整正文标题，删除受255字符限制的可选元数据标题赋值。凭据修复区分模式与真实BL错误，独立保存Key复用现有接口；依据见[REVIEW](REVIEW.md)。
 
 ## 功能不足
 

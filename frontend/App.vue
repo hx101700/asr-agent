@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from "vue";
-import { ElAlert, ElButton, ElCard, ElCollapse, ElCollapseItem, ElConfigProvider, ElDescriptions, ElDescriptionsItem, ElDivider, ElForm, ElFormItem, ElIcon, ElInput, ElOption, ElResult, ElSelect, ElStep, ElSteps, ElSwitch, ElTag, ElTooltip } from "element-plus";
+import { ElAlert, ElButton, ElCard, ElCollapse, ElCollapseItem, ElConfigProvider, ElDescriptions, ElDescriptionsItem, ElDivider, ElForm, ElFormItem, ElIcon, ElInput, ElMessage, ElOption, ElResult, ElSelect, ElStep, ElSteps, ElSwitch, ElTag, ElTooltip } from "element-plus";
 import { Aim, ChatLineSquare, Check, Download, FolderOpened, Headset, Key, Monitor, Moon, Reading, Setting, Sunny, View } from "@element-plus/icons-vue";
 import en from "element-plus/es/locale/lang/en";
 import zhCn from "element-plus/es/locale/lang/zh-cn";
@@ -51,6 +51,11 @@ const locale = computed(() => language.value === "en" ? en : zhCn);
 const step = computed(() => model.phase === "saved" ? 3 : model.preview || model.phase === "save_unknown" ? 1 : 0);
 const contextLength = computed(() => Array.from(form.context).length);
 const outputKinds: DirectoryKind[] = ["json", "document"];
+
+// 单独保存 Key 成功后显示本机保存回执。
+async function saveApiKey(): Promise<void> {
+  if (await actions.saveApiKey()) ElMessage.success(t("keySaved"));
+}
 
 // 将后端字段别名映射到当前页面的可访问输入区域。
 function invalid(field: string): boolean {
@@ -222,7 +227,7 @@ onMounted(actions.start);
               <ElSwitch id="use-api-key" :model-value="form.useApiKey" :disabled="!available.changeAuth" :aria-label="t('useKey')" @update:model-value="actions.setAuthMode($event === true)" />
             </div>
             <div v-if="form.useApiKey" class="expanded-option">
-              <KeyDisplay ref="keyDisplay" :loading="model.auth.status === 'loading'" :disabled="!available.changeAuth || model.auth.status === 'loading'" :t="t" @changed="actions.keyChanged" />
+              <KeyDisplay ref="keyDisplay" :status="model.auth.status" :disabled="!available.changeAuth" :t="t" @changed="actions.keyChanged" @save="saveApiKey" />
               <p class="helper">{{ t('keySaveHelp') }}</p>
             </div>
             <p v-if="invalid('auth_mode')" class="field-error">{{ error?.message }}</p>
