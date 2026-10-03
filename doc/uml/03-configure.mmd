@@ -9,7 +9,7 @@ participant P as DirectoryPicker对象
 participant R as Runtime对象
 participant I as inputs（函数模块）
 participant F as 本机文件
-Note over U,C: 新转写先打开页面，录音在网页中选择<br/>工作目录复用会话约定或当前任务目录
+Note over U,C: 新转写先打开页面<br/>录音在网页中选择<br/>工作目录复用会话约定<br/>或当前任务目录
 C->>H: Skill/scripts/asr.py --workspace 用户目录 serve<br/>宿主有浏览器工具时传--no-browser
 H->>S: 创建本次Session
 opt 使用系统浏览器
@@ -22,12 +22,12 @@ opt 使用宿主浏览器工具
     C->>B: 用回执中的完整URL打开页面
 end
 B->>W: 加载页面和静态资源
-Note over U,C: 按回执报告启动或打开请求结果，立即让用户操作<br/>正常路径不依赖computer-use或页面自动检查<br/>打开报错或用户反馈异常时再排查同一服务
+Note over U,C: 按回执报告启动或打开请求结果<br/>立即让用户操作<br/>正常路径不依赖computer-use<br/>或页面自动检查<br/>打开报错或用户反馈异常时<br/>再排查同一服务
 Note over C,H: Codex保留serve会话并结束当前回复<br/>页面提示保存后发送“继续”<br/>收到后读取原会话的configured回执
 Note over W,H: App.vue与Element Plus呈现界面<br/>useTranscription编排，model处理纯状态，api发送HTTP<br/>令牌保留在接口闭包；请求携带Accept-Language
 W->>H: actions.start()经api.ts请求GET /api/session
 H->>S: description()
-S-->>H: 模型、限制、默认目录与已保存回执
+S-->>H: 模型、限制、语言代码列表、默认目录与已保存回执
 H-->>W: 当前会话描述
 opt 调整界面语言或主题
     U->>W: 选择中文/English或system/light/dark
@@ -52,7 +52,8 @@ U->>W: 设置语种、说话人与参考人数；热词及上下文
 opt 选择自定义保存位置
     W->>H: POST /api/select-directory
     H->>S: select_directory(kind, picker_id)
-    S->>P: select(initial, request_id)
+    S->>S: 起始位置不可用时使用当前工作目录
+    S->>P: select(initial, picker_id)复用页面请求编号
     P->>U: choose_directory函数打开原生窗口
     U-->>P: 选择目录或取消
     P-->>S: Path或None

@@ -10,7 +10,7 @@ Configured --> Preparing : transcribe明确授权、配置有效且execution不�
 Preparing --> Running : prepare_input完成 / 内存设置RUNNING与unknown
 Preparing --> Stopped : 准备失败或首次记录保存失败 / not_started
 Running --> Stopped : RUNNING保存失败或BL进程启动失败 / not_started
-Running --> Stopped : BL等待失败或该阶段本地异常 / unknown
+Running --> Stopped : BL执行失败或结果读取/校验失败 / unknown
 Running --> JsonReady : BL结束且结果结构与正文通过检查 / result_received
 JsonReady --> JsonReady : 成功记录已保存 / 附加delivery
 note right of Configured

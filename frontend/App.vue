@@ -69,11 +69,6 @@ function detailLabel(field?: string): string {
   return key ? t(key) : field ?? "";
 }
 
-// 切换页面语言后重新生成需要本地化的预览。
-function changeLanguage(): void {
-  actions.languageChanged();
-}
-
 onMounted(actions.start);
 </script>
 
@@ -87,7 +82,7 @@ onMounted(actions.start);
           <span>MemoFlow</span>
         </a>
         <div class="appearance-controls">
-          <ElSelect id="interface-language" v-model="language" :aria-label="t('language')" :disabled="!available.changeLanguage" @change="changeLanguage" class="language-select">
+          <ElSelect id="interface-language" v-model="language" :aria-label="t('language')" :disabled="!available.changeLanguage" @change="actions.languageChanged" class="language-select">
             <ElOption value="zh-CN" label="简体中文" /><ElOption value="en" label="English" />
           </ElSelect>
           <ElSelect id="theme" v-model="theme" :aria-label="t('theme')" class="theme-select">
@@ -152,7 +147,7 @@ onMounted(actions.start);
             <div id="language_hint" :class="{ 'needs-attention': invalid('language_hint') }" tabindex="-1">
               <ElFormItem :label="t('audioLanguage')" for="audio-language" :error="fieldMessage('language_hint')">
                 <ElSelect id="audio-language" v-model="form.language" :empty-values="[null, undefined]" filterable @change="actions.changed()">
-                  <ElOption value="" :label="t('automatic')" /><ElOption v-for="[code] in model.session.languages" :key="code" :value="code" :label="languageName(code, language)" />
+                  <ElOption value="" :label="t('automatic')" /><ElOption v-for="code in model.session.languages" :key="code" :value="code" :label="languageName(code, language)" />
                 </ElSelect>
               </ElFormItem>
             </div>

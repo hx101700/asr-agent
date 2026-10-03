@@ -18,6 +18,8 @@ The refreshed interface pairs blue accents with neutral surfaces and consistent 
 
 Model Studio Console login uses your system default browser. Codex does not open a separate authorization page.
 
+If a save location is missing or occupied by a file, the folder picker now opens from your working folder so you can choose another location. This update also simplifies data passed between the page and local service and removes unused compatibility code.
+
 ### Installation and file storage
 
 Install the Skill independently and keep recording tasks, credentials, and dependencies in your chosen workspace. Save locations stay outside the Skill's program directory, so you can manage the tools and transcript files separately.

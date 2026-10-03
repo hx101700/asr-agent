@@ -20,7 +20,7 @@ from ..utils.hotwords import MAX_XLSX_BYTES
 from ..utils.job_files import publish_config
 from .inputs import load_hotwords, validate_audio
 from .rules import (
-    AUDIO_SUFFIXES, ValidationError, validate_context, LANGUAGES, validate_options,
+    AUDIO_SUFFIXES, ValidationError, validate_context, LANGUAGE_CODES, validate_options,
     MAX_CONTEXT_CHARS, MIN_SPEAKERS, MAX_SPEAKERS, MAX_UPLOAD_BYTES,
     MAX_DURATION_SECONDS, MAX_HOTWORDS,
 )
@@ -98,19 +98,18 @@ class Session:
             kind = next(iter(self._pending_uploads))
             raise ValidationError("文件仍在添加，请稍候。", f"{kind}_upload_id")
 
-    def select_directory(self, kind: object, picker_id: object = None) -> dict[str, object]:
+    def select_directory(self, kind: object, picker_id: object) -> dict[str, object]:
         """打开原生目录窗口，校验并登记所选保存位置。"""
         if kind not in ("json", "document"):
             raise ValidationError("未知的保存位置。", "directory")
         kind = cast(str, kind)
-        request_id = picker_id if picker_id is not None else uuid.uuid4().hex
         with self._state_lock:
             self._require_editable()
             initial = self.output_directories.get(kind, self.runtime.output_root)
-        while not initial.exists():
-            initial = initial.parent
+        if not initial.is_dir():
+            initial = self.runtime.workspace
         try:
-            selected = self._picker.select(initial, request_id)
+            selected = self._picker.select(initial, picker_id)
         except SetupError as exc:
             raise ValidationError(str(exc), f"{kind}_directory") from exc
         if selected is None:
@@ -165,7 +164,7 @@ class Session:
             return {"model": MODEL, "region": "cn-beijing",
                     "output_defaults": {"json": str(self.runtime.output_root),
                                         "document": str(self.runtime.output_root)},
-                    "languages": LANGUAGES,
+                    "languages": LANGUAGE_CODES,
                     "audio_suffixes": sorted(AUDIO_SUFFIXES),
                     "limits": {"audio_bytes": MAX_LOCAL_AUDIO_BYTES, "hotwords_bytes": MAX_XLSX_BYTES,
                                "upload_bytes": MAX_UPLOAD_BYTES, "audio_seconds": MAX_DURATION_SECONDS,

@@ -15,7 +15,7 @@ export interface Receipt {
 }
 export interface SessionDescription {
   model: string; region: string; limits: Limits; audio_suffixes: string[];
-  languages: [string, string][]; output_defaults: Record<DirectoryKind, string>;
+  languages: string[]; output_defaults: Record<DirectoryKind, string>;
   confirmed: Receipt | null;
 }
 export interface Configuration {

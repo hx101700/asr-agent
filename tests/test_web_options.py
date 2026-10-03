@@ -48,7 +48,7 @@ class OptionsFixture(RuntimeTestCase):
     def select(self, session, kind, destination):
         """模拟原生目录选择并返回登记结果。"""
         with patch("asr_runtime.utils.directory_picker.choose_directory", return_value=destination) as picker:
-            result = session.select_directory(kind)
+            result = session.select_directory(kind, "test-picker")
         picker.assert_called_once()
         return result
 
@@ -79,6 +79,30 @@ class DirectoryOptionTests(OptionsFixture):
         self.assertEqual(list(self.selected.iterdir()), [])
         self.assertFalse(self.runtime.output_root.exists())
 
+    def test_unavailable_initial_location_falls_back_to_workspace(self):
+        """验证起始位置被文件占用或已删除时仍可打开窗口改选目录。"""
+        for kind, initial, make_file in (
+            ("json", self.runtime.output_root, True),
+            ("document", self.other, True),
+            ("document", self.temporary_root / "removed-folder", False),
+        ):
+            with self.subTest(initial=initial):
+                if initial.is_dir():
+                    initial.rmdir()
+                if make_file:
+                    initial.write_text("keep", encoding="utf-8")
+                if kind == "document":
+                    self.session.output_directories[kind] = initial
+                with patch("asr_runtime.utils.directory_picker.subprocess.Popen") as start:
+                    process = start.return_value
+                    process.returncode = process.poll.return_value = 0
+                    process.communicate.return_value = (json.dumps({"path": str(self.selected)}), "")
+                    result = self.session.select_directory(kind, "choose-output")
+                self.assertEqual(result["path"], str(self.selected))
+                self.assertEqual(start.call_args.args[0][5], str(self.runtime.workspace))
+                if make_file:
+                    self.assertEqual(initial.read_text(encoding="utf-8"), "keep")
+
     def test_browser_cannot_register_external_directory_by_submitting_path(self):
         """验证外部保存位置必须来自原生目录登记。"""
         with self.assertRaises(ValidationError):
@@ -94,7 +118,7 @@ class DirectoryOptionTests(OptionsFixture):
                      patch("asr_runtime.utils.directory_picker.choose_directory", return_value=selected), \
                      patch("asr_runtime.application.session.tempfile.TemporaryFile") as probe:
                     with self.assertRaisesRegex(ValidationError, "Skill安装目录") as caught:
-                        self.session.select_directory(kind)
+                        self.session.select_directory(kind, "test-picker")
                     self.assertEqual(caught.exception.field, f"{kind}_directory")
                     probe.assert_not_called()
         self.assertEqual(self.session.output_directories, {})
@@ -256,7 +280,7 @@ class ProtectedOptionsEndpointTests(OptionsFixture):
         """验证目录接口使用原生选择且忽略客户端路径。"""
         with patch("asr_runtime.utils.directory_picker.choose_directory", return_value=self.selected) as picker:
             status, _, body = self.request("POST", "/api/select-directory", {
-                "kind": "document", "path": str(self.other),
+                "kind": "document", "picker_id": "select-document", "path": str(self.other),
             })
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(body)["path"], str(self.selected))
@@ -276,6 +300,13 @@ class ProtectedOptionsEndpointTests(OptionsFixture):
                     self.assertEqual(self.request("POST", route, origin="https://example.invalid")[0], 403)
         picker.assert_not_called()
         read_key.assert_not_called()
+
+    def test_directory_request_requires_page_request_id(self):
+        """验证缺少页面请求编号时拒绝打开不可关联取消操作的窗口。"""
+        with patch("asr_runtime.utils.directory_picker.choose_directory") as picker:
+            status, _, _ = self.request("POST", "/api/select-directory", {"kind": "json"})
+        self.assertEqual(status, 422)
+        picker.assert_not_called()
 
     def test_key_is_returned_only_by_dedicated_post_and_never_saved(self):
         """验证专用POST显示Key并保持配置与凭据分离。"""

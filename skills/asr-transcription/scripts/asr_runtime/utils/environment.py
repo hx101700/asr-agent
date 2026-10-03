@@ -154,7 +154,7 @@ def npm_entry(node: Path) -> Path:
 
 
 def run_process(
-    runtime: Runtime, argv: list[str], timeout: float | None = 60, *, isolated_config: bool = False,
+    runtime: Runtime, argv: list[str], timeout: float = 60, *, isolated_config: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     """在工作区执行本机命令，返回捕获的进程输出。"""
     try:
@@ -172,7 +172,6 @@ def run_process(
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
         )
     except subprocess.TimeoutExpired as exc:
-        # 安装等待另行传入None；短超时用于本机环境检查。
         raise SetupError("子进程等待超时，已停止，未自动重试。") from exc
     except OSError as exc:
         raise SetupError(f"无法启动子进程：{type(exc).__name__}") from exc

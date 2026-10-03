@@ -18,7 +18,7 @@ python -S -X utf8 $scriptPath --workspace $workspaceDir bootstrap
 $pythonPath = Join-Path $workspaceDir '.asr-transcription/.venv/Scripts/python.exe'
 ```
 
-bootstrap从Skill中的Python/npm依赖锁安装到工作目录的`.asr-transcription`，回执提供安装状态及`key_file`。已有可用环境直接复用，已有Key文件保留。安装进度持续输出到stderr并同步写入本机日志；stdout输出最终JSON。正常下载没有总耗时上限，等待同一次进程结束。
+bootstrap从Skill中的Python/npm依赖锁安装到工作目录的`.asr-transcription`，完成依赖检查后返回安装状态及`key_file`。成功后即可使用环境；doctor用于故障诊断。已有可用环境直接复用，已有Key文件保留。安装进度持续输出到stderr并同步写入本机日志；stdout输出最终JSON。正常下载没有总耗时上限，等待同一次进程结束。
 
 需要下载Python依赖时，先比较官方PyPI和阿里云镜像的文件前缀速度，优先使用较快来源，并准备锁定的pip 26.2.1。pip自行恢复中断下载，单个业务依赖最多恢复5次；该来源最终失败后，自动尝试另一个来源一次。已完整下载的wheel保存在`.asr-transcription/.runtime/wheels`供后续安装复用，换源不跨进程续接未完成的文件。两个来源都失败时停止并保留`python-install.log`，不要在Codex中额外循环重跑或改动摘要。
 
@@ -46,7 +46,7 @@ Python依赖从HTTPS PyPI或阿里云镜像下载并校验摘要，然后从本�
 
 用户在系统默认浏览器完成官方授权，Codex不另开授权页，也不通过computer-use验证页面。BL 2.1.0在Windows打开链接时存在参数引用问题：若输出完整备用链接，工具会把它交给同一系统浏览器，使用最后打开的完整链接页面。原login进程持续等待回调并保存凭据，Codex可结束当前回复并提示用户操作完成后发送“继续”。登录链接只用于打开页面，不贴入聊天或另存日志。
 
-`WAITING_FOR_LOGIN`是启动提示。收到“继续”后读取原login会话的结果，以最终回执的`configured=true`判断模型凭据已保存；已有凭据状态不明时调用`console-status`。成功与否由BL结果判断，不另问用户是否成功。登录15分钟超时、失败或`configured=false`时说明结果并停止，不重复发起授权。
+`WAITING_FOR_LOGIN`是启动提示。收到“继续”后读取原login会话的最终回执；其中已经包含BL状态查询结果，以`configured=true`判断模型凭据存在。登录15分钟超时、失败或`configured=false`时说明结果并停止，不重复发起授权。
 
 复用的是当前工作目录 `.asr-transcription/.state/bailian` 中的 BL 模型凭据。其他目录或系统级 BL 登录不代表这个工作目录已经配置。状态不明时运行`console-status`：`configured=true`表示模型 Key 存在；只有`console_configured=true`而`configured=false`时，先处理缺少模型凭据的提示。该命令只查询本机配置，云端鉴权由实际 BL 调用完成。账号准备见[阿里云官方指引](https://help.aliyun.com/zh/model-studio/first-api-call-to-qwen)。
 
@@ -73,7 +73,7 @@ Python依赖从HTTPS PyPI或阿里云镜像下载并校验摘要，然后从本�
 1. 添加一个音频文件。
 2. 选择语言、说话人区分和参考人数。说话人区分初始开启；多声道会提示生成单声道FLAC副本，原文件保留。
 3. 开启“添加热词”后，在“热词表”旁点击带下载图标的“下载模板”，取得Excel词表，填写并导入；需要上下文时填写含相关词语的参考文本。热词与上下文可同时使用。
-4. 通过原生目录窗口选择JSON和文档保存位置，默认是工作目录的`transcriptions`。取消窗口保留原位置。
+4. 通过原生目录窗口选择JSON和文档保存位置，默认是工作目录的`transcriptions`。起始位置不可用时窗口从当前工作目录打开；取消窗口保留原位置。
 5. 检查并预览，核对后保存设置，再由Codex按本次上传授权开始转写。
 
 文件添加和设置保存都在本机完成。保存后的热词来自已确认的词典快照；修改Excel后须重新导入确认。没有保存的编辑在刷新后不会恢复。
@@ -102,7 +102,7 @@ $jobId = '替换为网页保存回执中的编号'
 & $pythonPath -X utf8 $scriptPath --workspace $workspaceDir transcribe --job $jobId --authorize-upload
 ```
 
-用户自行使用终端时，保留serve终端，在另一个终端执行转写。BL完成临时上传、提交、轮询及原始结果保存，Python生成三种文档。失败或结果未知时停止，不自动重传。
+用户自行使用终端时，保留serve终端，在另一个终端执行转写。一次transcribe内由BL完成临时上传、提交、轮询及原始结果保存，Python随后生成三种文档；成功后直接交付，export仅用于明确要求的重导。失败或结果未知时停止，不自动重传。
 
 文件保存在已选择根目录的`JOB_ID/json/transcription.json`及`JOB_ID/documents/transcription.{docx,xlsx,md}`。三种文档保留原文、时间戳和启用时的说话人编号，标题为“源文件名 录音转写”。Excel/Word使用等线字体，具体排版由生成工具提供。
 

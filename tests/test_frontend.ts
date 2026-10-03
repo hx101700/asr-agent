@@ -9,7 +9,7 @@ import type { Api, Configuration, Endpoints, Language, Limits, Model, Receipt, S
 const limits: Limits = { audio_bytes: 2_000_000_000, hotwords_bytes: 5_000_000, upload_bytes: 1_000_000_000,
   audio_seconds: 43200, hotwords_count: 2000, context_chars: 400, speaker_min: 2, speaker_max: 100 };
 const description: SessionDescription = { model: "fixed-model", region: "cn-beijing", limits,
-  audio_suffixes: [".wav"], languages: [["zh", "中文"]], output_defaults: { json: "D:/example", document: "D:/example" }, confirmed: null };
+  audio_suffixes: [".wav"], languages: ["zh"], output_defaults: { json: "D:/example", document: "D:/example" }, confirmed: null };
 const audio = new File(["synthetic audio"], "sample.wav");
 const words = new File(["synthetic spreadsheet"], "words.xlsx");
 const receipt: Receipt = { job_id: "job", config_path: "fixture/config.json", json_directory: "fixture/json",

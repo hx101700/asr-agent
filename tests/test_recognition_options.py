@@ -1,6 +1,6 @@
 import unittest
 
-from asr_runtime.application.rules import LANGUAGES, validate_options
+from asr_runtime.application.rules import LANGUAGE_CODES, validate_options
 from asr_runtime.application.rules import ValidationError
 
 
@@ -16,7 +16,7 @@ class RecognitionOptionsTests(unittest.TestCase):
 
     def test_each_documented_language_yields_one_cli_compatible_hint(self):
         """验证每种支持语言生成单值CLI提示。"""
-        for code, _ in LANGUAGES:
+        for code in LANGUAGE_CODES:
             with self.subTest(language=code):
                 self.assertEqual(validate_options({"language_hint": code}, True), {
                     "language_hints": [code], "speaker_count": None,

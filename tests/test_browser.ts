@@ -79,6 +79,8 @@ test("Edge页面完成双语、主题、输入校验、Key保存及配置确认"
     assert.equal(await page.locator('#audio_upload_id').evaluate(element => element.contains(document.activeElement)), true);
     await page.locator('#audio_upload_id input[type=file]').setInputFiles(path.join(root, 'fixtures/sample.wav'));
     await page.locator('#audio_upload_id').getByText('Added', { exact: true }).waitFor();
+    await page.locator('#language_hint .el-select').click();
+    await page.getByRole('option', { name: 'English', exact: true }).click();
     await page.locator('label[for="use-api-key"]').click();
     await page.locator('#api-key-value').fill('fixture-ui-key-not-real');
     await page.getByRole('button', { name: 'Check and preview', exact: true }).click();
@@ -127,9 +129,10 @@ test("Edge页面完成双语、主题、输入校验、Key保存及配置确认"
     assert.equal(files.length, 1);
     const configuration = await fs.readFile(path.join(root, '.asr-transcription/.state/jobs', files[0], 'config.json'), 'utf8');
     assert.equal(configuration.includes('fixture-ui-key-not-real'), false);
-    const config = JSON.parse(configuration) as { execution_authorized: boolean; enhancement: { context: string } };
+    const config = JSON.parse(configuration) as { execution_authorized: boolean; enhancement: { context: string }; recognition_options: { language_hints: string[] } };
     assert.equal(config.execution_authorized, false);
     assert.equal(config.enhancement.context, input);
+    assert.deepEqual(config.recognition_options.language_hints, ['en']);
     await page.reload();
     await page.locator('#receipt').waitFor();
     assert.equal(await page.locator('html').getAttribute('lang'), 'en');
