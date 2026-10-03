@@ -32,4 +32,4 @@ MemoFlow第一阶段由独立的`asr-transcription` Skill完成单个录音的�
 
 ## 交付状态
 
-代码、Skill指引与凭据修复说明已完成，鉴权图已同步重绘。候选ZIP包含43个Skill运行资源、284228字节，SHA-256为`b993414b7554f2183d62c15a2d94d40b74a045c9c6b1569b53aa3326da56c22c`，清单和源码比对通过，待远端核对。继续更新同一[v0.1.0预览](https://github.com/hx101700/memoflow/releases/tag/v0.1.0)，不新增版本或合并master。
+实现提交`8da34db`已推送dev，同一[v0.1.0预览](https://github.com/hx101700/memoflow/releases/tag/v0.1.0)已更新，master保持不变。公开ZIP包含43个Skill运行资源、284228字节，SHA-256为`b993414b7554f2183d62c15a2d94d40b74a045c9c6b1569b53aa3326da56c22c`。清单、源码比对和匿名公开下载逐字节核对通过；远端保留一个Release、一个标签和一个ZIP附件。
