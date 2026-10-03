@@ -27,4 +27,6 @@ MemoFlow第一阶段由独立的asr-transcription Skill完成单录音网页配�
 
 代码、说明及两份受影响UML源稿与PNG已同步；其余8图协议未改变。11项最终打包测试通过，124个本地Markdown链接有效。
 
-ZIP含44文件、327657字节，SHA-256为`7b41e481560b3b5b7a6ea3f66652dc530ae2f2d37de16298fb02f924f94e0d36`；CRC、清单与源码逐文件字节核对通过。待同步dev及原v0.1.0预览，master与版本号保持不变。
+实现提交`ac8a3cc`已推送dev，原[v0.1.0预览](https://github.com/hx101700/memoflow/releases/tag/v0.1.0)的ZIP及双语说明同步完成。master与版本号保持不变。
+
+ZIP含44文件、327657字节，SHA-256为`7b41e481560b3b5b7a6ea3f66652dc530ae2f2d37de16298fb02f924f94e0d36`；CRC、清单与源码逐文件字节核对通过。匿名公开下载与本机包一致，135文件的远端源码树与实现提交一致；远端仍为一个Release、一个标签和一个ZIP附件。
